@@ -39,6 +39,10 @@ def boot():
             service = adb('shell','pm','path','android',required=False)
             if 'package:' in service.stdout:
                 return
+        if 'device offline' in ready.stderr:
+            # Emulator reboot can leave the old ADB transport offline even when
+            # the guest has restarted. Reconnect it rather than polling forever.
+            adb('reconnect', 'offline', required=False, timeout=15)
         time.sleep(3)
     raise RuntimeError('Adapted guest did not finish booting')
 

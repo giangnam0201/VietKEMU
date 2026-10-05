@@ -66,6 +66,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Test the actual ported karaoke stack
+        timeout-minutes: 12
         uses: ReactiveCircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc
         with:
           api-level: 30
@@ -75,10 +76,9 @@ jobs:
           disk-size: 4G
           emulator-boot-timeout: 300
           pre-emulator-launch-script: python tools/configure_displays.py
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -writable-system
+          emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -writable-system -show-kernel -logcat '*:W'
           script: |
-            python tools/provision_runtime.py artifacts/runtime/bridge
-            python tools/probe_port.py
+            python tools/run_port_probe.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
