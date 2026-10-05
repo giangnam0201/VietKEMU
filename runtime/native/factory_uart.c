@@ -82,6 +82,10 @@ JNIEXPORT jint JNICALL Java_com_example_jni_Serial_serialSetParam(JNIEnv *env, j
     }
     if (stops != 1 && stops != 2) return -EINVAL;
     if (stops == 2) options.c_cflag |= CSTOPB;
+    /* Original call sites pass ASCII 'n' (110), rather than enum zero. */
+    if (parity == 'n' || parity == 'N') parity = 0;
+    if (parity == 'o' || parity == 'O') parity = 1;
+    if (parity == 'e' || parity == 'E') parity = 2;
     if (parity < 0 || parity > 2) return -EINVAL;
     if (parity) options.c_cflag |= PARENB;
     if (parity == 1) options.c_cflag |= PARODD;
