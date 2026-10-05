@@ -18,6 +18,8 @@ def run(*args):
 
 
 def raw_image(path):
+    subprocess.run(['file', str(path)], check=False)
+    subprocess.run(['fdisk', '-l', str(path)], check=False)
     with path.open('rb') as source:
         sparse = source.read(4) == struct.pack('<I', 0xed26ff3a)
     if sparse:
