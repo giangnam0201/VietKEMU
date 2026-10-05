@@ -90,6 +90,21 @@ The original-app files and signatures were preserved in this experiment. A
 separate optional experiment provisions the original VDK into a writable cloud
 guest. That is a userspace compatibility test, not a Realtek board emulator.
 
+The [first VDK provisioning experiment](https://github.com/giangnam0201/VietKEMU/actions/runs/37327866205)
+failed to reconnect to its cloud guest after disabling verity and rebooting,
+before copying the framework. It therefore did not test the provisioned VDK
+and must not be interpreted as evidence that VDK provisioning cannot work.
+The optional provisioning script remains experimental.
+
+## Delivery status
+
+There is no working Windows emulator executable, original firmware boot,
+validated song playback or working panel/TV window pair in this repository.
+The implemented deliverables are firmware extraction, original resource/API
+inspection and reproducible cloud compatibility experiments. They establish
+the starting point and blockers for a custom runtime; they do not fulfill the
+requested 1:1 emulator yet.
+
 ## Requirements for an original-firmware runtime
 
 1. A guest environment that supports the original ARM application code,
