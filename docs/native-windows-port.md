@@ -30,6 +30,13 @@ the host handles the Home request only. Queue count is still the initial zero.
 `FragmentHistory` translates the original history and back rules, including
 clearing history on Home and disabled online-service fallback.
 
+The `MoreFragment` screen is translated from `layout_more_fragment.xml`,
+including the relative positions of all nine tiles, Vietnamese labels, original
+artwork and the Back button's gradient/layer drawable. The component host
+connects Home -> More -> Back/Home. More's feature actions (password guards,
+room/QR services, catalogue management and the individual destination screens)
+remain pending; their presence is not a claim that those features work.
+
 The host does not yet include the top bar, complete screen navigation,
 Phantom video, television UI, activation, playback or server operations.
 
