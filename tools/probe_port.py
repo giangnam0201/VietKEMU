@@ -30,6 +30,16 @@ if pulled.returncode == 0:
             matches.append(cert.name)
     (output / 'guest-key-matches.json').write_text(json.dumps(matches))
     framework.unlink()
+    if not matches:
+        raise RuntimeError('Guest certificate has no matching public development key; original system identity cannot be retained')
+    selected = matches[0].removesuffix('.x509.pem')
+    for apk in Path('artifacts/port/apks').glob('*.apk'):
+        signed = apk.with_suffix('.resigned')
+        subprocess.run([str(signer),'sign','--key',f'keys/{selected}.pk8','--cert',f'keys/{selected}.x509.pem','--out',str(signed),str(apk)],check=True)
+        os.replace(signed,apk)
+        subprocess.run([str(signer),'verify',str(apk)],check=True)
+else:
+    raise RuntimeError('Cannot identify the guest platform certificate')
 (output / 'report.json').write_text(json.dumps(report), encoding='utf-8')
 adb('shell', 'settings', 'put', 'global', 'hidden_api_policy', '1')
 adb('shell', 'settings', 'put', 'global', 'hidden_api_policy_pre_p_apps', '1')

@@ -30,6 +30,16 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" 'build-tools;35.0.0' 'ndk;27.2.12479018'
+      - name: Prepare Android development runtime with ARM translation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          "$SDKMANAGER" 'system-images;android-30;google_apis;x86_64'
+          sudo python tools/prepare_runtime_image.py extract --image "$ANDROID_HOME/system-images/android-30/google_apis/x86_64/system.img" --work artifacts/runtime
+          "$SDKMANAGER" --uninstall 'system-images;android-30;google_apis;x86_64'
+          "$SDKMANAGER" 'system-images;android-30;default;x86_64'
+          sudo python tools/prepare_runtime_image.py provision --image "$ANDROID_HOME/system-images/android-30/default/x86_64/system.img" --work artifacts/runtime
       - name: Compile portable vendor JNI adapter
         run: |
           mkdir -p artifacts/port
@@ -37,7 +47,7 @@ jobs:
           "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang" -shared -fPIC -Wall -Wextra -Werror -Wno-unused-parameter runtime/native/factory_uart.c -o artifacts/port/libfactoryuart.so
       - name: Port copies with original UI and application DEX preserved
         run: |
-          python tools/port_apks.py --ordinary --root firmware --vdk firmware/system/framework/vdk.jar --native artifacts/port/libvdk.so --serial artifacts/port/libfactoryuart.so --output artifacts/port/apks --key keys/platform.pk8 --certificate keys/platform.x509.pem --signer "$ANDROID_HOME/build-tools/35.0.0/apksigner" --aligner "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          python tools/port_apks.py --root firmware --vdk firmware/system/framework/vdk.jar --native artifacts/port/libvdk.so --serial artifacts/port/libfactoryuart.so --output artifacts/port/apks --key keys/platform.pk8 --certificate keys/platform.x509.pem --signer "$ANDROID_HOME/build-tools/35.0.0/apksigner" --aligner "$ANDROID_HOME/build-tools/35.0.0/zipalign"
       - uses: actions/upload-artifact@v4
         with:
           name: ported-apk-prototype
@@ -57,7 +67,7 @@ jobs:
         with:
           api-level: 30
           arch: x86_64
-          target: google_apis
+          target: default
           ram-size: 2048M
           emulator-boot-timeout: 300
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
@@ -67,4 +77,10 @@ jobs:
         with:
           name: apk-port-runtime-evidence
           path: artifacts/port-runtime/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: runtime-adapted-original-apps
+          path: artifacts/port/apks/
           retention-days: 7
