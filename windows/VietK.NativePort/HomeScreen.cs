@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -49,7 +50,8 @@ public sealed class HomeScreen(string root, HomeContract contract)
     }
 
     public Grid Tile(string image, string text, double width, int fragment,
-        double? height = null, double? textBottom = null)
+        double? height = null, double? textBottom = null, double textPadding = 0,
+        bool multilingual = false, bool singleLine = false)
     {
         var tile = new Grid
         {
@@ -57,9 +59,25 @@ public sealed class HomeScreen(string root, HomeContract contract)
             Background = new ImageBrush(Image(image)) { Stretch = Stretch.Fill },
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1)
         };
+        var size = contract.TextSize;
+        var available = width - 2 * textPadding;
+        if (multilingual)
+        {
+            var measured = new FormattedText(text, CultureInfo.GetCultureInfo("vi-VN"), FlowDirection.LeftToRight,
+                new Typeface("sans-serif"), size, Brushes.White, 1);
+            if (measured.Width > available)
+            {
+                // Preserve MultiLanguageTextView.refitTextForSingleLine's
+                // actual Paint.getTextWidths return value (character count).
+                // The original loop normally reduces one pixel, then clips.
+                do { size--; } while (text.Length > available && size >= 13);
+            }
+        }
         tile.Children.Add(new TextBlock
         {
-            Text = text, Foreground = Brushes.White, FontSize = contract.TextSize,
+            Text = text, Foreground = Brushes.White, FontSize = size,
+            MaxWidth = available, ClipToBounds = true, TextAlignment = TextAlignment.Center,
+            TextWrapping = singleLine ? TextWrapping.NoWrap : TextWrapping.Wrap,
             FontFamily = new FontFamily("sans-serif"), HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, textBottom ?? contract.TextBottom)
         });

@@ -115,7 +115,10 @@ def package_more(app, destination, entries, strings, values):
         assets.add(image)
         tile = {'id': identity, 'image': image, 'text': strings[label.get(android+'text').split('/')[-1]],
             'x': x, 'y': y, 'width': width, 'height': height,
-            'textBottom': number(label.get(android+'layout_marginBottom'))}
+            'textBottom': number(label.get(android+'layout_marginBottom')),
+            'textPadding': number(label.get(android+'paddingLeft', '0px')),
+            'multilingual': label.tag.endswith('MultiLanguageTextView'),
+            'singleLine': label.get(android+'singleLine') == 'true'}
         tiles.append(tile); positions[identity] = tile
     for name in assets:
         resource = app / 'apktool/res/drawable-mdpi' / name

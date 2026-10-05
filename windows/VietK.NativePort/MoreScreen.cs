@@ -8,7 +8,7 @@ using System.Windows.Media.Animation;
 namespace VietK.NativePort;
 
 public sealed record MoreTile(string Id, string Image, string Text, double X, double Y,
-    double Width, double Height, double TextBottom);
+    double Width, double Height, double TextBottom, double TextPadding, bool Multilingual, bool SingleLine);
 public sealed record MoreContract(MoreTile[] Tiles, double BackX, double BackY, double BackWidth, double BackHeight,
     double BackCorner, string BackStartColor, string BackEndColor);
 
@@ -28,7 +28,8 @@ public sealed class MoreScreen(string root, MoreContract contract, HomeContract 
         var tileFactory = new HomeScreen(root, home);
         foreach (var data in contract.Tiles)
         {
-            var tile = tileFactory.Tile(data.Image, data.Text, data.Width, -1, data.Height, data.TextBottom);
+            var tile = tileFactory.Tile(data.Image, data.Text, data.Width, -1, data.Height, data.TextBottom,
+                data.TextPadding, data.Multilingual, data.SingleLine);
             Canvas.SetLeft(tile, data.X); Canvas.SetTop(tile, data.Y); canvas.Children.Add(tile);
         }
         var back = new Border
