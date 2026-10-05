@@ -42,10 +42,15 @@ def package(decoded, destination):
         original = resources / 'drawable-mdpi' / name
         relative = original.relative_to(app / 'apktool').as_posix()
         digest = hashlib.sha256(original.read_bytes()).hexdigest()
-        if entries[relative]['sha256'] != digest:
-            raise RuntimeError('Decoded resource differs from original APK: ' + relative)
+        # Apktool normalizes qualifier paths (e.g. drawable-mdpi-v4 -> mdpi).
+        # Match the actual original entry by name AND bytes, never by a guessed
+        # normalized folder or an unchecked fallback copy.
+        matches = [entry for entry in entries.values()
+                   if Path(entry['path']).name == name and entry['sha256'] == digest]
+        if len(matches) != 1:
+            raise RuntimeError('Cannot map decoded resource to exactly one original APK entry: ' + relative)
         shutil.copy2(original, destination / name)
-        provenance.append({'resource': relative, 'sha256': digest})
+        provenance.append({'resource': matches[0]['path'], 'decoded_resource': relative, 'sha256': digest})
     contract = {
         'tiles': [{'tag': tag, 'image': image+'.png', 'text': strings.get(label, label), 'fragment': fragment}
                   for tag,image,label,fragment in specs],
