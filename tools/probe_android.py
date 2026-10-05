@@ -13,7 +13,8 @@ from pathlib import Path
 def adb(*args, binary=False, timeout=30):
     command = ['adb', *args]
     try:
-        return subprocess.run(command, capture_output=True, text=not binary, timeout=timeout)
+        return subprocess.run(command, capture_output=True, text=not binary, timeout=timeout,
+                              encoding=None if binary else 'utf-8', errors=None if binary else 'replace')
     except subprocess.TimeoutExpired as error:
         stdout = error.stdout or b''
         if not binary and isinstance(stdout, bytes):
