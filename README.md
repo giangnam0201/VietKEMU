@@ -4,7 +4,7 @@ Research workspace for the supplied `KTV-Plus_All_V1.7_RC1_update_20230118.zip`.
 The target is a Windows runtime with separate touch-panel and television-output
 windows, using the original firmware applications wherever possible.
 
-**Status: firmware investigation, not a working emulator.** No device boot or
+**Status: original APK compatibility port in development, not a working emulator.** No device boot or
 1:1 compatibility has been demonstrated. An interface replica would not establish
 firmware compatibility.
 
@@ -48,6 +48,15 @@ The completed stock Android experiment rejected the main karaoke/control/TV
 applications because their original certificates do not match the guest's
 system identity. Other components require the missing original vendor SDK.
 Only helper activities launched; karaoke operation is unverified.
+
+`port.yml` builds compatibility copies with the original resources and application
+DEX preserved byte for byte. It bundles the original vendor Java SDK, compiles a
+portable JNI startup adapter, and signs the copies for a development Android
+guest. It then installs and launches the stack on GitHub and records screenshots
+and crash logs. The adapter currently reports unsupported audio/display hardware
+operations; it does not yet implement playback, recording, or two Windows windows.
+Original activation logic is retained. Song servers and licensed media availability
+have not been verified. `port-research.yml` inspects the dependencies in the cloud.
 
 The small OTA reconstruction tests can run locally without extracting firmware:
 

@@ -1,0 +1,45 @@
+name: APK port dependency inspection
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original apps and Java inspection tool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 37324921816 -n firmware-applications -D firmware
+          gh release download v1.5.6 --repo skylot/jadx --pattern 'jadx-1.5.6.zip' --dir incoming
+          unzip -q incoming/jadx-1.5.6.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Inspect startup, playback, display, and service APIs
+        run: |
+          mkdir -p evidence
+          python tools/inventory_hosts.py firmware/vendor/app --output evidence/endpoint-hosts.json
+          for name in dualkmbox cbb; do
+            jadx/bin/jadx --no-res --show-bad-code -j 2 -d "research/$name" "firmware/vendor/app/$name/$name.apk" || test -d "research/$name/sources"
+          done
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          names = {'Serial','BaseApplication','DCBaseApplication','CbbInitManager','DeviceInfoUtils','PlatformInfoManager','MicroServiceUtil','MicroSeverStartLinkManager','DCServiceManager','DCHelper','CbbHelper','WholeDAOHelper','WholedbDownloadManager','TvManager','CbbShip','NativeCbb','HDPlayer','StorageManager'}
+          for root in Path('research').iterdir():
+              sources = root / 'sources'
+              for source in sources.rglob('*.java'):
+                  if source.stem in names or root.name == 'cbb':
+                      target = Path('evidence') / root.name / source.relative_to(sources)
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copyfile(source, target)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apk-port-dependency-evidence
+          path: evidence/
+          retention-days: 7
