@@ -1,0 +1,46 @@
+name: Collect original Windows port sources
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve completed full decoding
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 37386126110 -n original-apk-full-decode -D decoded
+      - name: Collect application source and original resource package
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          root = Path('decoded')
+          target = Path('source-review')
+          target.mkdir()
+          shutil.copy2(root / 'decode-summary.json', target)
+          for app in root.iterdir():
+              if not app.is_dir(): continue
+              for name in ('port-index.json', 'jadx.log', 'apktool.log'):
+                  if (app / name).exists():
+                      dest = target / app.name / name
+                      dest.parent.mkdir(parents=True, exist_ok=True)
+                      shutil.copy2(app / name, dest)
+              sources = app / 'java/sources'
+              for source in sources.rglob('*.java'):
+                  relative = source.relative_to(sources)
+                  if relative.parts[:2] not in (('com','evideo'), ('com','evideostb'), ('com','example')):
+                      continue
+                  dest = target / app.name / relative
+                  dest.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, dest)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-port-source-review
+          path: source-review/
+          retention-days: 7
