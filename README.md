@@ -8,6 +8,9 @@ windows, using the original firmware applications wherever possible.
 1:1 compatibility has been demonstrated. An interface replica would not establish
 firmware compatibility.
 
+See [firmware findings](docs/firmware-findings.md) for the original application
+stack, catalogue inventory and the vendor interfaces that must be reproduced.
+
 ## Confirmed from the supplied archive
 
 - Android 6.0.1, device `KTV-Plus`, eVideo build
@@ -35,6 +38,16 @@ The workflow reconstructs the system filesystem, extracts system/vendor files,
 inventories applications and native libraries, decodes karaoke resources and
 records hardware dependencies. Extracted proprietary files remain in private
 artifacts with limited retention.
+
+`runtime-research.yml` inspects the original VDK Java APIs and native dependencies
+on GitHub. `compatibility.yml` tests installation and launch on a stock Android
+guest with ARM translation, saving screenshots and diagnostics. A successful
+workflow means the experiment ran; it does not certify application compatibility.
+
+The completed stock Android experiment rejected the main karaoke/control/TV
+applications because their original certificates do not match the guest's
+system identity. Other components require the missing original vendor SDK.
+Only helper activities launched; karaoke operation is unverified.
 
 The small OTA reconstruction tests can run locally without extracting firmware:
 

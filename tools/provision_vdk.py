@@ -19,6 +19,7 @@ def command(*args):
 
 
 def boot():
+    time.sleep(3)
     command('wait-for-device')
     for attempt in range(90):
         if command('shell', 'getprop', 'sys.boot_completed').strip() == '1':
