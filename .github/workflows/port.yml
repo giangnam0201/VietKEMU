@@ -19,9 +19,11 @@ jobs:
           mkdir -p keys
           python - <<'PY'
           import subprocess, json, base64, pathlib
-          for name in ('platform.pk8', 'platform.x509.pem'):
-              result = subprocess.run(['gh','api',f'repos/aosp-mirror/platform_build/contents/target/product/security/{name}?ref=android-11.0.0_r48'],check=True,capture_output=True,text=True)
-              pathlib.Path('keys',name).write_bytes(base64.b64decode(json.loads(result.stdout)['content']))
+          for kind in ('platform', 'testkey', 'shared', 'media'):
+              for extension in ('pk8', 'x509.pem'):
+                  name = f'{kind}.{extension}'
+                  result = subprocess.run(['gh','api',f'repos/aosp-mirror/platform_build/contents/target/product/security/{name}?ref=android-11.0.0_r48'],check=True,capture_output=True,text=True)
+                  pathlib.Path('keys',name).write_bytes(base64.b64decode(json.loads(result.stdout)['content']))
           PY
       - name: Install build tools on GitHub
         run: |
@@ -35,7 +37,7 @@ jobs:
           "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang" -shared -fPIC -Wall -Wextra -Werror -Wno-unused-parameter runtime/native/factory_uart.c -o artifacts/port/libfactoryuart.so
       - name: Port copies with original UI and application DEX preserved
         run: |
-          python tools/port_apks.py --root firmware --vdk firmware/system/framework/vdk.jar --native artifacts/port/libvdk.so --serial artifacts/port/libfactoryuart.so --output artifacts/port/apks --key keys/platform.pk8 --certificate keys/platform.x509.pem --signer "$ANDROID_HOME/build-tools/35.0.0/apksigner" --aligner "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+          python tools/port_apks.py --ordinary --root firmware --vdk firmware/system/framework/vdk.jar --native artifacts/port/libvdk.so --serial artifacts/port/libfactoryuart.so --output artifacts/port/apks --key keys/platform.pk8 --certificate keys/platform.x509.pem --signer "$ANDROID_HOME/build-tools/35.0.0/apksigner" --aligner "$ANDROID_HOME/build-tools/35.0.0/zipalign"
       - uses: actions/upload-artifact@v4
         with:
           name: ported-apk-prototype

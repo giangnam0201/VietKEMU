@@ -1,5 +1,8 @@
 """Install the compatibility copies and observe their real startup behavior."""
 import json
+import os
+import re
+import subprocess
 import time
 from pathlib import Path
 from probe_android import adb, probe
@@ -11,6 +14,22 @@ mapping = {p['original']: p['ported'] for p in ported}
 report['apks'] = [dict(app, path=mapping[app['path']]) for app in report['apks'] if app['path'] in mapping]
 output = Path('artifacts/port-runtime')
 output.mkdir(parents=True, exist_ok=True)
+framework = output / 'guest-framework.apk'
+pulled = adb('pull', '/system/framework/framework-res.apk', str(framework), timeout=60)
+if pulled.returncode == 0:
+    signer = Path(os.environ['ANDROID_HOME']) / 'build-tools/35.0.0/apksigner'
+    certificate = subprocess.run([str(signer), 'verify', '--print-certs', str(framework)],
+                                 capture_output=True, text=True)
+    (output / 'guest-certificate.txt').write_text(certificate.stdout + certificate.stderr)
+    digest = re.search(r'certificate SHA-256 digest: ([0-9a-f]+)', certificate.stdout)
+    matches = []
+    for cert in Path('keys').glob('*.x509.pem'):
+        pem = subprocess.run(['openssl','x509','-in',str(cert),'-outform','DER'],capture_output=True,check=True)
+        import hashlib
+        if digest and hashlib.sha256(pem.stdout).hexdigest() == digest[1]:
+            matches.append(cert.name)
+    (output / 'guest-key-matches.json').write_text(json.dumps(matches))
+    framework.unlink()
 (output / 'report.json').write_text(json.dumps(report), encoding='utf-8')
 adb('shell', 'settings', 'put', 'global', 'hidden_api_policy', '1')
 adb('shell', 'settings', 'put', 'global', 'hidden_api_policy_pre_p_apps', '1')
