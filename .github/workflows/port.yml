@@ -1,6 +1,11 @@
 name: Original APK port
 on:
   workflow_dispatch:
+    inputs:
+      emulator-build:
+        description: 'Optional official emulator build ID for controlled runtime regression testing'
+        required: false
+        default: ''
 permissions:
   contents: read
   actions: read
@@ -72,6 +77,7 @@ jobs:
           api-level: 30
           arch: x86_64
           target: default
+          emulator-build: ${{ inputs.emulator-build }}
           ram-size: 2048M
           disk-size: 4G
           emulator-boot-timeout: 300
