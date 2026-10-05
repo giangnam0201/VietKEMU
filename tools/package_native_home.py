@@ -92,7 +92,7 @@ def package_more(app, destination, entries, strings, values):
     top = number(layout.get(android+'paddingTop'))
     tiles = []
     positions = {}
-    assets = {'icon_back_bg.png', 'icon_back.png'}
+    assets = {'icon_back.png'}
     for view in layout:
         if view.tag != 'FrameLayout': continue
         attrs = view.attrib
@@ -124,9 +124,12 @@ def package_more(app, destination, entries, strings, values):
             raise RuntimeError('Original More resource differs: ' + name)
         shutil.copy2(resource, destination / name)
     back = layout[-1]
+    colors = {entry.get('name'): entry.text for entry in ET.parse(app / 'apktool/res/values/colors.xml').getroot()}
     contract = {'tiles': tiles, 'backX': number(back.get(android+'layout_marginLeft')),
         'backY': top + number(back.get(android+'layout_marginTop')),
-        'backWidth': number('@dimen/icon_back_width'), 'backHeight': number('@dimen/icon_back_height')}
+        'backWidth': number('@dimen/icon_back_width'), 'backHeight': number('@dimen/icon_back_height'),
+        'backCorner': number('@dimen/icon_back_corner'),
+        'backStartColor': colors['bg_btn_ok_star'], 'backEndColor': colors['bg_btn_ok_end']}
     (destination / 'more.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
