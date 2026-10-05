@@ -49,6 +49,11 @@ def boot():
 
 def provision(source):
     adb('root'); adb('wait-for-device')
+    # This is the disposable AOSP guest, not the supplied VietK firmware.
+    # disable-verity only changes hashtree flags; after a warm emulator reboot,
+    # init rejects the changed vbmeta against the original kernel digest.
+    # The development guest must also disable verification before that reboot.
+    adb('shell', 'avbctl', 'disable-verification')
     verity = adb('disable-verity')
     if 'reboot' in verity.stdout.lower():
         adb('reboot'); boot(); adb('root'); adb('wait-for-device')
