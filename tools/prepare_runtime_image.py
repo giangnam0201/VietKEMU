@@ -30,6 +30,22 @@ def raw_image(path):
 
 def copy_bridge(image, work):
     raw_image(image)
+    layout = subprocess.run(['sfdisk', '--json', str(image)], capture_output=True, text=True)
+    if layout.returncode == 0:
+        table = json.loads(layout.stdout)['partitiontable']
+        (work / 'sdk-disk-layout.json').write_text(json.dumps(table, indent=2))
+        partition = max(table['partitions'], key=lambda p: p['size'])
+        sector = table.get('sectorsize', 512)
+        loop = subprocess.run(['losetup','--find','--show','--read-only','--offset',str(partition['start'] * sector),
+                               '--sizelimit',str(partition['size'] * sector),str(image)],check=True,capture_output=True,text=True).stdout.strip()
+        try:
+            run('python3', work / 'lpunpack.py', '-p', 'system,system_a', loop, work / 'logical')
+        finally:
+            run('losetup', '-d', loop)
+        choices = list((work / 'logical').glob('system*.img'))
+        if len(choices) != 1:
+            raise RuntimeError(f'Expected one SDK system logical partition, found {choices}')
+        image = choices[0]
     mount = (work / 'source-mount').resolve()
     mount.mkdir(parents=True, exist_ok=True)
     run('mount', '-o', 'loop,ro', image, mount)
@@ -50,6 +66,8 @@ def copy_bridge(image, work):
     finally:
         run('umount', mount)
     (work / 'bridge-files.json').write_text(json.dumps(found, indent=2))
+    if image.parent == work / 'logical':
+        image.unlink()
 
 
 def provision(image, work):

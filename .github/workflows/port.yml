@@ -31,15 +31,18 @@ jobs:
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" 'build-tools;35.0.0' 'ndk;27.2.12479018'
       - name: Prepare Android development runtime with ARM translation
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          mkdir -p artifacts/runtime
+          gh api repos/unix3dgforce/lpunpack/contents/lpunpack.py?ref=c59b8f3b069c5a8aa438a049fa4a091177172434 --jq .content | base64 -d > artifacts/runtime/lpunpack.py
           "$SDKMANAGER" 'system-images;android-30;google_apis;x86_64'
           sudo python tools/prepare_runtime_image.py extract --image "$ANDROID_HOME/system-images/android-30/google_apis/x86_64/system.img" --work artifacts/runtime
           "$SDKMANAGER" --uninstall 'system-images;android-30;google_apis;x86_64'
           "$SDKMANAGER" 'system-images;android-30;default;x86_64'
-          sudo python tools/prepare_runtime_image.py provision --image "$ANDROID_HOME/system-images/android-30/default/x86_64/system.img" --work artifacts/runtime
       - name: Compile portable vendor JNI adapter
         run: |
           mkdir -p artifacts/port
@@ -69,9 +72,13 @@ jobs:
           arch: x86_64
           target: default
           ram-size: 2048M
+          disk-size: 4G
           emulator-boot-timeout: 300
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: python tools/probe_port.py
+          pre-emulator-launch-script: python tools/configure_displays.py
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -writable-system
+          script: |
+            python tools/provision_runtime.py artifacts/runtime/bridge
+            python tools/probe_port.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
