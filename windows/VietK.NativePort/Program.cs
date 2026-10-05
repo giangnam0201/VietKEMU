@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using VietK.Core;
 
 namespace VietK.NativePort;
 
@@ -36,12 +37,20 @@ public static class Program
                 var expected = new[] { "singer", "app", "mixcloud", "youtube", "soudcloud", "more" };
                 if (!contract.Tiles.Select(t => t.Tag).SequenceEqual(expected))
                     throw new InvalidDataException("Original default home tile order changed");
+                using var catalogue = new WholeCatalogue(Path.Combine(root, "wholekmbox.db"));
+                var song = catalogue.GetSongById(101000);
+                if (song?.Name != "Mộng dưới hoa (sc)" || song.Spell != "MDH" || song.Singer != "Ái Vân,Thái Châu")
+                    throw new InvalidDataException("Native catalogue lookup differs from supplied firmware");
+                if (catalogue.GetSongById(-1) is not null || catalogue.IsOnline(-1))
+                    throw new InvalidDataException("Native catalogue fabricated a missing song");
                 File.WriteAllText(Path.Combine(args[1], "verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsRendering = true,
                     androidRuntimeUsed = false,
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,
+                    nativeCatalogueLookupVerified = true,
+                    originalSongCount = catalogue.GetCount(),
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"

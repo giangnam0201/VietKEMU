@@ -20,7 +20,22 @@ queue and persistence; television UI; actual playback and audio controls;
 original server/download protocol; remaining settings and peripheral features.
 The original activation and server authentication remain part of the behavior.
 
-No Windows screen or feature is currently verified. The firmware contains a song
+Implemented source translations: `HomeNewFragment`/`HomeNewAdapter` home body,
+original Vietnamese labels and drawables, default tile ordering, and the original
+0.9 scale/25 ms press animation. The Windows component host is a development
+artifact: it does not yet include the main top/bottom bars, screen navigation,
+Phantom video, television UI, activation, playback or server operations.
+
+`WholeCatalogue` translates read-only `WholeSongDAO` count, existence, ID lookup
+and remote-metadata checks. It reads the unchanged original database. An online
+metadata flag does not establish a live server or available song file.
+
+`native-windows.yml` checks original image hashes, compiles on Windows and renders
+the native home body to PNG. It also checks an actual Vietnamese catalogue entry
+and that missing entries are not fabricated. These checks do not establish full
+UI or feature fidelity.
+
+The firmware contains a song
 catalogue, not the complete song media collection. A port must report unavailable
 media and server failures truthfully. Decoding success does not establish 1:1
 fidelity or a working Windows release.

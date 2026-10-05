@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import shutil
+import sqlite3
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -63,6 +64,18 @@ def package(decoded, destination):
     }
     (destination / 'home.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
     (destination / 'asset-provenance.json').write_text(json.dumps(provenance, indent=2))
+    catalogue = app / 'apktool/assets/wholekmbox.jpg'
+    digest = hashlib.sha256(catalogue.read_bytes()).hexdigest()
+    if entries['assets/wholekmbox.jpg']['sha256'] != digest:
+        raise RuntimeError('Original catalogue bytes changed')
+    shutil.copy2(catalogue, destination / 'wholekmbox.db')
+    with sqlite3.connect(f'file:{catalogue}?mode=ro', uri=True) as database:
+        count = database.execute('SELECT count(*) FROM tblSong').fetchone()[0]
+    (destination / 'catalogue-provenance.json').write_text(json.dumps({
+        'original_asset': 'assets/wholekmbox.jpg', 'sha256': digest, 'songs': count,
+        'original_methods': 'WholeSongDAO.getCount/getSongById/isExist/isOnline/getCountHasRemote',
+        'media_availability': 'not established by catalogue metadata'
+    }, indent=2))
 
 
 if __name__ == '__main__':

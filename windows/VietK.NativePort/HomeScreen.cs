@@ -78,7 +78,10 @@ public sealed class HomeScreen(string root, HomeContract contract)
     private static void Scale(Grid tile, double value)
     {
         var transform = (ScaleTransform)tile.RenderTransform;
-        var animation = new DoubleAnimation(value, TimeSpan.FromMilliseconds(100));
+        // AnimCommonUtils.scaleXY uses 25 ms and Android's default
+        // AccelerateDecelerateInterpolator (cosine ease-in/ease-out).
+        var animation = new DoubleAnimation(value, TimeSpan.FromMilliseconds(25))
+        { EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } };
         transform.BeginAnimation(ScaleTransform.ScaleXProperty, animation);
         transform.BeginAnimation(ScaleTransform.ScaleYProperty, animation);
     }

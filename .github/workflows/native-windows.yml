@@ -40,6 +40,13 @@ jobs:
         run: |
           $process = Start-Process -FilePath artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Native rendering failed: $($process.ExitCode)" }
+      - name: Retain native failure diagnostics
+        if: failure()
+        run: |
+          New-Item -ItemType Directory -Force artifacts/native-verification | Out-Null
+          if (Test-Path "$env:TEMP/vietk-native-startup-error.txt") {
+            Copy-Item "$env:TEMP/vietk-native-startup-error.txt" artifacts/native-verification/
+          }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

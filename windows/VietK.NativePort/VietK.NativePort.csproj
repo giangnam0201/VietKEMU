@@ -9,6 +9,7 @@
     <StartupObject>VietK.NativePort.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\VietK.Core\VietK.Core.csproj" />
     <Content Include="Original\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
