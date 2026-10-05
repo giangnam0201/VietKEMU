@@ -4,8 +4,11 @@ The writable guest owns these platform settings; original karaoke app code,
 resources, device activation and server authentication remain untouched.
 """
 import argparse
+import json
+import re
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 OUTPUT = Path('artifacts/port-runtime')
@@ -47,6 +50,33 @@ def boot():
     raise RuntimeError('Adapted guest did not finish booting')
 
 
+def original_ui_warning_defaults():
+    # Android 6 did not show Android 11's deprecated-target-SDK dialogs. Use
+    # AppWarnings' actual persisted flag, leaving original APK target SDK intact.
+    # Format/flag: AOSP android-11.0.0_r48 AppWarnings.java.
+    existing = adb('shell', 'cat', '/data/system/packages-warnings.xml', required=False)
+    tree = ET.fromstring(existing.stdout) if existing.returncode == 0 else ET.Element('packages')
+    by_name = {entry.get('name'): entry for entry in tree.findall('package')}
+    originals = json.loads(Path('firmware/report.json').read_text(encoding='utf-8'))
+    built = {entry['original'] for entry in json.loads(Path('artifacts/port/apks/port-manifest.json').read_text())}
+    for app in originals['apks']:
+        if app['path'] not in built:
+            continue
+        match = re.search(r"^package: name='([A-Za-z0-9_.]+)'", app['badging'], re.M)
+        if not match:
+            raise RuntimeError('Cannot identify original app for guest UI settings')
+        entry = by_name.get(match[1])
+        if entry is None:
+            entry = ET.SubElement(tree, 'package', name=match[1])
+        entry.set('flags', str(int(entry.get('flags', '0')) | 4))
+    local = OUTPUT / 'original-ui-warnings.xml'
+    ET.ElementTree(tree).write(local, encoding='utf-8', xml_declaration=True)
+    adb('push', local, '/data/system/packages-warnings.xml')
+    adb('shell', 'chown', '1000:1000', '/data/system/packages-warnings.xml')
+    adb('shell', 'chmod', '600', '/data/system/packages-warnings.xml')
+    adb('shell', 'restorecon', '/data/system/packages-warnings.xml')
+
+
 def provision(source, permissive_development=False):
     adb('root'); adb('wait-for-device')
     # This is the disposable AOSP guest, not the supplied VietK firmware.
@@ -83,6 +113,7 @@ def provision(source, permissive_development=False):
     adb('shell','restorecon','/system/build.prop')
     adb('shell','setprop','persist.sys.locale','vi-VN')
     adb('shell','setprop','persist.sys.timezone','Asia/Taipei')
+    original_ui_warning_defaults()
     adb('reboot'); boot(); adb('root'); adb('wait-for-device')
     if permissive_development:
         # Development only: observe the original system app's vendor operations

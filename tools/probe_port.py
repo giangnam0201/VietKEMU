@@ -82,6 +82,9 @@ status = {
     'original_tv_service_observed': 'com.evideo.kmboxosdtv.OsdTvShowService' in tv_services,
     'ui_and_feature_fidelity': 'unverified',
     'playback_and_server_downloads': 'unverified',
+    'guest_selinux_mode': adb('shell', 'getenforce').stdout.strip(),
+    'active_input_method': adb('shell', 'settings', 'get', 'secure', 'default_input_method').stdout.strip(),
+    'installed_original_package_count': len(results) - len(failed),
 }
 (output / 'runtime-status.json').write_text(json.dumps(status, indent=2))
 if failed or not main_pid:
