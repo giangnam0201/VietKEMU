@@ -35,19 +35,6 @@ jobs:
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
           "$SDKMANAGER" 'build-tools;35.0.0' 'ndk;27.2.12479018'
-      - name: Prepare Android development runtime with ARM translation
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs
-          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          mkdir -p artifacts/runtime
-          gh api repos/unix3dgforce/lpunpack/contents/lpunpack.py?ref=c59b8f3b069c5a8aa438a049fa4a091177172434 --jq .content | base64 -d > artifacts/runtime/lpunpack.py
-          "$SDKMANAGER" 'system-images;android-30;google_apis;x86_64'
-          sudo python tools/prepare_runtime_image.py extract --image "$ANDROID_HOME/system-images/android-30/google_apis/x86_64/system.img" --work artifacts/runtime
-          "$SDKMANAGER" --uninstall 'system-images;android-30;google_apis;x86_64'
-          "$SDKMANAGER" 'system-images;android-30;default;x86_64'
       - name: Compile portable vendor JNI adapter
         run: |
           mkdir -p artifacts/port
@@ -61,10 +48,31 @@ jobs:
           name: ported-apk-prototype
           path: artifacts/port/
           retention-days: 7
-      - name: Release temporary compiler space before Android boot
+      - name: Release compiler space before runtime image downloads
         run: |
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --uninstall 'ndk;27.2.12479018'
           df -h "$HOME"
+      - name: Prepare Android development runtime with ARM translation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y android-sdk-libsparse-utils e2fsprogs
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          df -h "$HOME"
+          install_image() {
+            for attempt in 1 2 3; do
+              if "$SDKMANAGER" "$1"; then return 0; fi
+              if [ "$attempt" -eq 3 ]; then return 1; fi
+              sleep 3
+            done
+          }
+          mkdir -p artifacts/runtime
+          gh api repos/unix3dgforce/lpunpack/contents/lpunpack.py?ref=c59b8f3b069c5a8aa438a049fa4a091177172434 --jq .content | base64 -d > artifacts/runtime/lpunpack.py
+          install_image 'system-images;android-30;google_apis;x86_64'
+          sudo python tools/prepare_runtime_image.py extract --image "$ANDROID_HOME/system-images/android-30/google_apis/x86_64/system.img" --work artifacts/runtime
+          "$SDKMANAGER" --uninstall 'system-images;android-30;google_apis;x86_64'
+          install_image 'system-images;android-30;default;x86_64'
       - name: Enable runner virtualization
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
