@@ -55,7 +55,15 @@ def copy_bridge(image, work):
         root = mount / 'system' if (mount / 'system/lib').exists() else mount
         for p in root.rglob('*'):
             relative = p.relative_to(root)
-            if any(part in ('arm', 'arm64') for part in relative.parts) or p.name == 'libndk_translation.so':
+            name = relative.as_posix()
+            bridge_file = (
+                name.startswith(('bin/arm/', 'bin/arm64/', 'lib/arm/', 'lib64/arm64/', 'etc/binfmt_misc/'))
+                or name.startswith('bin/ndk_translation')
+                or name in ('etc/ld.config.arm.txt', 'etc/ld.config.arm64.txt')
+                or (name.startswith('etc/init/ndk_translation') and name.endswith('.rc'))
+                or (relative.parts[0] in ('lib', 'lib64') and p.name.startswith('libndk') and p.suffix == '.so')
+            )
+            if bridge_file:
                 if p.is_file():
                     target = work / 'bridge' / relative
                     target.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +71,8 @@ def copy_bridge(image, work):
                     found.append(str(relative))
         if not any(Path(name).name == 'libndk_translation.so' for name in found):
             raise RuntimeError('SDK source has no native bridge; runtime cannot be prepared')
+        if 'etc/ld.config.arm.txt' not in found:
+            raise RuntimeError('SDK ARM linker namespace configuration is missing; ARM processes cannot start')
     finally:
         run('umount', mount)
     (work / 'bridge-files.json').write_text(json.dumps(found, indent=2))

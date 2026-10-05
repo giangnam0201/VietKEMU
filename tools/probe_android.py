@@ -54,11 +54,11 @@ def probe(root, report_path, output):
             (output / 'guest-failure.log').write_text(adb('logcat', '-d').stdout, encoding='utf-8')
             save()
             raise RuntimeError('Guest package service unavailable; no app compatibility conclusion is possible')
-        installation = adb('install', '-r', '-g', str(root / app['path']), timeout=90)
+        installation = adb('install', '--no-incremental', '-r', '-g', str(root / app['path']), timeout=90)
         if any(error in installation.stdout + installation.stderr for error in ('Broken pipe', "Can't find service", 'device offline')):
             (output / 'guest-failure.log').write_text(adb('logcat', '-d').stdout, encoding='utf-8')
             if package_service_ready():
-                installation = adb('install', '-r', '-g', str(root / app['path']), timeout=90)
+                installation = adb('install', '--no-incremental', '-r', '-g', str(root / app['path']), timeout=90)
         results.append({'package': package, 'activity': activity, 'path': app['path'],
                         'install': installation.stdout + installation.stderr,
                         'install_exit': installation.returncode})
