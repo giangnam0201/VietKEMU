@@ -53,8 +53,10 @@ Only helper activities launched; karaoke operation is unverified.
 DEX preserved byte for byte. It bundles the original vendor Java SDK, compiles a
 portable JNI startup adapter, and signs the copies for a development Android
 guest. It then installs and launches the stack on GitHub and records screenshots
-and crash logs. The adapter currently reports unsupported audio/display hardware
-operations; it does not yet implement playback, recording, or two Windows windows.
+and crash logs. The adapter maps UART access to real guest serial ports and
+microphone recording to Android AudioRecord through the original application
+interfaces. Unsupported vendor display operations return errors. The recorder
+compiles on GitHub; Windows microphone capture and playback remain unverified.
 Original activation logic is retained. Song servers and licensed media availability
 have not been verified. `port-research.yml` inspects the dependencies in the cloud.
 

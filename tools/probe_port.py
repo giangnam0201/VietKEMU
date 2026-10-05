@@ -54,3 +54,21 @@ time.sleep(30)
 shot = adb('exec-out', 'screencap', '-p', binary=True)
 if shot.stdout.startswith(b'\x89PNG'):
     (output / 'main-panel.png').write_bytes(shot.stdout)
+
+# A completed experiment must not publish install failures as adapted apps.
+results = json.loads((output / 'compatibility.json').read_text())
+failed = [item['package'] for item in results if item['install_exit'] != 0]
+main_pid = adb('shell', 'pidof', 'com.evideo.kmbox').stdout.strip()
+tv_services = adb('shell', 'dumpsys', 'activity', 'services', 'com.evideo.daulkmbox_osdtv').stdout
+(output / 'tv-services.txt').write_text(tv_services, encoding='utf-8')
+status = {
+    'installation_failures': failed,
+    'main_process_alive': bool(main_pid),
+    'main_pid': main_pid,
+    'original_tv_service_observed': 'com.evideo.kmboxosdtv.OsdTvShowService' in tv_services,
+    'ui_and_feature_fidelity': 'unverified',
+    'playback_and_server_downloads': 'unverified',
+}
+(output / 'runtime-status.json').write_text(json.dumps(status, indent=2))
+if failed or not main_pid:
+    raise RuntimeError('Original stack startup incomplete; inspect runtime-status.json and saved application logs')

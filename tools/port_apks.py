@@ -122,10 +122,14 @@ def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=
                 data = original.read(entry.filename)
                 if entry.filename == 'AndroidManifest.xml':
                     data, changed = patch_manifest(data, ordinary)
-                elif re.fullmatch(r'classes\d*\.dex', entry.filename) or entry.filename == 'resources.arsc':
+                else:
+                    # Verify assets, layouts, catalogue, media and original native
+                    # libraries too, not just the main resource table and DEX.
                     retained[entry.filename] = hashlib.sha256(data).hexdigest()
                 patched.writestr(entry, data)
             if any('uses-library:' in change for change in changed):
+                if 'lib/armeabi-v7a/libvdk.so' in original.namelist():
+                    raise ValueError('Refusing to overwrite an original VDK library')
                 for name, data in framework_dex:
                     patched.writestr(f'classes{next_dex}.dex', data)
                     next_dex += 1
@@ -143,9 +147,10 @@ def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=
         with zipfile.ZipFile(signed) as verified:
             for name, digest in retained.items():
                 if hashlib.sha256(verified.read(name)).hexdigest() != digest:
-                    raise RuntimeError(f'Original UI/DEX changed unexpectedly: {name}')
+                    raise RuntimeError(f'Original application payload changed unexpectedly: {name}')
         report.append({'original': str(apk.relative_to(root)), 'ported': signed.name,
                        'manifest_changes': changed, 'original_payload_hashes': retained,
+                       'original_files_verified': len(retained),
                        'status': 'built; runtime operation unverified'})
         unsigned.unlink()
         aligned.unlink()
