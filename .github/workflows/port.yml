@@ -1,0 +1,61 @@
+name: Original APK port
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  port:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download original applications
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 37324921816 -n firmware-applications -D firmware
+          gh run download 37324921816 -n firmware-report -D firmware
+          mkdir -p keys
+          python - <<'PY'
+          import subprocess, json, base64, pathlib
+          for name in ('platform.pk8', 'platform.x509.pem'):
+              result = subprocess.run(['gh','api',f'repos/aosp-mirror/platform_build/contents/target/product/security/{name}?ref=android-11.0.0_r48'],check=True,capture_output=True,text=True)
+              pathlib.Path('keys',name).write_bytes(base64.b64decode(json.loads(result.stdout)['content']))
+          PY
+      - name: Install build tools on GitHub
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager 'build-tools;35.0.0' 'ndk;27.2.12479018'
+      - name: Compile portable vendor JNI adapter
+        run: |
+          mkdir -p artifacts/port
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang" -shared -fPIC -Wall -Wextra -Wno-unused-parameter runtime/native/vdk_adapter.c -llog -o artifacts/port/libvdk.so
+      - name: Port copies with original UI and application DEX preserved
+        run: |
+          python tools/port_apks.py --root firmware --vdk firmware/system/framework/vdk.jar --native artifacts/port/libvdk.so --output artifacts/port/apks --key keys/platform.pk8 --certificate keys/platform.x509.pem --signer "$ANDROID_HOME/build-tools/35.0.0/apksigner" --aligner "$ANDROID_HOME/build-tools/35.0.0/zipalign"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ported-apk-prototype
+          path: artifacts/port/
+          retention-days: 7
+      - name: Enable runner virtualization
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test the actual ported karaoke stack
+        uses: ReactiveCircus/android-emulator-runner@c9c93e6ba9c4194322e114c40970d5983d9a07cc
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          ram-size: 2048M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: python tools/probe_port.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apk-port-runtime-evidence
+          path: artifacts/port-runtime/
+          retention-days: 7

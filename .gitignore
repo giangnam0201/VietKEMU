@@ -11,3 +11,4 @@ artifacts/
 firmware/
 reports/private/
 .venv/
+keys/
