@@ -9,6 +9,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Test OTA block reconstruction
+        run: python -m unittest discover -s tests -v
       - name: Install filesystem and Android tools
         run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt device-tree-compiler apktool
       - name: Download supplied firmware from private release
@@ -19,6 +21,18 @@ jobs:
         run: python tools/analyze_firmware.py incoming/*.zip --work firmware
       - name: Decode device tree
         run: dtc -I dtb -O dts firmware/device.dtb > firmware/device.dts
+      - name: Decode karaoke application resources
+        run: |
+          python - <<'PY'
+          import json, pathlib, subprocess
+          root = pathlib.Path('firmware')
+          report = json.loads((root / 'report.json').read_text())
+          for app in report['apks']:
+              if any(word in app['badging'].lower() for word in ('evideo', 'ktv', 'duochang', 'vietk')):
+                  apk = root / app['path']
+                  dest = root / 'decoded' / apk.stem
+                  subprocess.run(['apktool', 'd', '-s', '-f', '-o', str(dest), str(apk)], check=True)
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-report
@@ -27,6 +41,11 @@ jobs:
             firmware/inventory.txt
             firmware/device.dts
           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: karaoke-resources
+          path: firmware/decoded/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: firmware-applications

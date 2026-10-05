@@ -64,7 +64,9 @@ def analyze(source, work):
         (work / 'device.dtb').write_bytes(tree)
     for partition in ('system', 'vendor'):
         image = work / f'{partition}.img'
-        if image.read_bytes()[:4] == bytes.fromhex('3aff26ed'):
+        with image.open('rb') as stream:
+            header = stream.read(4)
+        if header == bytes.fromhex('3aff26ed'):
             raw = work / f'{partition}.raw.img'
             subprocess.run(['simg2img', str(image), str(raw)], check=True)
             image = raw
@@ -75,9 +77,16 @@ def analyze(source, work):
     for apk in work.glob('*/**/*.apk'):
         result = subprocess.run(['aapt', 'dump', 'badging', str(apk)], capture_output=True, text=True)
         with zipfile.ZipFile(apk) as bundle:
+            interesting = []
+            if any(term in result.stdout.lower() for term in ('evideo', 'ktv', 'duochang', 'vietk')):
+                for name in bundle.namelist():
+                    if re.match(r'classes\d*\.dex$', name):
+                        interesting.extend(s.decode('ascii') for s in re.findall(rb'[ -~]{8,}', bundle.read(name))
+                                           if any(term in s.lower() for term in (b'realtek', b'evideo', b'/dev/', b'loadlibrary', b'presentation', b'displaymanager', b'song.db', b'license', b'activation', b'getprop', b'ktvservice')))
             apks.append({'path': str(apk.relative_to(work)), 'size': apk.stat().st_size,
                          'badging': result.stdout, 'native_libraries': [n for n in bundle.namelist() if n.endswith('.so')],
-                         'assets': [n for n in bundle.namelist() if n.startswith('assets/')]})
+                         'assets': [n for n in bundle.namelist() if n.startswith('assets/')],
+                         'dependency_strings': sorted(set(interesting))[:1500]})
     report['apks'] = apks
     report['native_files'] = [str(p.relative_to(work)) for p in work.glob('*/**/*.so')]
     report['databases'] = [str(p.relative_to(work)) for p in work.glob('*/**/*') if p.is_file() and p.suffix in ('.db', '.sqlite', '.sqlite3')]
