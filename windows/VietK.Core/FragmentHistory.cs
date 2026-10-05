@@ -2,7 +2,7 @@ namespace VietK.Core;
 
 public sealed record FragmentEntry(int Tag, IReadOnlyDictionary<string, string>? Arguments = null);
 
-// FragmentManagerUtil.backupLastFragmentIndex / backLastFragment. This manages
+// FragmentManagerUtil.backupLastFragmentIndex / recoveryLastFragment. This manages
 // history only; callers must provide a ported screen before navigating to it.
 public sealed class FragmentHistory
 {
@@ -25,6 +25,10 @@ public sealed class FragmentHistory
 
     public void Back(bool youtubeEnabled = true, bool mixcloudEnabled = true, bool soundcloudEnabled = true)
     {
+        // recoveryLastFragment removes the current tag and newer history first.
+        // Without this, a second Back would revisit the page just left.
+        var currentIndex = history.FindIndex(item => item.Tag == Current.Tag);
+        if (currentIndex >= 0) history.RemoveRange(currentIndex, history.Count - currentIndex);
         var previous = history.Count > 0 ? history[^1] : new FragmentEntry(0);
         if ((previous.Tag == 34 && !youtubeEnabled) || (previous.Tag == 35 && !mixcloudEnabled)
             || (previous.Tag == 36 && !soundcloudEnabled)) previous = new(0);

@@ -64,8 +64,19 @@ public static class Program
                 var history = new FragmentHistory();
                 history.Reload(new(1)); history.Reload(new(28)); history.Back();
                 if (history.Current.Tag != 1) throw new InvalidDataException("Singer back navigation differs");
+                history.Back();
+                if (history.Current.Tag != 0) throw new InvalidDataException("Repeated Back revisits the page just left");
+                history.Reload(new(35)); history.Reload(new(2)); history.Back(mixcloudEnabled: false);
+                if (history.Current.Tag != 0) throw new InvalidDataException("Disabled Mixcloud back fallback differs");
+                var arguments = new Dictionary<string, string> { ["youtube_search"] = "sample" };
+                history.Reload(new(34, arguments)); history.Reload(new(2)); history.Back();
+                if (history.Current.Tag != 34 || history.Current.Arguments is not null)
+                    throw new InvalidDataException("YouTube search arguments were not cleared on Back");
                 history.Reload(new(0));
                 if (history.Entries.Count != 0) throw new InvalidDataException("Home failed to clear navigation history");
+                var guard = new OriginalClickGuard();
+                if (!guard.TryClick(1000) || guard.TryClick(1500) || !guard.TryClick(1501) || !guard.TryClick(1000))
+                    throw new InvalidDataException("Original click guard boundary/clock-reset rules differ");
                 File.WriteAllText(Path.Combine(args[1], "verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsRendering = true,
@@ -76,6 +87,7 @@ public static class Program
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,
+                    originalClickGuardVerified = true,
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using VietK.Core;
 
 namespace VietK.NativePort;
 
@@ -44,16 +45,14 @@ public sealed class BottomBar(string root, BottomContract contract)
                 TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, contract.ImageHeight + contract.TextTop, 0, 0)
             });
-            var lastClick = 0L;
+            var clickGuard = new OriginalClickGuard();
             control.MouseLeftButtonDown += (_, e) => { control.CaptureMouse(); Scale(control, .9); e.Handled = true; };
             control.MouseLeftButtonUp += (_, e) =>
             {
                 var inside = new Rect(0, 0, control.ActualWidth, control.ActualHeight).Contains(e.GetPosition(control));
                 control.ReleaseMouseCapture(); Scale(control, 1);
                 var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                var interval = now - lastClick;
-                if (inside && (interval > 500 || interval < 0))
-                { lastClick = now; CommandRequested?.Invoke(data.Href); }
+                if (inside && clickGuard.TryClick(now)) CommandRequested?.Invoke(data.Href);
                 e.Handled = true;
             };
             control.LostMouseCapture += (_, _) => Scale(control, 1);
