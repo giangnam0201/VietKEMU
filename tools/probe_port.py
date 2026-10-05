@@ -45,7 +45,21 @@ adb('shell', 'settings', 'put', 'global', 'hidden_api_policy', '1')
 adb('shell', 'settings', 'put', 'global', 'hidden_api_policy_pre_p_apps', '1')
 adb('shell', 'settings', 'put', 'global', 'hidden_api_policy_p_apps', '1')
 adb('shell', 'settings', 'put', 'system', 'screen_off_timeout', '1800000')
-probe(Path('artifacts/port/apks'), output / 'report.json', output)
+# Install original interfaces and input methods, then let MicroServiceActivity
+# orchestrate its own services. Launching calibration/lock/settings activities
+# as independent tests can change state before the original startup sequence.
+excluded = ('com.android.packageinstaller',)
+(output / 'system-integration-pending.json').write_text(json.dumps({
+    'com.android.packageinstaller': 'Original OS installer is built but cannot replace the guest OS package as a normal app update'
+}, indent=2))
+probe(Path('artifacts/port/apks'), output / 'report.json', output,
+      include_all=True, launch_packages=set(), excluded_packages=excluded)
+methods = adb('shell', 'ime', 'list', '-s').stdout.splitlines()
+original_keyboard = [line.strip() for line in methods if line.startswith('bkav.android.inputmethod.gtv/')]
+(output / 'input-methods.txt').write_text('\n'.join(methods), encoding='utf-8')
+if original_keyboard:
+    adb('shell', 'ime', 'enable', original_keyboard[0])
+    adb('shell', 'ime', 'set', original_keyboard[0])
 adb('logcat', '-c')
 adb('shell', 'am', 'start', '-W', '-n', 'com.evideo.kmbox/com.evideo.kmbox.activity.MicroServiceActivity')
 time.sleep(30)

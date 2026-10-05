@@ -23,7 +23,7 @@ def adb(*args, binary=False, timeout=30):
         return subprocess.CompletedProcess(command, 124, stdout, message.encode() if binary else message)
 
 
-def probe(root, report_path, output):
+def probe(root, report_path, output, include_all=False, launch_packages=None, excluded_packages=()):
     output.mkdir(parents=True, exist_ok=True)
     report = json.loads(report_path.read_text(encoding='utf-8'))
     packages = []
@@ -31,7 +31,7 @@ def probe(root, report_path, output):
         badging = app['badging']
         package = re.search(r"^package: name='([^']+)'", badging, re.M)
         activity = re.search(r"^launchable-activity: name='([^']+)'", badging, re.M)
-        if package and any(s in package[1].lower() for s in ('evideo', 'ktv', 'vietk', 'duochang', 'kmbox')):
+        if package and package[1] not in excluded_packages and (include_all or any(s in package[1].lower() for s in ('evideo', 'ktv', 'vietk', 'duochang', 'kmbox'))):
             packages.append((app, package[1], activity[1] if activity else None))
     guest = adb('shell', 'getprop').stdout
     (output / 'guest-properties.txt').write_text(guest)
@@ -66,7 +66,7 @@ def probe(root, report_path, output):
         print(package, installation.stdout + installation.stderr, flush=True)
     (output / 'guest-install.log').write_text(adb('logcat', '-d').stdout, encoding='utf-8')
     for result in results:
-        if not result['activity'] or result['install_exit']:
+        if not result['activity'] or result['install_exit'] or (launch_packages is not None and result['package'] not in launch_packages):
             continue
         package = result['package']
         adb('logcat', '-c')
