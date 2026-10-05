@@ -25,8 +25,9 @@ jobs:
           PY
       - name: Install build tools on GitHub
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager 'build-tools;35.0.0' 'ndk;27.2.12479018'
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" 'build-tools;35.0.0' 'ndk;27.2.12479018'
       - name: Compile portable vendor JNI adapter
         run: |
           mkdir -p artifacts/port
