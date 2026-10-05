@@ -1,0 +1,53 @@
+name: Build original native Windows components
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  resources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve full original decode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 37386126110 -n original-apk-full-decode -D decoded
+      - name: Package the original home resources and source contract
+        run: python tools/package_native_home.py decoded original
+      - uses: actions/upload-artifact@v4
+        with:
+          name: original-native-home-resources
+          path: original/
+          retention-days: 7
+  windows:
+    needs: resources
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/download-artifact@v4
+        with:
+          name: original-native-home-resources
+          path: windows/VietK.NativePort/Original/
+      - name: Compile native Windows executable
+        run: dotnet publish windows/VietK.NativePort -c Release -r win-x64 --self-contained true -o artifacts/native-windows
+      - name: Render original home component on Windows
+        run: |
+          $process = Start-Process -FilePath artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Native rendering failed: $($process.ExitCode)" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-windows-verification
+          path: artifacts/native-verification/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-component
+          path: artifacts/native-windows/
+          retention-days: 7

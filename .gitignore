@@ -12,3 +12,6 @@ firmware/
 reports/private/
 .venv/
 keys/
+windows/**/bin/
+windows/**/obj/
+windows/**/Original/
