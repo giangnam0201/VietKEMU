@@ -1,0 +1,80 @@
+name: Vendor runtime research
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install inspection tools
+        run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt squashfs-tools binutils
+      - name: Download original firmware and Java inspection tool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download firmware-input --pattern '*.zip' --dir incoming
+          gh release download v1.5.6 --repo skylot/jadx --pattern 'jadx-1.5.6.zip' --dir incoming
+          unzip -q incoming/jadx-1.5.6.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Reconstruct firmware
+        run: python tools/analyze_firmware.py incoming/KTV*.zip --work firmware
+      - name: Inspect vendor Java and native dependencies
+        run: |
+          mkdir -p research/native research/manifests research/assets
+          readelf -d firmware/system/lib/libvdk.so > research/native/vdk-dynamic.txt
+          readelf -Ws firmware/system/lib/libvdk.so > research/native/vdk-symbols.txt
+          strings firmware/system/lib/libvdk.so > research/native/vdk-strings.txt
+          for lib in firmware/vendor/app/cbb/lib/arm/*.so; do
+            readelf -d "$lib" > "research/native/$(basename "$lib").txt"
+          done
+          for apk in firmware/vendor/app/dualkmbox/*.apk firmware/vendor/app/cbb/*.apk firmware/vendor/app/dcservice/*.apk; do
+            aapt dump xmltree "$apk" AndroidManifest.xml > "research/manifests/$(basename "$apk").txt"
+          done
+          python - <<'PY'
+          import zipfile, json, pathlib
+          result = []
+          for name in ('dualkmbox', 'cbb'):
+              apk = pathlib.Path(f'firmware/vendor/app/{name}/{name}.apk')
+              with zipfile.ZipFile(apk) as z:
+                  for item in z.infolist():
+                      if item.filename.startswith('assets/') and not item.is_dir():
+                          with z.open(item) as f:
+                              header = f.read(32)
+                          result.append({'apk': name, 'path': item.filename, 'size': item.file_size, 'header': header.hex()})
+          pathlib.Path('research/assets/headers.json').write_text(json.dumps(result, indent=2))
+          PY
+          jadx/bin/jadx --no-res --show-bad-code -j 2 -d research/vdk firmware/system/framework/vdk.jar
+          jadx/bin/jadx --no-res --show-bad-code -j 2 -d research/kmbox firmware/vendor/app/dualkmbox/dualkmbox.apk || test -d research/kmbox/sources
+      - name: Assemble compact runtime evidence
+        run: |
+          mkdir -p evidence
+          cp -r research/native research/manifests research/assets evidence/
+          cp -r research/vdk/sources evidence/vdk
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          sources = Path('research/kmbox/sources')
+          for p in sources.rglob('*.java'):
+              if p.stem in ('KmApplication', 'MicroServiceActivity', 'BoardInfo', 'DCHelper', 'CbbHelper', 'DCServiceHelper', 'MainActivity', 'VgaManager', 'TvManager'):
+                  target = Path('evidence/kmbox') / p.relative_to(sources)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(p, target)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vendor-runtime-evidence
+          path: evidence/
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vendor-runtime-original
+          path: |
+            firmware/system/framework/vdk.jar
+            firmware/system/lib/libvdk.so
+            firmware/system/etc/permissions/com.evideostb.vdk.xml
+          retention-days: 7

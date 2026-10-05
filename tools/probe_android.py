@@ -16,13 +16,13 @@ def adb(*args, binary=False, timeout=90):
 
 def probe(root, report_path, output):
     output.mkdir(parents=True, exist_ok=True)
-    report = json.loads(report_path.read_text())
+    report = json.loads(report_path.read_text(encoding='utf-8'))
     packages = []
     for app in report['apks']:
         badging = app['badging']
         package = re.search(r"^package: name='([^']+)'", badging, re.M)
         activity = re.search(r"^launchable-activity: name='([^']+)'", badging, re.M)
-        if package and any(s in package[1].lower() for s in ('evideo', 'ktv', 'vietk', 'duochang')):
+        if package and any(s in package[1].lower() for s in ('evideo', 'ktv', 'vietk', 'duochang', 'kmbox')):
             packages.append((app, package[1], activity[1] if activity else None))
     guest = adb('shell', 'getprop').stdout
     (output / 'guest-properties.txt').write_text(guest)
