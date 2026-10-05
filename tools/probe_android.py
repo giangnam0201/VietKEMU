@@ -10,8 +10,16 @@ import time
 from pathlib import Path
 
 
-def adb(*args, binary=False, timeout=90):
-    return subprocess.run(['adb', *args], capture_output=True, text=not binary, timeout=timeout)
+def adb(*args, binary=False, timeout=30):
+    command = ['adb', *args]
+    try:
+        return subprocess.run(command, capture_output=True, text=not binary, timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout or b''
+        if not binary and isinstance(stdout, bytes):
+            stdout = stdout.decode('utf-8', errors='replace')
+        message = f'ADB command timed out after {timeout}s'
+        return subprocess.CompletedProcess(command, 124, stdout, message.encode() if binary else message)
 
 
 def probe(root, report_path, output):
@@ -31,11 +39,15 @@ def probe(root, report_path, output):
     adb('shell', 'wm', 'density', '160')
     (output / 'displays.txt').write_text(adb('shell', 'dumpsys', 'display').stdout)
     results = []
+    def save():
+        (output / 'compatibility.json').write_text(json.dumps(results, indent=2), encoding='utf-8')
     for app, package, activity in packages:
-        installation = adb('install', '-r', '-g', str(root / app['path']))
+        installation = adb('install', '-r', '-g', str(root / app['path']), timeout=90)
         results.append({'package': package, 'activity': activity, 'path': app['path'],
                         'install': installation.stdout + installation.stderr,
                         'install_exit': installation.returncode})
+        save()
+        print(package, installation.stdout + installation.stderr, flush=True)
     for result in results:
         if not result['activity'] or result['install_exit']:
             continue
@@ -43,6 +55,8 @@ def probe(root, report_path, output):
         adb('logcat', '-c')
         launch = adb('shell', 'am', 'start', '-W', '-n', package + '/' + result['activity'])
         result['launch'] = launch.stdout + launch.stderr
+        result['launch_exit'] = launch.returncode
+        save()
         time.sleep(12)
         result['pid'] = adb('shell', 'pidof', package).stdout.strip()
         log = adb('logcat', '-d', '-v', 'threadtime').stdout
@@ -57,7 +71,8 @@ def probe(root, report_path, output):
                              'ClassNotFoundException', 'SecurityException', 'Fatal signal',
                              'dlopen failed', 'Unable to start', 'not found'))][-100:]
         adb('shell', 'am', 'force-stop', package)
-    (output / 'compatibility.json').write_text(json.dumps(results, indent=2))
+        save()
+    save()
     print(json.dumps(results, indent=2))
     if not packages:
         raise RuntimeError('No karaoke packages identified; inspect firmware-report manually')
