@@ -100,6 +100,13 @@ def run(*args):
     subprocess.run([str(arg) for arg in args], check=True)
 
 
+def signing_entry(name):
+    name = name.upper()
+    return name == 'META-INF/MANIFEST.MF' or bool(
+        re.fullmatch(r'META-INF/[^/]+\.(SF|RSA|DSA|EC)', name)
+        or re.fullmatch(r'META-INF/SIG-[^/]+', name))
+
+
 def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=False, serial=None):
     output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(vdk) as framework:
@@ -117,7 +124,7 @@ def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=
             dex_numbers = [int(m[1] or 1) for n in original.namelist() if (m := re.fullmatch(r'classes(\d*)\.dex', n))]
             next_dex = max(dex_numbers, default=0) + 1
             for entry in original.infolist():
-                if entry.filename.upper().startswith('META-INF/'):
+                if signing_entry(entry.filename):
                     continue
                 data = original.read(entry.filename)
                 if entry.filename == 'AndroidManifest.xml':
