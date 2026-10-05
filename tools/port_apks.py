@@ -100,7 +100,7 @@ def run(*args):
     subprocess.run([str(arg) for arg in args], check=True)
 
 
-def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=False):
+def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=False, serial=None):
     output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(vdk) as framework:
         framework_dex = [(n, framework.read(n)) for n in framework.namelist() if re.fullmatch(r'classes\d*\.dex', n)]
@@ -130,6 +130,11 @@ def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=
                     patched.writestr(f'classes{next_dex}.dex', data)
                     next_dex += 1
                 patched.write(native, 'lib/armeabi-v7a/libvdk.so')
+            if serial and apk.parent.name == 'dualkmbox':
+                name = 'lib/armeabi-v7a/libfactoryuart.so'
+                if name in original.namelist():
+                    raise ValueError('Refusing to overwrite an original UART library')
+                patched.write(serial, name)
         aligned = output / f'{apk.stem}.aligned.apk'
         signed = output / f'{apk.stem}.apk'
         run(aligner, '-f', '-p', '4', unsigned, aligned)
@@ -152,4 +157,5 @@ if __name__ == '__main__':
     for field in ('root', 'vdk', 'native', 'output', 'key', 'certificate', 'signer', 'aligner'):
         parser.add_argument('--' + field, type=Path, required=True)
     parser.add_argument('--ordinary', action='store_true')
+    parser.add_argument('--serial', type=Path)
     port(**vars(parser.parse_args()))
