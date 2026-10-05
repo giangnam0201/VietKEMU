@@ -80,6 +80,54 @@ def package(decoded, destination):
         'media_availability': 'not established by catalogue metadata'
     }, indent=2))
     package_bottom(app, destination, entries, strings)
+    package_more(app, destination, entries, strings, values)
+
+
+def package_more(app, destination, entries, strings, values):
+    android = '{http://schemas.android.com/apk/res/android}'
+    layout = ET.parse(app / 'apktool/res/layout/layout_more_fragment.xml').getroot()
+    def number(value):
+        if value.startswith('@dimen/'): value = values[value.split('/')[1]]
+        return float(re.fullmatch(r'([0-9.]+)(?:dip|dp|sp|px)', value)[1])
+    top = number(layout.get(android+'paddingTop'))
+    tiles = []
+    positions = {}
+    assets = {'icon_back_bg.png', 'icon_back.png'}
+    for view in layout:
+        if view.tag != 'FrameLayout': continue
+        attrs = view.attrib
+        identity = attrs[android+'id'].split('/')[-1]
+        width, height = number(attrs[android+'layout_width']), number(attrs[android+'layout_height'])
+        x = number(attrs.get(android+'layout_marginLeft', '0px'))
+        y = number(attrs.get(android+'layout_marginTop', '0px')) + top
+        right_of = attrs.get(android+'layout_toRightOf')
+        below = attrs.get(android+'layout_below')
+        align = attrs.get(android+'layout_alignLeft')
+        if right_of:
+            reference = positions[right_of.split('/')[-1]]
+            x += reference['x'] + reference['width']
+        if below:
+            reference = positions[below.split('/')[-1]]
+            y += reference['y'] + reference['height'] - top
+        if align: x = positions[align.split('/')[-1]]['x']
+        label = view[0]
+        image = attrs[android+'background'].split('/')[-1] + '.png'
+        assets.add(image)
+        tile = {'id': identity, 'image': image, 'text': strings[label.get(android+'text').split('/')[-1]],
+            'x': x, 'y': y, 'width': width, 'height': height,
+            'textBottom': number(label.get(android+'layout_marginBottom'))}
+        tiles.append(tile); positions[identity] = tile
+    for name in assets:
+        resource = app / 'apktool/res/drawable-mdpi' / name
+        digest = hashlib.sha256(resource.read_bytes()).hexdigest()
+        if not any(Path(entry['path']).name == name and entry['sha256'] == digest for entry in entries.values()):
+            raise RuntimeError('Original More resource differs: ' + name)
+        shutil.copy2(resource, destination / name)
+    back = layout[-1]
+    contract = {'tiles': tiles, 'backX': number(back.get(android+'layout_marginLeft')),
+        'backY': top + number(back.get(android+'layout_marginTop')),
+        'backWidth': number('@dimen/icon_back_width'), 'backHeight': number('@dimen/icon_back_height')}
+    (destination / 'more.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
 class BottomParser(HTMLParser):

@@ -25,9 +25,13 @@ public static class Program
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Missing original bottom bar contract");
             var bottom = new BottomBar(root, bottomContract);
-            Canvas Panel()
+            var moreContract = JsonSerializer.Deserialize<MoreContract>(File.ReadAllText(Path.Combine(root, "more.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidDataException("Missing original More screen contract");
+            var more = new MoreScreen(root, moreContract, contract);
+            Canvas Panel(int screen = 0)
             {
-                var panel = renderer.Create();
+                var panel = screen == 38 ? more.Create() : renderer.Create();
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
                 return panel;
@@ -44,6 +48,12 @@ public static class Program
                 var encoder = new PngBitmapEncoder();
                 encoder.Frames.Add(BitmapFrame.Create(image));
                 using (var file = File.Create(Path.Combine(args[1], "native-home.png"))) encoder.Save(file);
+                var moreCanvas = Panel(38);
+                moreCanvas.Measure(new Size(1280, 800)); moreCanvas.Arrange(new Rect(0, 0, 1280, 800)); moreCanvas.UpdateLayout();
+                var moreImage = new RenderTargetBitmap(1280, 800, 96, 96, PixelFormats.Pbgra32);
+                moreImage.Render(moreCanvas);
+                var moreEncoder = new PngBitmapEncoder(); moreEncoder.Frames.Add(BitmapFrame.Create(moreImage));
+                using (var file = File.Create(Path.Combine(args[1], "native-more.png"))) moreEncoder.Save(file);
                 // The contract was extracted from HomeNewFragment, not guessed.
                 var expected = new[] { "singer", "app", "mixcloud", "youtube", "soudcloud", "more" };
                 if (!contract.Tiles.Select(t => t.Tag).SequenceEqual(expected))
@@ -88,6 +98,7 @@ public static class Program
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,
                     originalClickGuardVerified = true,
+                    moreScreenNativeRendering = true,
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"
@@ -109,6 +120,11 @@ public static class Program
                 // Playback, queue and ambience requests need their real backends.
                 // They are not translated into invented playback success/state.
             };
+            renderer.NavigationRequested += fragment =>
+            {
+                if (fragment == 38) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(38) };
+            };
+            more.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
             return app.Run(window);
         }
         catch (Exception error)

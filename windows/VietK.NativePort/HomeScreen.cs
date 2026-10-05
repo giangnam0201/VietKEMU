@@ -48,11 +48,12 @@ public sealed class HomeScreen(string root, HomeContract contract)
         return canvas;
     }
 
-    private Grid Tile(string image, string text, double width, int fragment)
+    public Grid Tile(string image, string text, double width, int fragment,
+        double? height = null, double? textBottom = null)
     {
         var tile = new Grid
         {
-            Width = width, Height = contract.TileHeight,
+            Width = width, Height = height ?? contract.TileHeight,
             Background = new ImageBrush(Image(image)) { Stretch = Stretch.Fill },
             RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new ScaleTransform(1, 1)
         };
@@ -60,7 +61,7 @@ public sealed class HomeScreen(string root, HomeContract contract)
         {
             Text = text, Foreground = Brushes.White, FontSize = contract.TextSize,
             FontFamily = new FontFamily("sans-serif"), HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, contract.TextBottom)
+            VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, textBottom ?? contract.TextBottom)
         });
         // BaseScaleOnTouchListener: down 1->0.9, up 0.9->1.
         tile.MouseLeftButtonDown += (_, e) => { tile.CaptureMouse(); Scale(tile, 0.9); e.Handled = true; };
