@@ -1,0 +1,33 @@
+name: Decode originals for manual Windows port
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  decode:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install decoders
+        run: sudo apt-get update -qq && sudo apt-get install -y apktool binutils
+      - name: Download original firmware applications and JADX
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 37324921816 -n firmware-applications -D firmware
+          gh release download v1.5.6 --repo skylot/jadx --pattern 'jadx-1.5.6.zip' --dir incoming
+          unzip -q incoming/jadx-1.5.6.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Decode every original vendor app, including all DEX files
+        env:
+          JAVA_OPTS: -Xmx5g
+        run: python tools/decode_native_port.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-apk-full-decode
+          path: artifacts/native-decode/
+          retention-days: 7
+          compression-level: 6

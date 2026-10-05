@@ -4,7 +4,12 @@ Research workspace for the supplied `KTV-Plus_All_V1.7_RC1_update_20230118.zip`.
 The target is a Windows runtime with separate touch-panel and television-output
 windows, using the original firmware applications wherever possible.
 
-**Status: original APK compatibility port in development, not a working emulator.** No device boot or
+**Current target: manual native Windows EXE port, without an Android emulator.**
+See [native port approach](docs/native-windows-port.md). `native-decode.yml` decodes
+the original APKs on GitHub for a screen-by-screen and feature-by-feature rewrite.
+The Android runtime experiments below are historical research.
+
+**Status: decoding and port development; no working Windows release.** No device boot or
 1:1 compatibility has been demonstrated. An interface replica would not establish
 firmware compatibility.
 
