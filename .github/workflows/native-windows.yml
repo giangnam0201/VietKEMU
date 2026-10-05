@@ -5,6 +5,16 @@ permissions:
   contents: read
   actions: read
 jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Verify original song search rules
+        run: dotnet run --project windows/VietK.CoreChecks -c Release
   resources:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -24,7 +34,7 @@ jobs:
           path: original/
           retention-days: 7
   windows:
-    needs: resources
+    needs: [resources, core]
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
