@@ -33,7 +33,7 @@ jobs:
           api-level: 30
           arch: x86_64
           target: google_apis
-          ram-size: 3072M
+          ram-size: 2048M
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: python tools/probe_android.py
       - uses: actions/upload-artifact@v4

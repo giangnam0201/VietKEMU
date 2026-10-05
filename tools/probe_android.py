@@ -34,20 +34,36 @@ def probe(root, report_path, output):
             packages.append((app, package[1], activity[1] if activity else None))
     guest = adb('shell', 'getprop').stdout
     (output / 'guest-properties.txt').write_text(guest)
-    adb('shell', 'settings', 'put', 'global', 'overlay_display_devices', '1920x1080/160')
-    adb('shell', 'wm', 'size', '1280x720')
-    adb('shell', 'wm', 'density', '160')
     (output / 'displays.txt').write_text(adb('shell', 'dumpsys', 'display').stdout)
+    # Establish stock install compatibility before changing the guest display.
+    # A changing display configuration can restart system_server during boot.
+    packages.sort(key=lambda item: (item[1] != 'com.evideo.kmbox', item[1]))
     results = []
     def save():
         (output / 'compatibility.json').write_text(json.dumps(results, indent=2), encoding='utf-8')
+    def package_service_ready():
+        for attempt in range(12):
+            response = adb('shell', 'pm', 'path', 'android')
+            if response.returncode == 0 and 'package:' in response.stdout:
+                return True
+            time.sleep(2)
+        return False
     for app, package, activity in packages:
+        if not package_service_ready():
+            (output / 'guest-failure.log').write_text(adb('logcat', '-d').stdout, encoding='utf-8')
+            save()
+            raise RuntimeError('Guest package service unavailable; no app compatibility conclusion is possible')
         installation = adb('install', '-r', '-g', str(root / app['path']), timeout=90)
+        if any(error in installation.stdout + installation.stderr for error in ('Broken pipe', "Can't find service", 'device offline')):
+            (output / 'guest-failure.log').write_text(adb('logcat', '-d').stdout, encoding='utf-8')
+            if package_service_ready():
+                installation = adb('install', '-r', '-g', str(root / app['path']), timeout=90)
         results.append({'package': package, 'activity': activity, 'path': app['path'],
                         'install': installation.stdout + installation.stderr,
                         'install_exit': installation.returncode})
         save()
         print(package, installation.stdout + installation.stderr, flush=True)
+    (output / 'guest-install.log').write_text(adb('logcat', '-d').stdout, encoding='utf-8')
     for result in results:
         if not result['activity'] or result['install_exit']:
             continue
