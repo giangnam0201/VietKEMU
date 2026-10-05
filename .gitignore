@@ -12,3 +12,6 @@ firmware/
 reports/private/
 .venv/
 keys/
+desktop/**/assets/
+desktop/**/bin/
+desktop/**/obj/
