@@ -71,6 +71,8 @@ def provision(source):
         'ro.product.cpu.abilist':'x86_64,x86,arm64-v8a,armeabi-v7a,armeabi',
         'ro.product.cpu.abilist32':'x86,armeabi-v7a,armeabi',
         'ro.product.cpu.abilist64':'x86_64,arm64-v8a',
+        # Original system/build.prop defaults affecting the application UI.
+        'ro.product.locale': 'vi-VN',
     }
     lines = adb('shell','cat','/system/build.prop').stdout.splitlines()
     lines = [line for line in lines if line.split('=',1)[0] not in properties]
@@ -79,6 +81,8 @@ def provision(source):
     adb('push',propfile,'/system/build.prop')
     adb('shell','chmod','644','/system/build.prop')
     adb('shell','restorecon','/system/build.prop')
+    adb('shell','setprop','persist.sys.locale','vi-VN')
+    adb('shell','setprop','persist.sys.timezone','Asia/Taipei')
     adb('reboot'); boot(); adb('root'); adb('wait-for-device')
     loaded = adb('shell','getprop','ro.dalvik.vm.native.bridge').stdout.strip()
     if loaded != 'libndk_translation.so':

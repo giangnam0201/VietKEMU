@@ -62,7 +62,9 @@ have not been verified. `port-research.yml` inspects the dependencies in the clo
 
 The original MainActivity already starts the original TV service when Android
 reports multiple displays. `configure_displays.py` supplies a 1280×800 panel and
-1920×1080 external display. `windows/Start-VietK.ps1` hosts those actual guest
+1280×720 external framebuffer, matching the external size forced by the original
+build properties. The guest starts with the original Vietnamese locale.
+`windows/Start-VietK.ps1` hosts those actual guest
 framebuffers in separate Windows windows using scrcpy, once the adapted runtime
 is booted and all original components are installed. It is not a standalone
 working release: runtime provisioning, playback and TV startup remain unverified.

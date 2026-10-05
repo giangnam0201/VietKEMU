@@ -7,7 +7,8 @@ parser.add_argument('--avd', type=Path, default=Path.home() / '.android/avd/test
 args = parser.parse_args()
 values = {
     'hw.lcd.width': '1280', 'hw.lcd.height': '800', 'hw.lcd.density': '160',
-    'hw.display1.width': '1920', 'hw.display1.height': '1080',
+    # Firmware build.prop forces the external framebuffer to 1280 x 720.
+    'hw.display1.width': '1280', 'hw.display1.height': '720',
     'hw.display1.density': '160', 'hw.display1.xOffset': '-1',
     'hw.display1.yOffset': '-1', 'hw.display1.flag': '0',
     'hw.multi_display_window': 'yes',
