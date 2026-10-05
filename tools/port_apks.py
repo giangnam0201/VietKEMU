@@ -107,7 +107,7 @@ def signing_entry(name):
         or re.fullmatch(r'META-INF/SIG-[^/]+', name))
 
 
-def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=False, serial=None):
+def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=False, serial=None, all_vendor_apps=False):
     output.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(vdk) as framework:
         framework_dex = [(n, framework.read(n)) for n in framework.namelist() if re.fullmatch(r'classes\d*\.dex', n)]
@@ -115,7 +115,7 @@ def port(root, vdk, native, output, key, certificate, signer, aligner, ordinary=
         raise ValueError('Original VDK has no DEX code')
     report = []
     for apk in sorted((root / 'vendor/app').glob('*/*.apk')):
-        if apk.parent.name not in ('dualkmbox', 'cbb', 'dcservice', 'daulkmboxosdtv', 'hdplayer', 'evsdkserver', 'KmBoxPermission', 'VietkService', 'KmDataCenterService', 'KmHttpdService', 'KmAudioRecordService'):
+        if not all_vendor_apps and apk.parent.name not in ('dualkmbox', 'cbb', 'dcservice', 'daulkmboxosdtv', 'hdplayer', 'evsdkserver', 'KmBoxPermission', 'VietkService', 'KmDataCenterService', 'KmHttpdService', 'KmAudioRecordService'):
             continue
         unsigned = output / f'{apk.stem}.unsigned.apk'
         changed = []
@@ -170,4 +170,6 @@ if __name__ == '__main__':
         parser.add_argument('--' + field, type=Path, required=True)
     parser.add_argument('--ordinary', action='store_true')
     parser.add_argument('--serial', type=Path)
+    parser.add_argument('--all-vendor-apps', action='store_true',
+                        help='Preserve and build every vendor APK, including original optional interfaces and plugins')
     port(**vars(parser.parse_args()))
