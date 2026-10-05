@@ -8,10 +8,23 @@ import subprocess
 import time
 from pathlib import Path
 
+OUTPUT = Path('artifacts/port-runtime')
+
 
 def adb(*args, timeout=60, required=True):
-    result = subprocess.run(['adb', *map(str,args)],capture_output=True,text=True,timeout=timeout)
+    command = ['adb', *map(str,args)]
+    print('Provision: ' + ' '.join(command), flush=True)
+    try:
+        result = subprocess.run(command,capture_output=True,text=True,timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout or ''
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode('utf-8', errors='replace')
+        result = subprocess.CompletedProcess(command, 124, stdout, f'ADB timed out after {timeout}s')
     print(result.stdout + result.stderr, flush=True)
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    with (OUTPUT / 'provision.log').open('a', encoding='utf-8') as log:
+        log.write(' '.join(command) + '\n' + result.stdout + result.stderr + '\n')
     if required and result.returncode:
         raise RuntimeError('Guest provisioning command failed: ' + ' '.join(map(str,args)))
     return result
@@ -66,4 +79,15 @@ def provision(source):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('source',type=Path)
-    provision(parser.parse_args().source)
+    args = parser.parse_args()
+    try:
+        provision(args.source)
+    finally:
+        # Keep evidence even when provisioning fails before application probing.
+        for name, command in (
+            ('provision-logcat.txt', ('logcat','-d','-b','all')),
+            ('provision-properties.txt', ('shell','getprop')),
+            ('provision-devices.txt', ('devices','-l')),
+        ):
+            result = adb(*command, timeout=15, required=False)
+            (OUTPUT / name).write_text(result.stdout + result.stderr, encoding='utf-8')

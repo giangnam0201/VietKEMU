@@ -46,7 +46,7 @@ jobs:
       - name: Compile portable vendor JNI adapter
         run: |
           mkdir -p artifacts/port
-          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang" -shared -fPIC -Wall -Wextra -Wno-unused-parameter runtime/native/vdk_adapter.c -llog -o artifacts/port/libvdk.so
+          "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang" -shared -fPIC -Wall -Wextra -Werror -Wno-unused-parameter runtime/native/vdk_adapter.c runtime/native/audio_record.c -llog -o artifacts/port/libvdk.so
           "$ANDROID_HOME/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi23-clang" -shared -fPIC -Wall -Wextra -Werror -Wno-unused-parameter runtime/native/factory_uart.c -o artifacts/port/libfactoryuart.so
       - name: Port copies with original UI and application DEX preserved
         run: |
