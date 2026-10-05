@@ -47,7 +47,7 @@ def boot():
     raise RuntimeError('Adapted guest did not finish booting')
 
 
-def provision(source):
+def provision(source, permissive_development=False):
     adb('root'); adb('wait-for-device')
     # This is the disposable AOSP guest, not the supplied VietK firmware.
     # disable-verity only changes hashtree flags; after a warm emulator reboot,
@@ -84,6 +84,13 @@ def provision(source):
     adb('shell','setprop','persist.sys.locale','vi-VN')
     adb('shell','setprop','persist.sys.timezone','Asia/Taipei')
     adb('reboot'); boot(); adb('root'); adb('wait-for-device')
+    if permissive_development:
+        # Development only: observe the original system app's vendor operations
+        # before implementing the corresponding guest platform policy/backend.
+        # This does not modify the original application or licensing checks.
+        adb('shell', 'setenforce', '0')
+        if adb('shell', 'getenforce').stdout.strip() != 'Permissive':
+            raise RuntimeError('Development guest could not enter the requested permissive mode')
     loaded = adb('shell','getprop','ro.dalvik.vm.native.bridge').stdout.strip()
     if loaded != 'libndk_translation.so':
         raise RuntimeError('Guest did not load the configured ARM bridge property')
@@ -92,9 +99,10 @@ def provision(source):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('source',type=Path)
+    parser.add_argument('--permissive-development', action='store_true')
     args = parser.parse_args()
     try:
-        provision(args.source)
+        provision(args.source, args.permissive_development)
     finally:
         # Keep evidence even when provisioning fails before application probing.
         for name, command in (

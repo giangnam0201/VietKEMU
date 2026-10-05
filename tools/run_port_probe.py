@@ -4,6 +4,7 @@ The runner action otherwise waits indefinitely for inherited output pipes when
 the emulator exits but its crash reporter stays alive (upstream issue #385).
 """
 import os
+import argparse
 import signal
 import subprocess
 import sys
@@ -25,8 +26,14 @@ def release_crash_reporters():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--permissive-development', action='store_true')
+    args = parser.parse_args()
+    command = [sys.executable, 'tools/provision_runtime.py', 'artifacts/runtime/bridge']
+    if args.permissive_development:
+        command.append('--permissive-development')
     try:
-        subprocess.run([sys.executable, 'tools/provision_runtime.py', 'artifacts/runtime/bridge'], check=True)
+        subprocess.run(command, check=True)
         subprocess.run([sys.executable, 'tools/probe_port.py'], check=True)
     finally:
         release_crash_reporters()

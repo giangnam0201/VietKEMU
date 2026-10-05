@@ -84,7 +84,7 @@ jobs:
           pre-emulator-launch-script: python tools/configure_displays.py
           emulator-options: -no-window -gpu swiftshader -feature -Vulkan -no-snapshot -noaudio -no-boot-anim -writable-system -show-kernel -logcat '*:W'
           script: |
-            python tools/run_port_probe.py
+            python tools/run_port_probe.py --permissive-development
       - uses: actions/upload-artifact@v4
         if: always()
         with:
