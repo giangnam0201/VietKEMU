@@ -98,10 +98,31 @@ The optional provisioning script remains experimental.
 
 ## Delivery status
 
+The [development-guest port run](https://github.com/giangnam0201/VietKEMU/actions/runs/37339459780)
+now boots after writable-system provisioning, loads the ARM translation layer,
+and installs all 11 core application copies. The guest platform certificate
+matches the public AOSP platform key, so the apps retain `android.uid.system`.
+DisplayManager reports a primary display and a separate emulator external display.
+The original main app and HD player still fail before Java startup: the ARM
+`app_process` attempts to load the guest's x86 `libc++.so`. The next runtime
+build includes the SDK's ARM linker configuration and execution setup.
+
+The port builder now covers all 23 vendor APKs and verifies the original payload
+files byte for byte, replacing only signing metadata and the documented library
+manifest dependency. Optional interfaces and keyboards are included. The original
+OS PackageInstaller still requires separate integration because it conflicts
+with the guest's existing system package. The recorder JNI adapter compiles and
+calls Android AudioRecord for actual PCM; microphone operation is unverified.
+UART access uses actual guest device files and does not fabricate factory replies.
+
+Original build properties specify Vietnamese locale, density 160, and a forced
+1280×720 external framebuffer. These defaults are applied in the runtime setup.
+
 There is no working Windows emulator executable, original firmware boot,
 validated song playback or working panel/TV window pair in this repository.
-The implemented deliverables are firmware extraction, original resource/API
-inspection and reproducible cloud compatibility experiments. They establish
+The implemented deliverables include firmware extraction, original resource/API
+inspection, compatibility APK builds, guest provisioning, portable JNI adapters,
+and a Windows launcher for mirroring the real guest framebuffers. They establish
 the starting point and blockers for a custom runtime; they do not fulfill the
 requested 1:1 emulator yet.
 
