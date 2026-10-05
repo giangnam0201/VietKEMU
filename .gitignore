@@ -1,0 +1,13 @@
+*.zip
+*.img
+*.dat
+*.aes
+*.apk
+*.so
+__pycache__/
+node_modules/
+dist/
+artifacts/
+firmware/
+reports/private/
+.venv/

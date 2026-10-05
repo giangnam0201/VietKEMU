@@ -1,0 +1,39 @@
+name: Firmware analysis
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install filesystem and Android tools
+        run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt device-tree-compiler apktool
+      - name: Download supplied firmware from private release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download firmware-input --pattern '*.zip' --dir incoming
+      - name: Reconstruct and inspect firmware
+        run: python tools/analyze_firmware.py incoming/*.zip --work firmware
+      - name: Decode device tree
+        run: dtc -I dtb -O dts firmware/device.dtb > firmware/device.dts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-report
+          path: |
+            firmware/report.json
+            firmware/inventory.txt
+            firmware/device.dts
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-applications
+          path: |
+            firmware/system/app/
+            firmware/system/priv-app/
+            firmware/vendor/app/
+            firmware/vendor/priv-app/
+            firmware/system/framework/
+          retention-days: 7
