@@ -58,6 +58,15 @@ operations; it does not yet implement playback, recording, or two Windows window
 Original activation logic is retained. Song servers and licensed media availability
 have not been verified. `port-research.yml` inspects the dependencies in the cloud.
 
+The original MainActivity already starts the original TV service when Android
+reports multiple displays. `configure_displays.py` supplies a 1280×800 panel and
+1920×1080 external display. `windows/Start-VietK.ps1` hosts those actual guest
+framebuffers in separate Windows windows using scrcpy, once the adapted runtime
+is booted and all original components are installed. It is not a standalone
+working release: runtime provisioning, playback and TV startup remain unverified.
+A replacement Windows interface was discarded because it would not preserve the
+required original UX.
+
 The small OTA reconstruction tests can run locally without extracting firmware:
 
 ```powershell
