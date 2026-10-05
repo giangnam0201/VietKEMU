@@ -9,7 +9,15 @@ See [native port approach](docs/native-windows-port.md). `native-decode.yml` dec
 the original APKs on GitHub for a screen-by-screen and feature-by-feature rewrite.
 The Android runtime experiments below are historical research.
 
-**Status: decoding and port development; no working Windows release.** No device boot or
+**Status: native home component and catalogue lookups build and verify on Windows;
+no complete karaoke release.** All 23 vendor APKs have decoded resources and
+smali. Java reconstruction has unresolved methods recorded in the decode reports.
+The native build uses original home drawables/labels and reads the unchanged
+72,355-song catalogue. Main controls, navigation, TV, playback and servers remain
+pending. Run `native-windows.yml` for the development component and verification
+artifacts. These checks do not establish 1:1 fidelity.
+
+No device boot or
 1:1 compatibility has been demonstrated. An interface replica would not establish
 firmware compatibility.
 

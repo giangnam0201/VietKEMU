@@ -35,6 +35,12 @@ the native home body to PNG. It also checks an actual Vietnamese catalogue entry
 and that missing entries are not fabricated. These checks do not establish full
 UI or feature fidelity.
 
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37389039595
+(Windows compilation, native PNG rendering, original default tile ordering,
+original asset hashes, Vietnamese song ID 101000 lookup, missing-ID handling,
+and catalogue count 72,355). The component host contains pending navigation
+events; it is not presented as a usable karaoke application.
+
 The firmware contains a song
 catalogue, not the complete song media collection. A port must report unavailable
 media and server failures truthfully. Decoding success does not establish 1:1
