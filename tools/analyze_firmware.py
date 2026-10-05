@@ -50,7 +50,9 @@ def extract_ext4(image, destination):
 
 def analyze(source, work):
     work.mkdir(parents=True, exist_ok=True)
-    report = {'source': source.name, 'sha256': hashlib.file_digest(source.open('rb'), 'sha256').hexdigest()}
+    with source.open('rb') as stream:
+        checksum = hashlib.file_digest(stream, 'sha256').hexdigest()
+    report = {'source': source.name, 'sha256': checksum}
     with zipfile.ZipFile(source) as archive:
         report['entries'] = [{'path': e.filename, 'size': e.file_size} for e in archive.infolist()]
         report['metadata'] = archive.read('META-INF/com/android/metadata').decode()
@@ -62,6 +64,8 @@ def analyze(source, work):
             import shutil
             shutil.copyfileobj(incoming, outgoing)
         (work / 'device.dtb').write_bytes(tree)
+        with archive.open('squashfs1.img') as incoming, (work / 'rootfs.img').open('wb') as outgoing:
+            shutil.copyfileobj(incoming, outgoing)
     for partition in ('system', 'vendor'):
         image = work / f'{partition}.img'
         with image.open('rb') as stream:
@@ -71,10 +75,11 @@ def analyze(source, work):
             subprocess.run(['simg2img', str(image), str(raw)], check=True)
             image = raw
         extract_ext4(image, work / partition)
+    subprocess.run(['unsquashfs', '-d', str(work / 'rootfs'), str(work / 'rootfs.img')], check=True)
     props = list(work.glob('*/build.prop')) + list(work.glob('*/**/build.prop'))
     report['properties'] = {str(p.relative_to(work)): p.read_text(errors='replace') for p in set(props)}
     apks = []
-    for apk in work.glob('*/**/*.apk'):
+    for apk in (p for part in ('system', 'vendor', 'rootfs') for p in (work / part).rglob('*.apk')):
         result = subprocess.run(['aapt', 'dump', 'badging', str(apk)], capture_output=True, text=True)
         with zipfile.ZipFile(apk) as bundle:
             interesting = []
@@ -83,15 +88,24 @@ def analyze(source, work):
                     if re.match(r'classes\d*\.dex$', name):
                         interesting.extend(s.decode('ascii') for s in re.findall(rb'[ -~]{8,}', bundle.read(name))
                                            if any(term in s.lower() for term in (b'realtek', b'evideo', b'/dev/', b'loadlibrary', b'presentation', b'displaymanager', b'song.db', b'license', b'activation', b'getprop', b'ktvservice')))
+            architectures = {}
+            for name in bundle.namelist():
+                if name.endswith('.so'):
+                    with bundle.open(name) as library:
+                        header = library.read(20)
+                    if header[:4] == b'\x7fELF' and len(header) >= 20:
+                        machine = struct.unpack('<H' if header[5] == 1 else '>H', header[18:20])[0]
+                        architectures[name] = {40: 'ARM', 183: 'AArch64', 3: 'x86', 62: 'x86_64'}.get(machine, str(machine))
             apks.append({'path': str(apk.relative_to(work)), 'size': apk.stat().st_size,
                          'badging': result.stdout, 'native_libraries': [n for n in bundle.namelist() if n.endswith('.so')],
+                         'architectures': architectures,
                          'assets': [n for n in bundle.namelist() if n.startswith('assets/')],
                          'dependency_strings': sorted(set(interesting))[:1500]})
     report['apks'] = apks
     report['native_files'] = [str(p.relative_to(work)) for p in work.glob('*/**/*.so')]
     report['databases'] = [str(p.relative_to(work)) for p in work.glob('*/**/*') if p.is_file() and p.suffix in ('.db', '.sqlite', '.sqlite3')]
     (work / 'report.json').write_text(json.dumps(report, indent=2, ensure_ascii=False))
-    inventory = '\n'.join(str(p.relative_to(work)) for part in ('system', 'vendor') for p in (work / part).rglob('*') if p.is_file())
+    inventory = '\n'.join(str(p.relative_to(work)) for part in ('system', 'vendor', 'rootfs') for p in (work / part).rglob('*') if p.is_file())
     (work / 'inventory.txt').write_text(inventory)
     print(json.dumps({'apks': [{'path': a['path'], 'badging': a['badging'][:1500]} for a in apks], 'databases': report['databases']}, indent=2))
 

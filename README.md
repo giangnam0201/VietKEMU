@@ -1,0 +1,65 @@
+# VietKEMU
+
+Research workspace for the supplied `KTV-Plus_All_V1.7_RC1_update_20230118.zip`.
+The target is a Windows runtime with separate touch-panel and television-output
+windows, using the original firmware applications wherever possible.
+
+**Status: firmware investigation, not a working emulator.** No device boot or
+1:1 compatibility has been demonstrated. An interface replica would not establish
+firmware compatibility.
+
+## Confirmed from the supplied archive
+
+- Android 6.0.1, device `KTV-Plus`, eVideo build
+  `lvbinhui.20220629.v1.2.b57`.
+- Device-tree compatibility includes `Realtek,rtd-1296`.
+- The update configuration enables `secure_boot=1`; kernel, recovery and audio
+  firmware are supplied as `.aes` files.
+- Android system is a full block OTA (`system.new.dat` plus transfer list).
+- Vendor filesystem and a separate SquashFS filesystem are included.
+- This is an update archive, not an Android Virtual Device image.
+
+## Remote analysis
+
+Large extraction runs in the private repository's GitHub Actions, not on the
+Windows host. The original ZIP is stored as a private release asset; it is not
+committed to Git or publicly redistributed.
+
+```powershell
+gh workflow run firmware.yml --repo giangnam0201/VietKEMU
+gh run list --repo giangnam0201/VietKEMU --workflow firmware.yml
+gh run download RUN_ID --repo giangnam0201/VietKEMU -n firmware-report -D artifacts/report
+```
+
+The workflow reconstructs the system filesystem, extracts system/vendor files,
+inventories applications and native libraries, decodes karaoke resources and
+records hardware dependencies. Extracted proprietary files remain in private
+artifacts with limited retention.
+
+The small OTA reconstruction tests can run locally without extracting firmware:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+## Compatibility gates
+
+1. Identify the actual karaoke package, its launcher and required system services.
+2. Test original applications in an ARM-compatible Android runtime on GitHub.
+3. Establish separate panel/output display paths using actual application output.
+4. Validate song database, local playback, controls and persistence.
+5. Compare against real hardware before describing fidelity as 1:1.
+
+CPU emulation alone does not reproduce Realtek video/audio engines, vendor HALs,
+external display routing or device provisioning. A generic QEMU ARM board cannot
+be assumed to boot this update. Without a physical reference device, pixel and
+behavior fidelity cannot be verified.
+
+## Source references
+
+- [QEMU ARM system boards](https://www.qemu.org/docs/master/system/target-arm.html)
+- [QEMU generic virt board](https://www.qemu.org/docs/master/system/arm/virt)
+- [VietK Plus manual](https://vietk.vn/upload/KTV-Plus.pdf)
+
+These references describe platforms and product behavior. The supplied archive
+is the source for the firmware facts above.

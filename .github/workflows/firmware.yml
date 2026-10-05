@@ -12,7 +12,7 @@ jobs:
       - name: Test OTA block reconstruction
         run: python -m unittest discover -s tests -v
       - name: Install filesystem and Android tools
-        run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt device-tree-compiler apktool
+        run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt device-tree-compiler apktool squashfs-tools
       - name: Download supplied firmware from private release
         env:
           GH_TOKEN: ${{ github.token }}
