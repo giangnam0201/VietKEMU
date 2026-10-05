@@ -8,6 +8,9 @@ import json
 import re
 import shutil
 import sqlite3
+import subprocess
+import zipfile
+from html.parser import HTMLParser
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -76,6 +79,66 @@ def package(decoded, destination):
         'original_methods': 'WholeSongDAO.getCount/getSongById/isExist/isOnline/getCountHasRemote',
         'media_availability': 'not established by catalogue metadata'
     }, indent=2))
+    package_bottom(app, destination, entries, strings)
+
+
+class BottomParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.anchor = None
+        self.buttons = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'a': self.anchor = attrs
+        if tag == 'img' and self.anchor and self.anchor.get('data-genre') == '13':
+            self.buttons.append({'href': self.anchor['data-href'], 'src': attrs['src'],
+                'x': float(self.anchor['data-posx']), 'y': float(self.anchor['data-posy']),
+                'width': float(attrs['data-width']), 'height': float(attrs['data-height'])})
+
+    def handle_endtag(self, tag):
+        if tag == 'a': self.anchor = None
+
+
+def package_bottom(app, destination, entries, strings):
+    archive = app / 'apktool/assets/default_template.zip'
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != entries['assets/default_template.zip']['sha256']:
+        raise RuntimeError('Original template archive differs')
+    labels = {'home_imv': 'bottom_home', 'ambience_imv': 'bottom_ambience', 'ori_imv': 'bottom_original',
+        'accp_imv': 'bottom_accompaniment', 'voldec': 'bottom_voice_del', 'play_imv': 'bottom_play',
+        'pause_imv': 'bottom_pause', 'volinc': 'bottom_voice_add', 'replay_imv': 'bottom_replay',
+        'cut_song_imv': 'bottom_cutsong', 'order_bg': 'bottom_order'}
+    bottom_source = (app / 'java/sources/com/evideo/kmbox/view/menubar/BottomMenuBarView.java').read_text()
+    for key in labels.values():
+        if f'R.string.{key}' not in bottom_source: raise RuntimeError('Unmapped original bottom label: ' + key)
+    parser = BottomParser()
+    provenance = []
+    with zipfile.ZipFile(archive) as template:
+        parser.feed(template.read('module_bottom/index.html').decode('utf-8'))
+        for item in parser.buttons:
+            original = template.read('module_bottom/' + item['src'])
+            local = destination / ('bottom-' + item['src'])
+            local.write_bytes(original)
+            png = local.with_suffix('.png')
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(local), '-frames:v', '1', str(png)], check=True)
+            item['image'] = png.name
+            item['text'] = strings[labels[item['href']]]
+            provenance.append({'archive': 'assets/default_template.zip', 'entry': 'module_bottom/'+item['src'],
+                'original_sha256': hashlib.sha256(original).hexdigest(),
+                'windows_png_sha256': hashlib.sha256(png.read_bytes()).hexdigest(),
+                'conversion': 'lossless PNG representation for Windows WPF'})
+    colors = {entry.get('name'): entry.text for entry in ET.parse(app / 'apktool/res/values/colors.xml').getroot()}
+    badge = app / 'apktool/res/drawable-mdpi/icon_playlist_num.png'
+    digest = hashlib.sha256(badge.read_bytes()).hexdigest()
+    if not any(entry['sha256'] == digest and Path(entry['path']).name == badge.name for entry in entries.values()):
+        raise RuntimeError('Original queue count badge differs')
+    shutil.copy2(badge, destination / badge.name)
+    # Values from MenuBarManager, CommonModuleView and image_btn_with_text_lay.
+    contract = {'buttons': parser.buttons, 'y': 660, 'moduleTop': 10,
+        'imageWidth': 40, 'imageHeight': 32, 'textTop': 5, 'textHeight': 30,
+        'textSize': 16, 'textColor': colors['system_singer_name_color']}
+    (destination / 'bottom.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
+    (destination / 'bottom-provenance.json').write_text(json.dumps(provenance, indent=2))
 
 
 if __name__ == '__main__':

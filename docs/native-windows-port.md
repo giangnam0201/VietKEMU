@@ -23,7 +23,14 @@ The original activation and server authentication remain part of the behavior.
 Implemented source translations: `HomeNewFragment`/`HomeNewAdapter` home body,
 original Vietnamese labels and drawables, default tile ordering, and the original
 0.9 scale/25 ms press animation. The Windows component host is a development
-artifact: it does not yet include the main top/bottom bars, screen navigation,
+artifact. The original bottom bar now has its template positions, Vietnamese
+labels, original converted icon images, paired pause/vocal-state visibility and
+500 ms click guard. Playback commands remain requests without a backend;
+the host handles the Home request only. Queue count is still the initial zero.
+`FragmentHistory` translates the original history and back rules, including
+clearing history on Home and disabled online-service fallback.
+
+The host does not yet include the top bar, complete screen navigation,
 Phantom video, television UI, activation, playback or server operations.
 
 `WholeCatalogue` translates read-only `WholeSongDAO` count, existence, ID lookup

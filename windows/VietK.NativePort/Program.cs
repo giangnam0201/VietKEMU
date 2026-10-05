@@ -21,10 +21,21 @@ public static class Program
                 ?? throw new InvalidDataException("Missing original home contract");
             var app = new Application();
             var renderer = new HomeScreen(root, contract);
+            var bottomContract = JsonSerializer.Deserialize<BottomContract>(File.ReadAllText(Path.Combine(root, "bottom.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidDataException("Missing original bottom bar contract");
+            var bottom = new BottomBar(root, bottomContract);
+            Canvas Panel()
+            {
+                var panel = renderer.Create();
+                var bar = bottom.Create();
+                Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
+                return panel;
+            }
             if (args.Length == 2 && args[0] == "--capture")
             {
                 Directory.CreateDirectory(args[1]);
-                var canvas = renderer.Create();
+                var canvas = Panel();
                 canvas.Measure(new Size(1280, 800));
                 canvas.Arrange(new Rect(0, 0, 1280, 800));
                 canvas.UpdateLayout();
@@ -43,6 +54,18 @@ public static class Program
                     throw new InvalidDataException("Native catalogue lookup differs from supplied firmware");
                 if (catalogue.GetSongById(-1) is not null || catalogue.IsOnline(-1))
                     throw new InvalidDataException("Native catalogue fabricated a missing song");
+                if (!bottom.IsVisible("pause_imv") || bottom.IsVisible("play_imv") ||
+                    !bottom.IsVisible("ori_imv") || bottom.IsVisible("accp_imv"))
+                    throw new InvalidDataException("Original default paired control state differs");
+                bottom.SetConfirmedPlaybackState(true, true);
+                if (!bottom.IsVisible("play_imv") || bottom.IsVisible("pause_imv") ||
+                    !bottom.IsVisible("accp_imv") || bottom.IsVisible("ori_imv"))
+                    throw new InvalidDataException("Paired controls do not follow confirmed playback state");
+                var history = new FragmentHistory();
+                history.Reload(new(1)); history.Reload(new(28)); history.Back();
+                if (history.Current.Tag != 1) throw new InvalidDataException("Singer back navigation differs");
+                history.Reload(new(0));
+                if (history.Entries.Count != 0) throw new InvalidDataException("Home failed to clear navigation history");
                 File.WriteAllText(Path.Combine(args[1], "verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsRendering = true,
@@ -51,6 +74,8 @@ public static class Program
                     originalAssetsVerifiedDuringPackaging = true,
                     nativeCatalogueLookupVerified = true,
                     originalSongCount = catalogue.GetCount(),
+                    bottomControlStateRulesVerified = true,
+                    originalNavigationHistoryVerified = true,
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"
@@ -63,7 +88,14 @@ public static class Program
             {
                 Title = "VietK — native home component (port in development)",
                 Width = 1280, Height = 800, Background = Brushes.Black,
-                Content = new Viewbox { Stretch = Stretch.Uniform, Child = renderer.Create() }
+                Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() }
+            };
+            bottom.CommandRequested += command =>
+            {
+                if (command == "home_imv")
+                    window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
+                // Playback, queue and ambience requests need their real backends.
+                // They are not translated into invented playback success/state.
             };
             return app.Run(window);
         }
