@@ -1,0 +1,53 @@
+name: Collect authoritative original port bytecode
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve completed original decode
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 37386126110 -n original-apk-full-decode -D decoded
+      - name: Retain song and playlist bytecode with DEX provenance
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil
+          app = Path('decoded/dualkmbox')
+          apktool = app / 'apktool'
+          output = Path('bytecode-review')
+          classes = {'SongDAO', 'SongIdDAO', 'MediaDAO', 'WholeSongDAO', 'Song', 'Media',
+                     'PlayListManager', 'KmPlayListItem', 'SelectedLocalListManager',
+                     'SongDownListManager', 'OrderSongManger', 'ReportTableManager',
+                     'MuiltCollectListManager', 'SongRecyclerGridViewAdapter', 'UpdateDbManager'}
+          entries = {entry['path']: entry for entry in json.loads((app/'original-entries.json').read_text())}
+          files = []
+          found = set()
+          for root in apktool.glob('smali*'):
+              if not root.is_dir(): continue
+              dex = 'classes.dex' if root.name == 'smali' else root.name.removeprefix('smali_') + '.dex'
+              for source in (root/'com/evideo/kmbox').rglob('*.smali'):
+                  name = source.stem.split('$')[0]
+                  if name not in classes: continue
+                  relative = source.relative_to(apktool)
+                  destination = output / relative
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, destination)
+                  files.append({'path': relative.as_posix(), 'decodedSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+                                'originalDex': dex, 'originalDexSha256': entries[dex]['sha256']})
+                  found.add(name)
+          missing = {'SongDAO','SongIdDAO','MediaDAO','PlayListManager','KmPlayListItem','Song'} - found
+          if missing: raise RuntimeError('Missing original bytecode: ' + ','.join(sorted(missing)))
+          (output/'provenance.json').write_text(json.dumps(files, indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: original-song-playlist-bytecode
+          path: bytecode-review/
+          retention-days: 7
