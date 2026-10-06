@@ -4,9 +4,10 @@ import json
 import shutil
 import subprocess
 import zipfile
+import sys
 from pathlib import Path
 
-from analyze_firmware import extract_ext4, reconstruct
+from analyze_firmware import reconstruct
 from decode_native_port import decode
 
 
@@ -61,6 +62,11 @@ def main():
                 raise RuntimeError(f'No files extracted from {image}')
     if not partitions:
         raise RuntimeError('Unknown OTA format; inspect inventory before adapting extraction')
+    properties = {p.relative_to(work).as_posix(): p.read_text(errors='replace')
+                  for partition in partitions for p in (work / partition).rglob('build.prop')}
+    (output / 'properties.json').write_text(json.dumps(properties, indent=2))
+    if '--properties-only' in sys.argv:
+        return
     applications = []
     selected = []
     for partition in partitions:

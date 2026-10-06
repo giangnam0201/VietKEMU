@@ -16,6 +16,13 @@ jobs:
         run: gh run download 37427570700 -n current-official-music-firmware -D artifacts/current-firmware
       - name: Retain vendor source and original protocol bytecode
         run: python tools/package_music_evidence.py
+      - name: Read current firmware version properties
+        run: |
+          python -m pip install gdown==5.2.0
+          mkdir -p incoming
+          gdown 1-l9rE_5GLyvkgYMGya14mucQGPaLaE2A -O incoming/KTV-Plus_ota_package.zip
+          python tools/inspect_current_firmware.py --properties-only
+          cp artifacts/current-firmware/properties.json artifacts/current-music-evidence/properties.json
       - uses: actions/upload-artifact@v4
         with:
           name: current-music-service-evidence
