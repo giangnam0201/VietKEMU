@@ -26,7 +26,9 @@ The controlling app is `dualkmbox`; karaoke playback is in the separate
 to restore karaoke. `PlayerCtrlService` sends original command types: toggle 0,
 play 1, pause 2, track 3, next 4, replay 5, tone 6, volume 7, stop 8, resume 9,
 mute 10, microphone volume 11, immediate-next 12 and tone-with-tip 13.
-`KmPlayerCtrl` delegates to `KmDurationPlayer`; it also coordinates scoring,
+`KmPlayerCtrl` delegates playback to `KmPlayerCtrlImpl` and `KmVideoPlayer`
+(with `EvIjkPlayer` below it). `KmDurationPlayer` separately probes duration.
+The controller also coordinates scoring,
 recording, secondary presentations, resource availability and player events.
 Port those call paths before advertising working playback or two-screen parity.
 

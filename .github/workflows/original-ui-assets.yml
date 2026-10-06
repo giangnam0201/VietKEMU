@@ -1,0 +1,32 @@
+name: Recover original firmware fonts and branding
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  recover:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install original filesystem readers
+        run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt squashfs-tools
+      - name: Reconstruct supplied firmware on GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download firmware-input --pattern '*.zip' --dir incoming
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          archives=list(Path('incoming').glob('*.zip'))
+          if len(archives)!=1: raise RuntimeError('Expected one supplied firmware')
+          subprocess.run(['python','tools/analyze_firmware.py',str(archives[0]),'--work','firmware-ui'],check=True)
+          PY
+      - name: Retain original font configuration and branding candidates
+        run: python tools/collect_firmware_ui_assets.py firmware-ui artifacts/original-firmware-ui
+      - uses: actions/upload-artifact@v4
+        with:
+          name: original-firmware-ui-assets
+          path: artifacts/original-firmware-ui/
+          retention-days: 30
