@@ -26,6 +26,8 @@ jobs:
                      'PlayListDAOManager',
                      'PlayListManager', 'KmPlayListItem', 'SelectedLocalListManager',
                      'SongDownListManager', 'SongDownListDAO', 'DownListDAOManager', 'OrderSongManger', 'ReportTableManager',
+                     'SongDownloadManager', 'LocalOnlineSongManager', 'BaseOnlineSongManager', 'MsOnlineSongManager', 'NoEvideoOnlineManager',
+                     'DCDomain', 'AppDownloadManager', 'DownLoadTaskItem',
                      'MuiltCollectListManager', 'SongRecyclerGridViewAdapter', 'UpdateDbManager'}
           entries = {entry['path']: entry for entry in json.loads((app/'original-entries.json').read_text())}
           files = []
