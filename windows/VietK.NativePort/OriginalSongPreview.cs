@@ -42,7 +42,8 @@ public sealed class OriginalSongPreview : IDisposable
         overlay.PreviewKeyDown+=(_,e)=> { if(e.Key==Key.Escape) { Close();e.Handled=true; } };
         var heading=new StackPanel { Orientation=Orientation.Horizontal,Height=60,MaxWidth=550,HorizontalAlignment=HorizontalAlignment.Center };
         title=Text(song.Name,24,375);singer=Text(song.Singer,19,150);singer.Margin=new(15,0,0,0);
-        heading.Children.Add(title);heading.Children.Add(singer);Put(content,heading,50,0);
+        heading.Children.Add(title);heading.Children.Add(singer);
+        heading.Measure(new Size(550,60));Put(content,heading,(650-heading.DesiredSize.Width)/2,0);
         var close=Button("×",50,50);close.Tag="preview-close";close.FontSize=30;close.Background=Brushes.Transparent;
         if(File.Exists(Asset("dialog_common_close_n.png")))close.Content=new Image { Source=Bitmap(Asset("dialog_common_close_n.png")),Stretch=Stretch.None };
         close.PreviewMouseLeftButtonDown+=(_,_)=> { if(File.Exists(Asset("dialog_common_close_h.png")))close.Content=new Image { Source=Bitmap(Asset("dialog_common_close_h.png")),Stretch=Stretch.None }; };

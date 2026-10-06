@@ -26,6 +26,8 @@ internal static class NativeSongPreviewVerification
             preview.Show(song);
             Require(preview.IsOpen&&Application.Current.Windows.Count==2,"Song preview introduced another native window");
             await Until(()=>preview.Frames>5&&preview.VideoVisible,"Preview did not render after original 800ms reveal delay");
+            var heading=Descendants<StackPanel>(panel).Single();
+            Require(Math.Abs(Canvas.GetLeft(heading)+heading.ActualWidth/2-325)<1,"Preview title/singer group was not centered as in the source layout");
             Require(preview.Decoder!.Muted&&preview.Decoder.AudioDisabled&&preview.Decoder.Native.AudioTrack==-1,"Preview retained an active audio track");
             Require(television.DecodedPreviewFrames>tvFrames,"Opening song preview stopped TV frame delivery");
             var order=Descendants<Button>(panel).Single(button=>Equals(button.Tag,"preview-order"));
