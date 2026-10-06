@@ -182,6 +182,24 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         }
         return null;
     }
+    public async Task<string?> VerifiedCachedVideo(YouTubeVideo video,CancellationToken cancellation)
+    {
+        if(CompletedVideo(video) is { } current)return current;
+        if(VideoId(video.Id)!=video.Id)return null;
+        foreach(var extension in new[]{".stream.ts",".mkv"})
+        {
+            var path=Path.GetFullPath(Path.Combine(cacheDirectory,video.Id,video.Id+extension));var marker=path+".complete";
+            if(!File.Exists(path) || !File.Exists(marker) || !long.TryParse(await File.ReadAllTextAsync(marker,cancellation),out var size) ||
+                size<=0 || new FileInfo(path).Length!=size)continue;
+            try
+            {
+                await VerifyAudioCoverage(path,cancellation);
+                await File.WriteAllTextAsync(path+".complete.av2",size.ToString(CultureInfo.InvariantCulture),cancellation);return path;
+            }
+            catch(YouTubeIncompleteAudioException) { } // Retain old file, but never replay its truncated audio.
+        }
+        return null;
+    }
     private async Task VerifyAudioCoverage(string path,CancellationToken cancellation)
     {
         var probe=await Run(Tool("ffprobe"),["-v","error","-show_entries",

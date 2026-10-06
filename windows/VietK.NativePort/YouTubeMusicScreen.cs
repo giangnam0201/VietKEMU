@@ -244,7 +244,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         SetStatus("Đang tải: "+video.Title);
         try
         {
-            var file=client.CompletedVideo(video);
+            var file=await client.VerifiedCachedVideo(video,cancellation.Token);
             if(file is null)
             {
             liveTransfer=client.StartProgressive(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>

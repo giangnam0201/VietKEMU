@@ -8,6 +8,16 @@ if(args.Length==4 && args[0]=="--verify-progressive-fixture")
     using var transfer=client.StartProgressive(video,_=>{},CancellationToken.None,args[2]);
     await transfer.WaitUntilReady(CancellationToken.None);var file=await transfer.Completion;
     if(client.CompletedVideo(video)!=file)throw new InvalidDataException("Recovered media did not receive validated cache marker");
+    File.Move(file+".complete.av2",file+".complete",true);
+    if(await client.VerifiedCachedVideo(video,CancellationToken.None)!=file)
+        throw new InvalidDataException("Complete legacy cache was unnecessarily downloaded again");
+    var badVideo=video with { Id="fixture0002" };
+    var badDirectory=Path.Combine(args[3],badVideo.Id);Directory.CreateDirectory(badDirectory);
+    var badFile=Path.Combine(badDirectory,badVideo.Id+".stream.ts");
+    File.Copy(Path.Combine(Path.GetDirectoryName(args[2])!,"legacy-incomplete.ts"),badFile,true);
+    File.WriteAllText(badFile+".complete",new FileInfo(badFile).Length.ToString());
+    if(await client.VerifiedCachedVideo(badVideo,CancellationToken.None) is not null || File.Exists(badFile+".complete.av2"))
+        throw new InvalidDataException("Legacy cache with 45% audio was accepted for replay");
     Console.WriteLine("Interrupted audio input reconnected and completed with verified full audio/video coverage.");return;
 }
 

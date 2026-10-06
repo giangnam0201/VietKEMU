@@ -15,7 +15,7 @@ Main music source: YouTube (yt-dlp + native TV decoder)
   marked complete. Seeking ahead of downloaded data is not supported.
 - Audio coverage is checked against video length. A transfer whose audio ends
   early retries through the regular downloader and resumes near the old position.
-  Older caches are downloaded again once to apply this audio validation.
+  Older caches are checked once; only incomplete audio requires another download.
 - TV and panel preview share decoded frames directly; there is no snapshot
   timer or second decoder. Slow PCs can still drop presentation frames.
 - Next, pause/play, replay and volume use the existing bottom controls.

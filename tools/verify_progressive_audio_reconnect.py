@@ -2,6 +2,7 @@
 import http.server
 import json
 import socket
+import shutil
 import subprocess
 import sys
 import threading
@@ -63,6 +64,7 @@ info = {'id': 'fixture0001', 'title': 'HTTP audio reconnect fixture', 'duration'
                      'vcodec': 'none', 'acodec': 'mp4a.40.2'}]}
 info_file = output/'fixture-info.json'
 info_file.write_text(json.dumps(info), encoding='utf-8')
+shutil.copy2(fixtures/'audio-ends-early.ts', output/'legacy-incomplete.ts')
 try:
     subprocess.run(['dotnet', 'run', '--project', 'windows/VietK.CoreChecks', '-c', 'Release', '--',
                     '--verify-progressive-fixture', str(tools), str(info_file), str(output/'cache')],
@@ -70,7 +72,8 @@ try:
     if not cut or not any(start > 0 for start in audio_ranges):
         raise RuntimeError('Fixture did not prove audio interruption and byte-range recovery')
     report = {'audioDisconnectedAt45Percent': cut, 'audioResumedWithRange': True,
-              'completeAudioVideoCoverageVerified': True}
+              'completeAudioVideoCoverageVerified': True,
+              'validLegacyCacheReusedAndTruncatedLegacyCacheRejected': True}
     (output/'reconnect-verification.json').write_text(json.dumps(report, indent=2))
     print(json.dumps(report))
 finally:
