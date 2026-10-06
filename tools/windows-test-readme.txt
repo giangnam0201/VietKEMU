@@ -13,8 +13,9 @@ Available to test:
 - Pause, replay, seek, original/accompaniment and output volume controls.
 
 Still incomplete:
-- Live music-server authorization requires a registered device identity; firmware
-  alone does not contain the hardware chip ID. Live server playback is unverified.
+- A live login accepted this PC's real BIOS serial and MAC, but song 101000's
+  media request returned no video URL. Production song playback is unverified.
+  Firmware alone does not contain an individual device's hardware chip ID.
 - Encrypted karaoke, complete TV overlays, subtitles/scoring and microphone DSP.
 - Other screens, controls and full original UI/UX parity.
 Song catalogue entries are metadata; this package does not include playable music.

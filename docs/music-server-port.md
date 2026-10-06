@@ -3,8 +3,12 @@
 The Windows host now connects the translated data-center client and media URL
 resolver to HTTP file transfer, a persistent completed-file cache, download and
 selected queues, and a separate native TV decoder window. This remains a partial
-manual port. Live production-server authorization and encrypted karaoke playback
-have not been verified.
+manual port. A live login accepted this PC's actual BIOS serial and physical
+adapter MAC and returned a token, validation code and service URL. This does not
+prove music-library access: the approved request for song 101000 returned HTTP
+200 with `errorcode: "0"`, an empty error message and no `medialist`. A retry
+matched the APK's field order and produced the same result without a redirect.
+No production song was downloaded. Encrypted karaoke playback remains unverified.
 
 ## Original protocol evidence
 
@@ -52,6 +56,19 @@ truncated-file rejection. The Windows verification also exercises a clearly
 identified loopback login/media server through the cache and queues into the
 real decoder, and checks decoded frames and PCM. Those fixtures are not shipped
 as songs and do not prove access to VietK's production music library.
+
+Build run `37422777784` (commit `5243e80`) passed signed loopback login, media
+lookup, download, cache and queue promotion through the real Windows decoder.
+It also verified decoded video pixels, left/right and multiple-stream PCM,
+pause/resume, seek, replay, volume amplitude and decoder completion. The native
+test ZIP is available under `artifacts/windows-test-v18` locally. These results
+are distinct from the unsuccessful production media lookup described above.
+
+`tools/probe_music_server.py` provides an operator-authorized live diagnostic
+using real supplied identity and server-issued authentication. Identity and
+session records stay in ignored local artifacts and must not be committed or
+uploaded. Its public report records whether a media list and completed download
+actually exist; server code zero alone is never reported as successful playback.
 
 For local video testing without server authorization, launch
 `VietK.NativePort.exe --play-media "C:\path\video.mp4"`. This is a developer probe,
