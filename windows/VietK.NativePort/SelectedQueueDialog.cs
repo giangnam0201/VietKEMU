@@ -23,13 +23,15 @@ public sealed class SelectedQueueDialog
     private readonly Dictionary<string,Canvas> transfers=[];
     private string? playingId;
     private readonly SelectedQueueDrag? drag;
+    private readonly bool youtubeIcons;
+    private readonly Func<YouTubeVideo,bool>? canDrag;
     internal SelectedQueueDrag Drag=>drag??throw new InvalidOperationException("Queue reorder callback is missing");
     public bool ShowingHistory { get; private set; }
     public Canvas Overlay { get; }=new() { Width=1280,Height=800,Background=new SolidColorBrush(Color.FromArgb(128,0,0,0)) };
     public StackPanel Rows { get; }=new();
-    public SelectedQueueDialog(Canvas panel,Action<YouTubeVideo> remove,Action<YouTubeVideo> top,Action clear,Action shuffle,Action retry,string? resources=null,Action<YouTubeVideo,int>? move=null)
+    public SelectedQueueDialog(Canvas panel,Action<YouTubeVideo> remove,Action<YouTubeVideo> top,Action clear,Action shuffle,Action retry,string? resources=null,Action<YouTubeVideo,int>? move=null,bool youtubeIcons=true,Func<YouTubeVideo,bool>? canDrag=null)
     {
-        this.panel=panel;this.remove=remove;this.top=top;this.clear=clear;this.shuffle=shuffle;this.retry=retry;
+        this.panel=panel;this.remove=remove;this.top=top;this.clear=clear;this.shuffle=shuffle;this.retry=retry;this.youtubeIcons=youtubeIcons;this.canDrag=canDrag;
         this.resources=resources??Path.Combine(OriginalSupplement.Root,"ambience","playlist");
         content=new Canvas { Width=563,Height=596,ClipToBounds=true };
         var border=new Border { Width=563,Height=596,CornerRadius=new CornerRadius(10),Background=new SolidColorBrush(Color.FromRgb(0x48,0x17,0x40)),Child=content };
@@ -85,7 +87,8 @@ public sealed class SelectedQueueDialog
             var name=Text(video.Title,index==0 && playing?20:18);name.MaxWidth=250;name.TextTrimming=TextTrimming.CharacterEllipsis;
             if(index==0 && playing)name.Foreground=new SolidColorBrush(Color.FromRgb(255,207,17));
             name.Measure(new Size(250,65));Put(row,name,70,(65-name.DesiredSize.Height)/2);
-            Put(row,Icon("icon_youtube",33,30),70+name.DesiredSize.Width+15,17.5);
+            var sourceIcon=Icon("icon_youtube",33,30);sourceIcon.Visibility=youtubeIcons?Visibility.Visible:Visibility.Collapsed;
+            Put(row,sourceIcon,70+name.DesiredSize.Width+15,17.5);
             var transfer=new Canvas { Width=80,Height=50,IsHitTestVisible=false };
             Put(row,transfer,350,7.5);transfers[video.Id]=transfer;
             if(downloadStates?.TryGetValue(video.Id,out var state)==true)SetTransfer(video.Id,state);
@@ -94,7 +97,7 @@ public sealed class SelectedQueueDialog
             Put(row,ClickIcon("ic_delete",()=>remove(video)),499,0);
             var retryHit=new Border { Width=440,Height=65,Background=Brushes.Transparent };
             retryHit.MouseLeftButtonUp+=(_,e)=> { if(position==0 && !playing)retry();e.Handled=true; };Put(row,retryHit,0,0);
-            drag?.Attach(retryHit,row,video,index);
+            if(canDrag?.Invoke(video)!=false)drag?.Attach(retryHit,row,video,index);
             Rows.Children.Add(row);
         }
     }

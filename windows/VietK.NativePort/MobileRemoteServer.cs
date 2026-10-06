@@ -112,7 +112,10 @@ public sealed class MobileRemoteServer : IDisposable
                     if(string.IsNullOrWhiteSpace(request.Id)||request.Id.Length>30||request.Id.Any(char.IsControl)||!playback.Television.Overlay.Barrage.Send(request.Id))throw new ArgumentException("Invalid wish or missing local assets");
                 }
                 else if(request.Action=="screen")playback.Television.SetScreenMask(!playback.Television.IsScreenMasked);
-                else music.RemoteQueue(request.Action,request.Id,request.Target);
+                else if(request.Bank=="original")
+                { if(music.OriginalQueue is null)throw new ArgumentException();music.OriginalQueue.Action(request.Action,request.Id,request.Target); }
+                else if(request.Bank is "youtube" or "")music.RemoteQueue(request.Action,request.Id,request.Target);
+                else throw new ArgumentException("Unknown queue bank");
                 return true;
             });
             await context.Response.WriteAsJsonAsync(new { accepted=true });
@@ -187,5 +190,5 @@ public sealed class MobileRemoteServer : IDisposable
         catch(OperationCanceledException) { }
         await web.DisposeAsync();
     }).GetAwaiter().GetResult();
-    public sealed record RemoteAction(string Action="",string Id="",bool First=false,int Target=0);
+    public sealed record RemoteAction(string Action="",string Id="",bool First=false,int Target=0,string Bank="");
 }

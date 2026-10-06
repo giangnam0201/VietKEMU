@@ -39,9 +39,11 @@ public sealed class YouTubeMusicScreen : IDisposable
     internal Func<string>? MobileConnectionInfo { get; set; }
     internal Action? RePairMobile { get; set; }
     internal Action? OpenMobilePairing { get; set; }
+    internal OriginalQueueRemote? OriginalQueue { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
         volume=playback.Decoder.OutputVolumeStep,muted=playback.Decoder.Muted,
         canSwitchVocal=playback.CanSwitchVocal,originalVocal=playback.ConfirmedOriginalVocal,vocalUnavailableReason=playback.VocalUnavailableReason,
+        source=playback.Source.ToString(),original=OriginalQueue?.State(),
         status=message,transfers=queueTransfers.ToDictionary(pair=>pair.Key,pair=>pair.Value) };
     internal Task<IReadOnlyList<YouTubeVideo>> RemoteSearch(string query,CancellationToken cancellation)=>client.Search(query,cancellation);
     internal void RemoteAdd(YouTubeVideo video,bool first)=>Add(video,first);
@@ -78,7 +80,16 @@ public sealed class YouTubeMusicScreen : IDisposable
         if(File.Exists(queueFile))queue.AddRange((JsonSerializer.Deserialize<YouTubeVideo[]>(File.ReadAllText(queueFile))??[])
             .Where(video=>YouTubeMusicClient.VideoId(video.Id)==video.Id));
         playback.CommandOverride=Command;
-        playback.LocalMediaRequested+=()=> { active=false; };
+        playback.SourceChanged+=SourceChanged;
+    }
+    private void SourceChanged(PlaybackSource source)
+    {
+        if(source==PlaybackSource.LocalKaraoke)
+        {
+            ++generation;active=false;downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;
+            SetStatus("Đang phát bài VietK từ hàng chờ cục bộ.");
+        }
+        else if(source==PlaybackSource.Idle)active=false;
     }
     public Canvas Create(string? query=null,bool loadDefault=true)
     {
@@ -329,18 +340,21 @@ public sealed class YouTubeMusicScreen : IDisposable
         if(first) { queue.RemoveAll(item=>item.Id==video.Id);queue.Insert(0,video); }
         else if(queue.All(item=>item.Id!=video.Id))queue.Add(video);
         Save();RefreshQueue();
-        if(first || wasEmpty)_=PlayFirst();
+        if(first || (wasEmpty&&playback.Source!=PlaybackSource.LocalKaraoke))_=PlayFirst();
     }
     private void RefreshQueue()
     {
         foreach(var id in queueTransfers.Keys.Where(id=>queue.All(item=>item.Id!=id)).ToArray())queueTransfers.Remove(id);
-        bottom.SetConfirmedQueueCount(queue.Count);queueDialog?.Refresh(queue,active,queueTransfers);
-        UpdateMarquee();
+        if(OriginalQueue?.ShouldPresent!=true)bottom.SetConfirmedQueueCount(queue.Count);
+        queueDialog?.Refresh(queue,active,queueTransfers);
+        if(playback.Source!=PlaybackSource.LocalKaraoke)UpdateMarquee();
         foreach(var (id,title) in visibleTitles)
             title.Foreground=queue.Any(item=>item.Id==id)?new SolidColorBrush(Color.FromRgb(255,231,97)):Brushes.White;
     }
     private void Remove(YouTubeVideo video)
     {
+        if(!active&&downloading is null&&playback.Source==PlaybackSource.LocalKaraoke)
+        { queue.RemoveAll(item=>item.Id==video.Id);Save();RefreshQueue();return; }
         if(queue.FirstOrDefault()?.Id==video.Id) { Next();return; }
         queue.RemoveAll(item=>item.Id==video.Id);Save();RefreshQueue();
     }
@@ -373,7 +387,7 @@ public sealed class YouTubeMusicScreen : IDisposable
             }
             if(stamp!=generation || disposed)return;
             if(liveTransfer is null)SetQueueTransfer(video.Id,null);
-            if(!playback.PlayMedia(file,preserveStereo:true))throw new IOException("Không phát được video đã tải.");
+            if(!playback.PlayMedia(file,preserveStereo:true,source:PlaybackSource.YouTube))throw new IOException("Không phát được video đã tải.");
             active=true;SetStatus("Đang phát: "+video.Title);RefreshQueue();
             playback.Television.Overlay.SetSong(video.Title,queue.Skip(1).FirstOrDefault()?.Title??"");
             if(liveTransfer is not null)
@@ -391,7 +405,7 @@ public sealed class YouTubeMusicScreen : IDisposable
                         if(stamp==generation) { SetQueueTransfer(video.Id,new(progress.Received,progress.Total));SetStatus("Đang tải lại âm thanh: "+video.Title+" — "+queueTransfers[video.Id].Caption); }
                     }),cancellation.Token);
                     if(stamp!=generation || disposed)return;
-                    if(!playback.PlayMedia(repaired,preserveStereo:true))throw new IOException("Không phát được video đã tải lại.");
+                    if(!playback.PlayMedia(repaired,preserveStereo:true,source:PlaybackSource.YouTube))throw new IOException("Không phát được video đã tải lại.");
                     active=true;RefreshQueue();
                     var deadline=DateTime.UtcNow.AddSeconds(15);
                     while(playback.Player.State==OriginalVideoState.Preparing && DateTime.UtcNow<deadline)
@@ -430,12 +444,13 @@ public sealed class YouTubeMusicScreen : IDisposable
         }
         if(command=="replay_imv" && active && playback.Player.Source is string source)
         {
-            active=playback.PlayMedia(source,preserveStereo:true);
+            active=playback.PlayMedia(source,preserveStereo:true,source:PlaybackSource.YouTube);
             playback.Television.Overlay.ShowControl("replay");
             return true;
         }
         if(command=="decoder_completed") { if(!active)return false;Next();return true; }
-        if(command=="cut_song_imv") { Next();return true; }
+        if(command=="cut_song_imv")
+        { if(!active&&downloading is null&&playback.Source!=PlaybackSource.YouTube)return false;Next();return true; }
         if(command is "ori_imv" or "accp_imv")
         {
             if(playback.CanSwitchVocal)return false;
@@ -443,13 +458,16 @@ public sealed class YouTubeMusicScreen : IDisposable
                 "Video YouTube không có thông tin kênh nguyên xướng / nhạc đệm của VietK.":playback.VocalUnavailableReason);
             return true;
         }
-        if(command is "order_bg" or "orderlist_imv") { ShowQueue();return true; }
+        if(command is "order_bg" or "orderlist_imv")
+        { if(OriginalQueue?.ShouldPresent==true)OriginalQueue.ShowDialog();else ShowQueue();return true; }
         return false;
     }
     private void Next()
     { downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;++generation;active=false;playback.Player.Stop();if(queue.Count>0)queue.RemoveAt(0);Save();RefreshQueue();_=PlayFirst(); }
     private void Clear()
     {
+        if(!active&&downloading is null&&playback.Source==PlaybackSource.LocalKaraoke)
+        { queue.Clear();queueTransfers.Clear();Save();RefreshQueue();return; }
         if(active && queue.Count>0)
         {
             OriginalQueueOrder.ClearExceptPlaying(queue,idle:false);Save();RefreshQueue();
@@ -487,5 +505,5 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private static void Put(Canvas canvas,UIElement element,double x,double y)
     { Canvas.SetLeft(element,x);Canvas.SetTop(element,y);canvas.Children.Add(element); }
-    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();liveTransfer?.Dispose();playback.CommandOverride=null; }
+    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();liveTransfer?.Dispose();playback.SourceChanged-=SourceChanged;playback.CommandOverride=null; }
 }

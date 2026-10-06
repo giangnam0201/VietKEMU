@@ -64,6 +64,7 @@ public static class Program
             OriginalSelectedQueue? selectedQueue=null;
             OriginalDownloadQueue? downloadQueue=null;
             NativePlayback? playback=null;
+            OriginalQueueRemote? originalRemote=null;
             using var musicServer=new NativeMusicServer(app.Dispatcher,stateDirectory,id=>songState.GetSongById(id));
             IReadOnlyList<SongMedia> AvailableMedia(int id)=>musicServer.Get(id) is { } cached?
                 new[]{cached.Metadata}.Concat(songState.GetMedia(id)).ToArray():songState.GetMedia(id);
@@ -72,7 +73,7 @@ public static class Program
                 app.Dispatcher.BeginInvoke(() =>
                 {
                     var item = selectedQueue?.Snapshot().FirstOrDefault();
-                    if (item is null) { playback?.Player.Stop(); return; }
+                    if (item is null) { playback?.StartIdleDemo(); return; }
                     var cached=musicServer.Get(item.SongMetadata.Id);
                     var path=string.IsNullOrEmpty(item.PlayUrl)?cached?.Path:item.PlayUrl;
                     if(item.PlayType!="normal" || string.IsNullOrEmpty(path))return;
@@ -83,7 +84,8 @@ public static class Program
             {
                 var combined=(selectedQueue?.Snapshot()??Array.Empty<SelectedPlaylistItem>())
                     .Concat(downloadQueue?.Snapshot()??Array.Empty<SelectedPlaylistItem>()).ToArray();
-                bottom.SetConfirmedQueueCount(combined.Length);
+                if(playback?.Source!=PlaybackSource.YouTube)bottom.SetConfirmedQueueCount(combined.Length);
+                originalRemote?.Refresh();
                 queueBrowser?.SetConfirmedQueuedSongs(combined.Select(item=>item.SongMetadata.Id).ToHashSet());
             }
             selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
@@ -486,6 +488,13 @@ public static class Program
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             playback = nativePlayback;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
+            originalRemote=new OriginalQueueRemote(selectedQueue,downloadQueue,nativePlayback,bottom,()=>
+            {
+                if(selectedQueue.Count>0)StartQueuedMedia();
+                downloadSelection.Start();
+            });
+            youtubeMusic.OriginalQueue=originalRemote;
+            nativePlayback.Player.Played+=originalRemote.Refresh;
             using var mobileRemote=new MobileRemoteServer(app.Dispatcher,youtubeMusic,nativePlayback,ambience:ambienceExpressions);
             youtubeMusic.MobileConnectionInfo=()=>mobileRemote.ConnectionInfo;
             youtubeMusic.RePairMobile=mobileRemote.RePair;

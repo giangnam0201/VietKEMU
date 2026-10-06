@@ -1,5 +1,6 @@
 """Real mobile browser -> native HTTP -> Windows queue, using synthetic search data."""
 import os
+import sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright, expect
 
@@ -15,6 +16,23 @@ with sync_playwright() as p:
     page.goto(base + '#token=' + token)
     expect(page.locator('#connection')).to_have_text('Đã kết nối')
     assert '#token=' not in page.url
+    if os.environ.get('VIETK_REMOTE_TEST_PHASE') == 'original':
+        page.locator('#queueTab').click()
+        expect(page.locator('#queueBank')).to_have_value('original')
+        expect(page.locator('#rows .row')).to_have_count(4)
+        expect(page.locator('#rows .row').nth(3)).to_contain_text('45%')
+        page.locator('#rows .row').nth(2).get_by_role('button', name='Ưu tiên', exact=True).click()
+        expect(page.locator('#rows .row').nth(1)).to_contain_text('Original fixture B')
+        page.locator('#queueBank').select_option('youtube')
+        expect(page.locator('#rows .row')).to_have_count(2)
+        page.locator('#queueBank').select_option('original')
+        expect(page.locator('#rows .row')).to_have_count(4)
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Original queue page overflows'
+        page.screenshot(path=str(output / 'phone-original-queue.png'), full_page=True)
+        assert not errors, 'Original queue JavaScript errors'
+        browser.close()
+        print('Original native queue browser selection, priority, download progress and source isolation verified.')
+        sys.exit(0)
     page.locator('#query').fill('fixture')
     page.locator('#searchButton').click()
     expect(page.locator('#results .card')).to_have_count(1)

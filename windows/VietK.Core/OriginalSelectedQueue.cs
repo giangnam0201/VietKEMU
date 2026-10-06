@@ -131,4 +131,10 @@ public sealed class OriginalSelectedQueue
         lock(items)return OriginalPlaylistIdentity.Exists(items,item);
     }
     public void ClearWithoutNext() { lock(items)items.Clear();post(new(5)); }
+    // SelectedLocalListManager updates runtime state only in these two paths.
+    // Its APK sends no DAO message for clear-except-playing or shuffle.
+    public void ClearExceptPlaying(bool idle)
+    { lock(items)OriginalQueueOrder.ClearExceptPlaying(items,idle);changed(); }
+    public bool Shuffle(Func<int,int> next)
+    { lock(items) { if(!OriginalQueueOrder.Shuffle(items,next))return false;changed();return true; } }
 }

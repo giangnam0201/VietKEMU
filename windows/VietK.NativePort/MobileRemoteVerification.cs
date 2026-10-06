@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using VietK.Core;
+using Microsoft.Data.Sqlite;
 
 namespace VietK.NativePort;
 
@@ -110,6 +111,7 @@ internal static class MobileRemoteVerification
         var idleMode=playback.Player.SingMode;
         await Send(new { action="command",id="ori_imv" });
         Require(playback.Player.SingMode==idleMode,"Phone changed vocal mode during idle playback");
+        await VerifyOriginalQueue(playback,music,server,client,stereo,directory,panel,bottom);
         using(var invalid=await client.PostAsJsonAsync("api/action",new { action="command",id="shutdown" }))Require(invalid.StatusCode==HttpStatusCode.BadRequest,"Unknown phone command accepted");
         using(var unknown=await client.PostAsJsonAsync("api/action",new { action="add",id="unsearched1" }))Require(unknown.StatusCode==HttpStatusCode.BadRequest,"Unsearched arbitrary media accepted");
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
@@ -118,8 +120,85 @@ internal static class MobileRemoteVerification
         playback.Television.Overlay.Qr.Configure(new());
         File.WriteAllText(Path.Combine(directory,"verification.json"),JsonSerializer.Serialize(new { realHttp=true,pairedAuthorization=true,originRejection=true,searchFixture=true,
             nativeQueueAdd=true,priority=true,reorder=true,remove=true,clearProtectsPlaying=true,volumeAndTvFeedback=true,revocation=true,
-            pauseResume=true,replay=true,nextRestoresIdle=true,blackout=true,muteAndVolumeUnmute=true,vocalActualPcmAndTvFeedback=true,phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
+            pauseResume=true,replay=true,nextRestoresIdle=true,blackout=true,muteAndVolumeUnmute=true,vocalActualPcmAndTvFeedback=true,
+            originalQueueStableDuplicateIds=true,originalPriorityMoveDelete=true,originalClearAndShufflePreserveHead=true,
+            localNextLeavesYouTubeQueueIntact=true,originalDownloadProgressAndCancel=true,
+            phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
+    }
+    private static async Task VerifyOriginalQueue(NativePlayback playback,YouTubeMusicScreen music,MobileRemoteServer server,HttpClient client,string stereo,string directory,Canvas panel,BottomBar bottom)
+    {
+        void Require(bool value,string error) { if(!value)throw new InvalidDataException(error); }
+        using var database=new SqliteConnection("Data Source=:memory:");database.Open();
+        using(var schema=database.CreateCommand())
+        { schema.CommandText="CREATE TABLE tblSelectedList(id INTEGER NOT NULL PRIMARY KEY,songid INT,canscore INT,sequence INT,customerId TEXT,tableid INT,stage INT)";schema.ExecuteNonQuery(); }
+        var store=new SelectedListStore(database);OriginalQueueRemote? remote=null;OriginalSelectedQueue? selected=null;
+        LocalSong Song(int id)=>new(id,"Original fixture "+(id==1?"A":"B"),"",0,"",new int[4],new int[4],new int[4],0,1,0,"","",0,"",1,0);
+        SelectedPlaylistItem Item(int id)=>new(Song(id),0,null,new SongMedia(id,id,stereo,100,0,1,"0","0",1,"","","","",0,null,null,"original-phone-fixture"))
+            { PlayName=Song(id).Name,PlayId=id.ToString(),PlayUrl=stereo };
+        void Start()
+        {
+            var head=selected!.Snapshot().FirstOrDefault();
+            if(head is null)playback.StartIdleDemo();else RequireMedia(playback.PlayMedia(head.PlayUrl,head.VideoMedia));
+        }
+        selected=new OriginalSelectedQueue(Song,command=>command.Apply(store,_=>false),()=>remote?.Refresh(),Start);
+        selected.Initialize(store,()=>[]);
+        var cancelled=0;var retried=0;
+        var downloads=new OriginalDownloadQueue(_=>{},()=>remote?.Refresh(),()=>{},()=>cancelled++,_=>{},_=>{});
+        downloads.Initialize(()=>{},()=>[],true);
+        remote=new OriginalQueueRemote(selected,downloads,playback,bottom,()=>retried++);music.OriginalQueue=remote;
+        void Next()=>selected.DeleteByIndex(0);
+        playback.NextRequested+=Next;playback.Player.Played+=remote.Refresh;
+        try
+        {
+            music.SeedRemoteFixture();selected.Add(Item(1));selected.Add(Item(1));selected.Add(Item(2));downloads.Add(Item(2));
+            downloads.SetProgressBySong(2,100,45);
+            var deadline=DateTime.UtcNow.AddSeconds(10);
+            while(playback.Player.State!=OriginalVideoState.Play) { if(DateTime.UtcNow>deadline)throw new TimeoutException("Original phone queue did not start");await Task.Delay(50); }
+            remote.Refresh();
+            Require(bottom.QueueCount==4,"Original selected/download badge differs");
+            var local=selected.Snapshot();var first="local:"+local[0].FlowId;var repeated="local:"+local[1].FlowId;var third="local:"+local[2].FlowId;
+            Require(first!=repeated,"Repeated original song orders lost their distinct flow IDs");
+            using(var state=JsonDocument.Parse(await client.GetStringAsync("api/state")))
+            {
+                var original=state.RootElement.GetProperty("original");
+                Require(original.GetProperty("active").GetBoolean()&&original.GetProperty("queue").GetArrayLength()==4,"Original phone state does not show actual lists");
+                Require(original.GetProperty("transfers").GetProperty("download:"+downloads.Snapshot()[0].FlowId).GetProperty("received").GetInt64()==45,"Original download percentage missing");
+            }
+            var before=panel.Children.Count;playback.Command("order_bg");
+            Require(panel.Children.Count==before+1,"Original Đã chọn did not open actual local queue");panel.Children.RemoveAt(panel.Children.Count-1);
+            if(Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1")
+            {
+                var start=new System.Diagnostics.ProcessStartInfo("python") { UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };
+                start.ArgumentList.Add("tools/verify_mobile_browser.py");
+                start.Environment["VIETK_REMOTE_TEST_URL"]=client.BaseAddress!.ToString();start.Environment["VIETK_REMOTE_TEST_TOKEN"]=server.TestToken;
+                start.Environment["VIETK_REMOTE_TEST_OUTPUT"]=Path.GetFullPath(directory);start.Environment["VIETK_REMOTE_TEST_PHASE"]="original";
+                using var browser=System.Diagnostics.Process.Start(start)!;var stdout=browser.StandardOutput.ReadToEndAsync();var stderr=browser.StandardError.ReadToEndAsync();
+                try { await browser.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)); }
+                catch(TimeoutException) { browser.Kill(true);throw new InvalidDataException("Original queue browser verification timed out"); }
+                Require(browser.ExitCode==0,"Original phone browser failed: "+((await stdout)+(await stderr)).Replace(server.TestToken,"[redacted]",StringComparison.Ordinal));
+            }
+            async Task Send(string action,string id="",int target=0)
+            { using var response=await client.PostAsJsonAsync("api/action",new { action,id,target,bank="original" });Require(response.IsSuccessStatusCode,"Original phone action failed: "+response.StatusCode); }
+            await Send("top",repeated);Require(selected.Snapshot()[1].FlowId==repeated[6..],"Original duplicate-row priority failed");
+            await Send("move",repeated,2);Require(selected.Snapshot()[2].FlowId==repeated[6..],"Original duplicate-row move failed");
+            await Send("remove",repeated);Require(selected.Count==2&&selected.Snapshot()[0].FlowId==first[6..],"Original repeated-row removal affected playing copy");
+            await Send("shuffle");Require(selected.Snapshot()[0].FlowId==first[6..],"Original shuffle replaced the playing head");
+            using(var response=await client.PostAsJsonAsync("api/action",new { action="command",id="cut_song_imv" }))Require(response.IsSuccessStatusCode,"Original next command failed");
+            Require(selected.Count==1&&selected.Snapshot()[0].FlowId==third[6..],"Next advanced YouTube instead of original karaoke");
+            using(var state=JsonDocument.Parse(await client.GetStringAsync("api/state")))Require(state.RootElement.GetProperty("queue").GetArrayLength()==2,"Local next modified saved YouTube orders");
+            deadline=DateTime.UtcNow.AddSeconds(10);
+            while(playback.Player.State!=OriginalVideoState.Play) { if(DateTime.UtcNow>deadline)throw new TimeoutException("Next original song failed to start");await Task.Delay(50); }
+            using(var response=await client.PostAsJsonAsync("api/action",new { action="remove",id="fixture0001",bank="youtube" }))Require(response.IsSuccessStatusCode,"Saved YouTube row removal failed");
+            Require(playback.Source==PlaybackSource.LocalKaraoke&&playback.Player.State==OriginalVideoState.Play&&selected.Count==1,"Saved YouTube removal interrupted local playback");
+            using(var response=await client.PostAsJsonAsync("api/action",new { action="clear",bank="youtube" }))Require(response.IsSuccessStatusCode,"Saved YouTube clear failed");
+            using(var response=await client.PostAsJsonAsync("api/action",new { action="add",id="fixture0003" }))Require(response.IsSuccessStatusCode,"YouTube wait-list add failed");
+            Require(playback.Source==PlaybackSource.LocalKaraoke&&playback.Player.State==OriginalVideoState.Play&&selected.Count==1,"Normal YouTube add took over local playback");
+            await Send("clear");Require(selected.Count==1&&downloads.Count==0&&cancelled==1,"Original clear stopped playing song or failed to cancel downloads");
+            await Send("retry");Require(retried==1,"Original retry did not reach its native callback");
+            await Send("remove",third);Require(selected.Count==0&&playback.IsPlayingIdle,"Original last-song removal did not restore idle output");
+        }
+        finally { playback.NextRequested-=Next;playback.Player.Played-=remote.Refresh;music.OriginalQueue=null; }
     }
     private static void RequireMedia(bool accepted) { if(!accepted)throw new InvalidDataException("Remote vocal fixture rejected"); }
 }

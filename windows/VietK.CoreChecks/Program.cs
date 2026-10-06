@@ -301,6 +301,13 @@ using(var queueDb=new SqliteConnection("Data Source=:memory:"))
     var fresh=new OriginalSelectedQueue(Lookup,Post,()=>{},()=>{});
     fresh.Initialize(store,Restore);Require(fresh.ClearOnInitialize && store.Count==0 && fresh.Count==0,
         "Default manager initialization did not clear the persisted selected list");
+    fresh.Add(Item(10));fresh.Add(Item(20));fresh.Add(Item(30));
+    var beforeRuntimeOnly=commands.Count;
+    Require(fresh.Shuffle(_=>0)&&fresh.Snapshot().Select(item=>item.SongMetadata.Id).SequenceEqual(new[]{10,30,20}),
+        "Original runtime shuffle changed the playing head");
+    fresh.ClearExceptPlaying(false);Require(fresh.Count==1&&fresh.Snapshot()[0].SongMetadata.Id==10,"Original runtime clear removed playing head");
+    fresh.ClearExceptPlaying(true);Require(fresh.Count==0&&commands.Count==beforeRuntimeOnly,
+        "Runtime-only shuffle/clear invented an APK DAO message");
 }
 Console.WriteLine("Original selected items/manager verified: reconstruction, score polarity, media preference, initialization, Top, drag indices, flow identity and notifications.");
 
