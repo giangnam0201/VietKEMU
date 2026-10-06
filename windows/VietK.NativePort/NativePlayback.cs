@@ -285,6 +285,11 @@ public sealed class NativePlayback : IDisposable
         idleVideoPath=Path.GetFullPath(path);SavePreferences();
         if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
     }
+    public void UseFactoryIdleVideo()
+    {
+        idleVideoPath="";SavePreferences();
+        if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
+    }
     private void SavePreferences()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);

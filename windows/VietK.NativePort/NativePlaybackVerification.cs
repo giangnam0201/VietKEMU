@@ -214,7 +214,7 @@ public static class NativePlaybackVerification
                 using(var preferences=JsonDocument.Parse(File.ReadAllText(Path.Combine(output,"playback-state.json"))))
                     Require(preferences.RootElement.GetProperty("IdleVideoPath").GetString()==Path.GetFullPath(multi),
                         "Volume save lost custom idle-video selection");
-                playback.Player.Stop();File.Delete(Path.Combine(output,"Demo.mp4"));
+                playback.UseFactoryIdleVideo();playback.Player.Stop();File.Delete(Path.Combine(output,"Demo.mp4"));
                 // This package uses a known decoder fixture. The owner's real
                 // factory clip stays local and is never uploaded by CI.
                 var supplement=Path.Combine(output,"supplement-fixture.zip");

@@ -142,7 +142,8 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Chữ chạy trên TV…",EditMarquee);
-        Add("Chọn video chờ (Demo.mp4)…",ChooseIdleVideo);menu.IsOpen=true;
+        Add("Chọn video chờ (Demo.mp4)…",ChooseIdleVideo);
+        Add("Dùng video chờ gốc",()=> { playback.UseFactoryIdleVideo();SetStatus("Đã khôi phục video chờ mặc định."); });menu.IsOpen=true;
     }
     private void ChooseIdleVideo()
     {
