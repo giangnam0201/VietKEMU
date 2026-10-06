@@ -11,7 +11,7 @@ tiles open the same panel. yt-dlp supplies public search results (no Data API ke
 and pasted video links work through the same queue. Cards use the original
 230-by-195 geometry, the firmware background, original YouTube icon, VietK header
 and existing bottom controls. The panel now includes a touch keyboard and a
-live snapshot preview of the TV video with its overlays; all menus and pixel
+live shared-frame preview of the TV video with its overlays; all menus and pixel
 parity remain unfinished. Results now use the original two rows of three cards per page,
 up to 48 results per search, stretched 230x140 thumbnails, centered 220x45
 titles, and queued-title color `#ffffe761`. The firmware's Roboto is used.
@@ -44,7 +44,23 @@ requested re-encode; ffprobe checks for both audio and video. Only a successful
 process result and a completed verified file create a cache marker. Cancellation
 kills the process tree and generation checks prevent an old fetch from starting
 after next/clear. Completed files are played by bundled libVLC in the independent
-TV window. No embedded player, WebView or stream URL extraction is used.
+TV window. The main panel now uses yt-dlp's FFmpeg downloader with H.264/AAC
+selection and MPEG-TS output. A loopback-only HTTP server serves the growing
+cache file, waiting at temporary EOF for more bytes. Playback begins after a
+256 KiB initial buffer; it does not wait for the transfer to finish. After a
+successful producer exit, ffprobe checks both streams before a completion
+marker is saved. Next/clear cancels the producer and closes the stream. Failed
+transfers keep the queued song for retry. Completed cache entries avoid another
+download. Seeking beyond downloaded data remains unsupported.
+No embedded player or WebView is used.
+
+TV and preview share one libVLC decoded frame buffer and one WPF visual tree,
+including the same overlays. Frame callbacks replace disk snapshots and the
+500 ms timer; the UI coalesces frames when it cannot keep up. Native tests check
+playback before a delayed writer finishes and more than ten frame updates in
+one second, alongside real decoded video and PCM checks. The public YouTube
+probe now exercises the progressive path; a server rejection is reported as
+unverified, independently of deterministic local-stream verification.
 Browser authentication is enabled only through an explicit Firefox selection.
 One queued song is fetched at a time. Next cancels the active
 fetch and advances; failures remain visible for retry/removal. Persistent queue
