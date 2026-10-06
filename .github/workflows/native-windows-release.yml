@@ -36,6 +36,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Decoder fixture generation failed' }
       - name: Compile native Windows executable
         run: dotnet publish windows/VietK.NativePort -c Release -r win-x64 --self-contained true -o artifacts/native-windows
+      - name: Verify real yt-dlp and FFmpeg audio reconnect
+        run: |
+          python tools/verify_progressive_audio_reconnect.py artifacts/native-windows/YouTubeTools artifacts/playback-fixtures artifacts/native-verification/audio-reconnect
+          if ($LASTEXITCODE -ne 0) { throw 'Audio reconnect verification failed' }
       - name: Render original UI on Windows
         run: |
           $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru

@@ -1,6 +1,16 @@
 using Microsoft.Data.Sqlite;
 using VietK.Core;
 
+if(args.Length==4 && args[0]=="--verify-progressive-fixture")
+{
+    var client=new YouTubeMusicClient(args[1],args[3]);
+    var video=new YouTubeVideo("VietKAVTest1","Interrupted audio HTTP fixture","","");
+    using var transfer=client.StartProgressive(video,_=>{},CancellationToken.None,args[2]);
+    await transfer.WaitUntilReady(CancellationToken.None);var file=await transfer.Completion;
+    if(client.CompletedVideo(video)!=file)throw new InvalidDataException("Recovered media did not receive validated cache marker");
+    Console.WriteLine("Interrupted audio input reconnected and completed with verified full audio/video coverage.");return;
+}
+
 // Explicit query fixtures, not licensed song media or a simulated server.
 using var connection = new SqliteConnection("Data Source=:memory:");
 connection.Open();
