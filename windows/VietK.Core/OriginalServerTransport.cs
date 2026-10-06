@@ -75,13 +75,18 @@ public sealed class OriginalMusicTransfer : IDisposable
             await using(var output=new FileStream(temporary,FileMode.Create,FileAccess.Write,FileShare.None,65536,true))
             {
                 var buffer=new byte[65536];long written=0;
+                var lastProgress=System.Diagnostics.Stopwatch.StartNew();
                 while(true)
                 {
                     timeout.CancelAfter(TimeSpan.FromSeconds(10));
                     var count=await input.ReadAsync(buffer,timeout.Token);
                     if(count==0)break;
                     await output.WriteAsync(buffer.AsMemory(0,count),cancellation);
-                    written+=count;progress(written,total.Value);
+                    written+=count;
+                    // AppDownItem publishes progress every two seconds, plus
+                    // its final byte count. Avoid flooding a weak PC's UI.
+                    if(lastProgress.ElapsedMilliseconds>=2000 || written>=total.Value)
+                    { progress(written,total.Value);lastProgress.Restart(); }
                 }
                 await output.FlushAsync(cancellation);
                 if(written<total.Value)throw new OriginalTransferException(1014,"Incomplete music file");

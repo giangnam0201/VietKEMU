@@ -8,7 +8,7 @@ using VietK.Core;
 namespace VietK.NativePort;
 
 public sealed record MusicServerConfiguration(string LoginUrl="http://viet.duochang.cc/login",
-    string ChipId="",string Mac="",string UserAgent="",string MusicDirectory="");
+    string ChipId="",string Mac="",string UserAgent="KTV-Plus/1.2.b57/1.9.1/android/1.0.0",string MusicDirectory="");
 public sealed record CachedMusic(int SongId,string Path,SongMedia Metadata);
 
 // Windows substitutes a real writable cache directory for Android's mounted
@@ -53,6 +53,8 @@ public sealed class NativeMusicServer : IDisposable
             new MusicServerConfiguration(),new JsonSerializerOptions { WriteIndented=true }));
         Configuration=JsonSerializer.Deserialize<MusicServerConfiguration>(File.ReadAllText(ConfigurationFile))
             ??throw new InvalidDataException("Invalid music-server.json");
+        if(string.IsNullOrWhiteSpace(Configuration.UserAgent))
+            Configuration=Configuration with { UserAgent=new MusicServerConfiguration().UserAgent };
         DirectoryPath=Path.GetFullPath(string.IsNullOrWhiteSpace(Configuration.MusicDirectory)?
             Path.Combine(stateDirectory,"music"):Configuration.MusicDirectory);
         Directory.CreateDirectory(DirectoryPath);

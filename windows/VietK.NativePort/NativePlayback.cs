@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WPF;
+using MediaPlayer = LibVLCSharp.Shared.MediaPlayer;
 using VietK.Core;
 
 namespace VietK.NativePort;
@@ -179,6 +180,9 @@ public sealed class NativePlayback : IDisposable
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
         Player.Stop(); CurrentMedia = metadata;
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
+        // KmPlayerCtrlImpl.getMediaVolume; configured HDD scale defaults to 1.
+        var gain=(metadata?.DefaultVolume??100)/100f;
+        Player.SetVolume(gain <= 0 ? 0.8f : gain);
         return Player.SetSource(path) == 0 && Player.Play() == 0;
     }
     public void Command(string command)
