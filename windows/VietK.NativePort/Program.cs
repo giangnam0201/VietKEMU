@@ -207,8 +207,12 @@ public static class Program
                             selected.ReadStoredEntries().Single().Song.SongId!=101000 ||
                             selected.ReadStoredEntries().Single().Song.CanScore || fixtureQueue.Snapshot()[0].LocalFlag!=0)
                             throw new InvalidDataException("Native queue/worker/observer integration differs or fabricated media/scoring");
-                        gridFixture.UpdateLayout();
-                        var queueImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);queueImage.Render(gridFixture);
+                        var queuedSongs=imported.Search.BySpell("MDH",0,0,new(),new(true,true));
+                        if(!queuedSongs.Any(song=>song.Id==101000))throw new InvalidDataException("Queued visual fixture does not include its selected song");
+                        var queuedFixture=browser.CreateVerificationFixture(queuedSongs);
+                        var queuedBottom=bottom.Create();Canvas.SetTop(queuedBottom,bottomContract.Y);queuedFixture.Children.Add(queuedBottom);
+                        queuedFixture.Measure(new Size(1280,800));queuedFixture.Arrange(new Rect(0,0,1280,800));queuedFixture.UpdateLayout();
+                        var queueImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);queueImage.Render(queuedFixture);
                         var queueEncoder=new PngBitmapEncoder();queueEncoder.Frames.Add(BitmapFrame.Create(queueImage));
                         using(var file=File.Create(Path.Combine(args[1],"native-queue-observer-fixture.png")))queueEncoder.Save(file);
                         fixtureQueue.DeleteByIndex(0);fixtureDispatcher.FlushAsync().GetAwaiter().GetResult();
