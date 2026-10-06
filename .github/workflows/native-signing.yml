@@ -1,0 +1,38 @@
+name: Inspect original data-center native signing
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install original firmware and ARM inspection tools
+        run: sudo apt-get update -qq && sudo apt-get install -y e2fsprogs android-sdk-libsparse-utils aapt squashfs-tools binutils binutils-arm-linux-gnueabi binutils-aarch64-linux-gnu
+      - name: Retrieve original application files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 37324921816 -n firmware-applications -D firmware
+      - name: Locate and inspect original signing library
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          if not list(Path('firmware').rglob('libsign-lib.so')):
+              subprocess.run(['gh','release','download','firmware-input','--pattern','*.zip','--dir','incoming'],check=True)
+              archives=list(Path('incoming').glob('*.zip'))
+              if len(archives)!=1: raise RuntimeError('Expected one original firmware ZIP')
+              subprocess.run(['python','tools/analyze_firmware.py',str(archives[0]),'--work','firmware-signing'],check=True)
+          PY
+          python tools/research_native_signing.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-native-signing-evidence
+          path: artifacts/native-signing/
+          retention-days: 14

@@ -590,3 +590,73 @@ failMediaUpdate=true;urlEvents.Clear();urlStage.Run(10);
 Require(urlEvents.Last()=="error:1013:False" && !urlEvents.Any(item=>item.StartsWith("download:")),"Media persistence failure started a transfer");
 urlStage.Reset();Require(urlStage.VideoUrl is null,"Download URL reset differs");
 Console.WriteLine("Original media URL resolver verified: request fields, response schema, HTTP probes, score/volume callbacks, first-media selection and 1012/1013/1015 routing.");
+
+var authTokens=new OriginalDataCenterTokens();authTokens.Set(null,"null-key");
+Require(authTokens.Get(null)=="null-key" && authTokens.Get("missing") is null,"URI token map null/absent key behavior differs");
+var authEvents=new List<string>();var authPosts=new List<DataCenterPost>();var authNetwork=true;
+var loginReply="""
+    {"errorcode":"0","errormessage":"","cmdid_filter":"sn_.*","serverUrlList":"[{\"type\":\"music\",\"url\":\"https://fixture.invalid/music\"},{\"type\":\"\",\"url\":\"ignored\"}]",
+     "token":"fixture-token","serverip":"http://fixture.invalid:8080/commu","validatecode":"fixture-validation",
+     "viet_api":"https://fixture.invalid/viet","video_img_url":"https://fixture.invalid/images","countrycode":"VN"}
+    """;
+var commuReply="""{"errorcode":"0","errormessage":"","medialist":[]}""";
+OriginalDataCenterClient Client(bool requireToken=true)=>new(authTokens,()=>authNetwork,()=>"fixture-chip",()=>"fixture-mac",
+    ()=>"fixture-agent","fixture-sign-version",(chip,salt)=>
+    { Require(chip=="fixture-chip","Signer received a different device identity");authEvents.Add("sign:"+salt);return "fixture-sign"; },
+    request=>
+    {
+        authPosts.Add(request);
+        var command=System.Text.Json.Nodes.JsonNode.Parse(request.Body)!["cmdid"]!.GetValue<string>();
+        authEvents.Add("post:"+command);
+        return command.EndsWith("device_login")?loginReply:commuReply;
+    },(key,value)=>authEvents.Add("config:"+key+":"+value),country=>authEvents.Add("country:"+country),
+    ip=>authEvents.Add("ip:"+ip),requireToken);
+var authClient=Client();authClient.SetLoginUri("https://fixture.invalid/login");
+var songRequest=new System.Text.Json.Nodes.JsonObject { ["cmdid"]="sn_song_media_list",["songid"]=10 };
+authClient.Send(songRequest);
+Require(authClient.IsLoggedIn && authClient.RequestUri=="http://fixture.invalid:8080/commu" &&
+    authClient.ServerUrls.Count==1 && authClient.ServerUrls["music"]=="https://fixture.invalid/music" &&
+    authEvents.SequenceEqual(new[]{"sign:bs_device_login","post:bs_device_login",
+        "config:config_youtube_base_url:https://fixture.invalid/viet","config:key_song_img_url:https://fixture.invalid/images",
+        "country:VN","ip:fixture.invalid:8080","sign:fixture-token","post:sn_song_media_list"}),
+    "Original login, configuration/broadcast, server URL filtering, token signing or request order differs");
+Require(authPosts[0].Https && !authPosts[1].Https &&
+    authPosts[0].Headers.Select(pair=>pair.Key).SequenceEqual(new[]{"Accept-Charset","Accept-Encoding","Accept","doubledecode",
+        "User-Agent","sessionid","validcode","devicetag","signversion","sign"}) &&
+    authPosts[0].Headers.Single(pair=>pair.Key=="validcode").Value=="" &&
+    authPosts[1].Headers.Single(pair=>pair.Key=="validcode").Value=="fixture-validation",
+    "Original headers, validation transition or case-sensitive HTTP transport routing differ");
+authEvents.Clear();authPosts.Clear();authClient.Send(songRequest);
+Require(authPosts.Count==1 && authEvents.SequenceEqual(new[]{"sign:fixture-token","post:sn_song_media_list"}),"Logged-in client unnecessarily logged in again");
+authEvents.Clear();authPosts.Clear();var permissionDenied=false;
+try { authClient.Send(new() { ["cmdid"]="prefix_sn_song_media_list" }); }catch(InvalidOperationException) { permissionDenied=true; }
+Require(permissionDenied && authPosts.Count==0 && authEvents.Count==0,"Permission filter used substring match or signed a rejected request");
+authNetwork=false;var networkDenied=false;
+try { authClient.Send(songRequest); }catch(IOException) { networkDenied=true; }
+Require(networkDenied && authPosts.Count==0,"Offline data-center request reached transport");authNetwork=true;
+authTokens.Set(authClient.LoginUri,"");authClient.Send(songRequest);
+Require(authPosts.Count==2,"Normal data-center client ignored the empty-token login guard");
+authClient.SetLoginUri("https://fixture.invalid/other-login");
+Require(!authClient.IsLoggedIn && authClient.ValidateCode=="" && authClient.CommandFilter=="" && authClient.RequestUri=="" &&
+    authTokens.Get("https://fixture.invalid/login")=="fixture-token" && authClient.ServerUrls.Count==1,
+    "Logout/reset destroyed URI tokens or URL registry, or retained validation/filter state");
+loginReply="""{"errorcode":"12","errormessage":"fixture denied","token":"partial-token","serverip":"http://fixture.invalid/path","validatecode":""}""";
+var validationDenied=false;
+try { authClient.Send(songRequest); }catch(InvalidOperationException) { validationDenied=true; }
+Require(validationDenied && authClient.LoginErrorCode=="12" && authClient.LoginErrorMessage=="fixture denied" &&
+    authTokens.Get(authClient.LoginUri)=="partial-token" && authClient.ServerUrls.Count==0,
+    "Denied validation did not preserve original partially updated login state");
+loginReply="""{"errorcode":"0","token":"new-token","serverip":"http://fixture.invalid/path","validatecode":"ok"}""";
+authClient.Send(songRequest);
+Require(authClient.LoginErrorCode=="12" && authClient.LoginErrorMessage=="fixture denied","Successful retry erased original stale login error fields");
+commuReply="""{"payload":"this original response without error fields exceeds fifty characters"}""";
+var truncationFailed=false;
+try { authClient.Send(songRequest); }catch(System.Text.Json.JsonException) { truncationFailed=true; }
+Require(truncationFailed,"Original 50-character response truncation/parse failure was silently repaired");
+commuReply="""{"errorcode":"0"}""";authEvents.Clear();authPosts.Clear();
+var ktvClient=Client(false);ktvClient.IsKtv=true;ktvClient.SetLoginUri("https://fixture.invalid/ktv-login");
+ktvClient.Send(new() { ["cmdid"]="pm_fixture" });
+Require(ktvClient.IsLoggedIn && authPosts.Count==2 && authPosts.All(request=>request.Headers.All(pair=>pair.Key!="sign")) &&
+    authEvents.All(item=>!item.StartsWith("sign:") && !item.StartsWith("country:") && !item.StartsWith("config:")),
+    "KTV/pm request signing or normal-login side effects differ");
+Console.WriteLine("Original data-center login/request state verified: URI tokens, signing routes, headers, permission gates, config/broadcast order, partial failure state and response truncation.");
