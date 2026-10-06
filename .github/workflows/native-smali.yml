@@ -81,6 +81,37 @@ jobs:
           if missing: raise RuntimeError('Missing original server transport bytecode: ' + ','.join(sorted(missing)))
           (output/'provenance.json').write_text(json.dumps(files, indent=2))
           PY
+      - name: Retain original karaoke playback and TV bytecode
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil
+          app=Path('decoded/daulkmboxosdtv')
+          output=Path('bytecode-review/daulkmboxosdtv')
+          classes={'KmPlayerCtrl','KmPlayerCtrlImpl','KmPlayerCtrlType','KmVideoPlayer','KmBasePlayerType',
+                   'EvIjkPlayer','IEvBasePlayer','IEvBasePlayerListener','AdaptedEvMediaPlayer','EvMediaPlayer',
+                   'OsdTvViewManager','OsdTvManager','PlayerCtrlService','PlayCtrlReceiver','KmDurationPlayer'}
+          entries={entry['path']:entry for entry in json.loads((app/'original-entries.json').read_text())}
+          records=[];found=set()
+          for root in (app/'apktool').glob('smali*'):
+              if not root.is_dir(): continue
+              dex='classes.dex' if root.name=='smali' else root.name.removeprefix('smali_')+'.dex'
+              for path in (root/'com').rglob('*.smali'):
+                  name=path.stem.split('$')[0]
+                  if name not in classes: continue
+                  relative=path.relative_to(app/'apktool')
+                  target=output/relative;target.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(path,target);found.add(name)
+                  records.append({'path':relative.as_posix(),'decodedSha256':hashlib.sha256(path.read_bytes()).hexdigest(),
+                                  'originalDex':dex,'originalDexSha256':entries[dex]['sha256']})
+          missing={'KmPlayerCtrl','KmPlayerCtrlImpl','KmVideoPlayer','EvIjkPlayer','AdaptedEvMediaPlayer'}-found
+          if missing: raise RuntimeError('Missing original player classes: '+','.join(sorted(missing)))
+          paths=list((app/'apktool/res/layout').glob('*.xml'))+list((app/'apktool/res/values').glob('*.xml'))
+          for path in paths:
+              relative=path.relative_to(app/'apktool')
+              target=output/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
+          (output/'provenance.json').write_text(json.dumps(records,indent=2))
+          PY
       - name: Retain original main-screen UI reference
         run: |
           python - <<'PY'
