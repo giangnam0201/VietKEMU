@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Media.Imaging;
 using LibVLCSharp.Shared;
 using VietK.Core;
 
@@ -23,6 +24,7 @@ public static class NativePlaybackVerification
             Content = new Viewbox { Child = panel } };
         app.MainWindow = host;
         using var playback = new NativePlayback(bottom, output);
+        playback.PreviewFrameChanged += _ => { };
         using var tap = new PcmTap(playback.Decoder.Native);
         var result = 1;
         host.Loaded += async (_, _) =>
@@ -43,6 +45,10 @@ public static class NativePlaybackVerification
                 var snapshot = Path.GetFullPath(Path.Combine(output, "original-tv-video.png"));
                 Require(playback.Decoder.Native.TakeSnapshot(0, snapshot, 0, 0), "Native video snapshot request failed");
                 await Until(() => File.Exists(snapshot) && new FileInfo(snapshot).Length > 1024, "Decoded video snapshot missing");
+                await Until(() => playback.DecodedPreviewFrames>0 && playback.PreviewFrame is not null,
+                    "Panel preview did not receive real decoder pixels");
+                var previewEncoder=new PngBitmapEncoder();previewEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
+                using(var previewFile=File.Create(Path.Combine(output,"panel-tv-preview.png")))previewEncoder.Save(previewFile);
 
                 var sourceStereo = Path.GetFullPath(Path.Combine(fixtures, "stereo.mkv"));
                 var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
@@ -78,6 +84,7 @@ public static class NativePlaybackVerification
                 await Until(() => !bottom.OriginalVocal, "Panel track icon did not observe the decoder");
                 playback.Command("pause_imv");
                 await Until(() => bottom.Paused && playback.Decoder.Native.State == VLCState.Paused, "Pause button did not pause decoder");
+                Require(playback.Television.Overlay.Paused,"TV pause indicator missing");
                 var pausedAt = playback.Decoder.Position;
                 await Task.Delay(350);
                 Require(Math.Abs(playback.Decoder.Position - pausedAt) < 100, "Paused decoder clock kept running");
@@ -94,6 +101,8 @@ public static class NativePlaybackVerification
                 var quietPower=await MeasurePower(tap,440);
                 playback.Command("volinc");
                 Require(playback.Decoder.OutputVolumeStep == volume + 1,"Original 0..20 volume step differs");
+                Require(playback.Television.Overlay.LastControl=="play_ctrl_audio_bg" && playback.Television.Overlay.ControlVisible,
+                    "TV volume feedback missing");
                 // libVLC's amem output does not publish a volume report for its
                 // getter. Verify actual decoded sample amplitude instead.
                 var loudPower=await UntilPower(tap,440,value=>value>quietPower*1.15,
@@ -130,10 +139,21 @@ public static class NativePlaybackVerification
                 playback.Player.Seek(playback.Decoder.Duration - 800);
                 await Until(() => next == 2, "Actual decoder completion did not request queue advance");
                 Require(playback.Player.State == OriginalVideoState.Idle, "Original completion state not idle");
+                // This is explicitly a test fixture, not the original idle asset.
+                File.Copy(multi,Path.Combine(output,"Demo.mp4"),true);
+                var idleStarts=played;
+                Require(playback.StartIdleDemo(),"Configured Demo.mp4 did not start");
+                await Until(()=>played>idleStarts && playback.Decoder.Duration>0,"Idle video did not decode");
+                playback.Player.Seek(playback.Decoder.Duration-800);
+                await Until(()=>played>idleStarts+1,"Idle video did not loop after real decoder completion");
+                Require(next==2,"Idle broadcast advanced the song queue");
+                playback.Player.Stop();File.Delete(Path.Combine(output,"Demo.mp4"));
                 File.WriteAllText(Path.Combine(output, "playback-verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsDecoder = "bundled libVLC", androidRuntimeUsed = false,
                     independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
+                    decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,
+                    configuredIdleDemoDecoderAndLoopVerified=true,
                     stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,
                     youtubeStereoPcmAndReplayVerified = true,
                     pauseResumeClockVerified = true, nativeSeekReplayVerified = true,

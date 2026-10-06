@@ -10,14 +10,29 @@ The app now opens its native YouTube panel. Song-name and original YouTube home
 tiles open the same panel. yt-dlp supplies public search results (no Data API key),
 and pasted video links work through the same queue. Cards use the original
 230-by-195 geometry, the firmware background, original YouTube icon, VietK header
-and existing bottom controls; touch keyboard, all menus and pixel parity remain
-unfinished. Results now use the original two rows of three cards per page,
+and existing bottom controls. The panel now includes a touch keyboard and a
+live snapshot preview of the TV video with its overlays; all menus and pixel
+parity remain unfinished. Results now use the original two rows of three cards per page,
 up to 48 results per search, stretched 230x140 thumbnails, centered 220x45
 titles, and queued-title color `#ffffe761`. The firmware's Roboto is used.
 The verification command checks six-card pagination, partial final pages and
 page bounds, and saves a separate clearly labeled layout-fixture screenshot.
 Those fixture cards never enter normal app results or the download queue.
 Queue IDs and displayed metadata persist in `youtube-queue.json`.
+
+The TV overlay uses the decoded TV APK's play, pause, replay and volume images
+and layout dimensions. Transient control feedback lasts six seconds as in the
+original source. The VietK logo and current/next-song scrolling text appear on
+both the TV and its panel preview. Mobile connection QR and ambience effects
+remain pending.
+
+Idle playback follows the original separate `Demo.mp4` broadcast path. Place
+the actual demo clip beside `VietK.NativePort.exe` or at
+`%LOCALAPPDATA%\VietKNativePort\Demo.mp4`. It loops on startup and after clearing
+or exhausting the queue, and appears in the panel preview through the same
+decoder. The original demo bytes have not yet been located in the supplied
+exports; the grading animation is not substituted for this clip. CI verifies
+the idle decoder and loop with an explicitly identified test fixture.
 
 yt-dlp fetches video plus audio at up to 1080p. FFmpeg merges/remuxes with no
 requested re-encode; ffprobe checks for both audio and video. Only a successful

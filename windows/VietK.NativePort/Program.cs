@@ -413,7 +413,7 @@ public static class Program
                 using(var youtubePlayback=new NativePlayback(youtubeBottom,args[1]))
                 using(var youtubeCapture=new YouTubeMusicScreen(root,args[1],youtubePlayback,youtubeBottom))
                 {
-                    var youtubeCanvas=youtubeCapture.Create();TextElement.SetFontFamily(youtubeCanvas,OriginalFont.Family);
+                    var youtubeCanvas=youtubeCapture.Create(loadDefault:false);TextElement.SetFontFamily(youtubeCanvas,OriginalFont.Family);
                     youtubeCanvas.Children.Add(top.Create());var youtubeBar=youtubeBottom.Create();
                     Canvas.SetTop(youtubeBar,bottomContract.Y);youtubeCanvas.Children.Add(youtubeBar);
                     youtubeCanvas.Measure(new Size(1280,800));youtubeCanvas.Arrange(new Rect(0,0,1280,800));youtubeCanvas.UpdateLayout();
@@ -495,6 +495,7 @@ public static class Program
             window.Loaded += async (_, _) =>
             {
                 nativePlayback.ShowTelevision(window);
+                nativePlayback.StartIdleDemo();
                 // Developer probe, separate from the original song-library UI.
                 if (args.Length == 2 && args[0] == "--play-media" && !nativePlayback.PlayMedia(Path.GetFullPath(args[1])))
                     throw new InvalidDataException("Playback probe source is unavailable");

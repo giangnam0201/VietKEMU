@@ -413,7 +413,43 @@ def package_player_reference(decoded, destination, firmware):
     output = destination / 'player'
     output.mkdir(exist_ok=True)
     (output / original.name).write_bytes(payload)
+    # Idle broadcasts live on device/USB storage; do not substitute the scoring
+    # clip if the original Demo.mp4 was not included in the firmware export.
+    demos = [path for path in firmware.rglob('*') if path.is_file() and path.name.lower() == 'demo.mp4']
+    demo_record = {'available': bool(demos), 'originalStoragePath': '/kmbox/video/Demo.mp4'}
+    if demos:
+        demo = demos[0]
+        shutil.copy2(demo, output / 'Demo.mp4')
+        demo_record.update({'source': str(demo.relative_to(firmware)), 'sha256': hashlib.sha256(demo.read_bytes()).hexdigest()})
+    (output / 'idle-demo.json').write_text(json.dumps(demo_record, indent=2))
     shutil.copy2(decoded / 'daulkmboxosdtv/apktool/res/layout/activity_osd.xml', output / 'activity_osd.xml')
+    tv = decoded / 'daulkmboxosdtv'
+    tv_entries = json.loads((tv / 'original-entries.json').read_text())
+    records = []
+    for name in ('play', 'pause', 'replay', 'original', 'accompany', 'play_ctrl_audio_bg'):
+        candidates = sorted((tv / 'apktool/res').glob('drawable*/' + name + '.png'))
+        if not candidates:
+            raise RuntimeError('Original TV control image missing: ' + name)
+        image = candidates[0]
+        image_hash = hashlib.sha256(image.read_bytes()).hexdigest()
+        matches = [item for item in tv_entries if Path(item['path']).name == image.name and item['sha256'] == image_hash]
+        if not matches:
+            raise RuntimeError('Original TV control image provenance differs: ' + name)
+        shutil.copy2(image, output / (name + '.png'))
+        records.append({'file': name + '.png', 'sha256': image_hash, 'original': matches[0]['path']})
+    (output / 'osd-provenance.json').write_text(json.dumps(records, indent=2))
+    tv_dimensions = {item.get('name'): item.text for item in ET.parse(tv / 'apktool/res/values/dimens.xml').getroot()}
+    def tv_dimension(name):
+        return float(re.sub(r'(dip|dp|px|sp)$', '', tv_dimensions[name]))
+    (output / 'osd.json').write_text(json.dumps({
+        'controlWidth': tv_dimension('osd_tv_play_ctrl_width'),
+        'controlHeight': tv_dimension('osd_tv_play_ctrl_height'),
+        'controlY': tv_dimension('osd_tv_play_ctrl_margin_top'),
+        'numberY': tv_dimension('osd_tv_play_ctrl_number_margin_top'),
+        'numberSize': tv_dimension('osd_tv_play_ctrl_text_size'),
+        'timeoutMs': 6000,
+        'provenance': 'km_msg_osdtv.xml; KmOSDMessageView; KmConfig.IntonationConfig.DOWNCOUNT_BEGINTIME'
+    }, indent=2))
     (output / 'provenance.json').write_text(json.dumps({
         'app': app.name, 'asset': 'assets/grade_video.mp4', 'sha256': digest,
         'scope': 'Original grading video retained for actual Windows decode verification and eventual grading UI; not a karaoke song library.'}, indent=2))

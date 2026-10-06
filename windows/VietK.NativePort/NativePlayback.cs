@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Media.Imaging;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WPF;
 using MediaPlayer = LibVLCSharp.Shared.MediaPlayer;
@@ -147,6 +148,7 @@ public sealed class TelevisionWindow : Window
 {
     private bool allowClose;
     private readonly Border black;
+    public TelevisionOverlay Overlay { get; }
     public bool BlackVisible => black.Visibility == Visibility.Visible;
     public TelevisionWindow(MediaPlayer player)
     {
@@ -154,7 +156,10 @@ public sealed class TelevisionWindow : Window
         // activity_osd: full video surface, black cover above it, then loading,
         // playback hint and grading containers. Missing OSD layers stay absent.
         black = new Border { Background = Brushes.Black };
-        Content = new VideoView { MediaPlayer = player, Content = black };
+        Overlay=new TelevisionOverlay(Path.Combine(AppContext.BaseDirectory,"Original"));
+        var layers=new Grid();layers.Children.Add(black);
+        layers.Children.Add(new Viewbox { Child=Overlay.Canvas,Stretch=Stretch.Uniform });
+        Content = new VideoView { MediaPlayer = player, Content = layers };
     }
     public void SetBlack(bool visible) => black.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     protected override void OnClosing(CancelEventArgs e)
@@ -164,12 +169,33 @@ public sealed class TelevisionWindow : Window
     }
     public void ClosePermanently() { allowClose = true; Close(); }
     public void Detach() => ((VideoView)Content).MediaPlayer = null;
+    public BitmapSource CompositePreview(BitmapSource? video)
+    {
+        Overlay.Canvas.Measure(new Size(1280,720));Overlay.Canvas.Arrange(new Rect(0,0,1280,720));
+        var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())
+        {
+            var bounds=new Rect(0,0,640,360);context.DrawRectangle(Brushes.Black,null,bounds);
+            if(!BlackVisible && video is not null)context.DrawImage(video,bounds);
+            context.DrawRectangle(new VisualBrush(Overlay.Canvas),null,bounds);
+        }
+        var result=new RenderTargetBitmap(640,360,96,96,PixelFormats.Pbgra32);result.Render(drawing);result.Freeze();return result;
+    }
 }
 
 public sealed class NativePlayback : IDisposable
 {
     private readonly BottomBar bottom;
     private readonly string stateFile;
+    private readonly string previewDirectory;
+    private readonly DispatcherTimer previewTimer;
+    private string? pendingPreview;
+    private DateTime pendingPreviewAt;
+    private bool playingIdle;
+    private int previewSequence;
+    private BitmapSource? previewVideo;
+    public BitmapSource? PreviewFrame { get; private set; }
+    public int DecodedPreviewFrames { get; private set; }
+    public event Action<BitmapSource>? PreviewFrameChanged;
     public WindowsVideoDecoder Decoder { get; }
     public OriginalVideoPlayer Player { get; }
     public TelevisionWindow Television { get; }
@@ -183,22 +209,49 @@ public sealed class NativePlayback : IDisposable
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
         Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
         Television = new TelevisionWindow(Decoder.Native);
+        previewDirectory=Path.Combine(stateDirectory,"preview");Directory.CreateDirectory(previewDirectory);
+        previewTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(500) };
+        previewTimer.Tick+=(_,_)=>RefreshPreview();previewTimer.Start();
         Player = new OriginalVideoPlayer(Decoder, Television.SetBlack);
         Decoder.Original = Player;
-        Decoder.ConfirmedPause = paused => bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
+        Decoder.ConfirmedPause = paused => { bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
+            Television.Overlay.SetPaused(paused); };
         Decoder.ConfirmedTrack = () => bottom.SetConfirmedPlaybackState(Player.State == OriginalVideoState.Pause,
             Player.SingMode == OriginalSingMode.Original);
         Player.Completed += () => Dispatcher.CurrentDispatcher.BeginInvoke(() =>
-        { if(CommandOverride?.Invoke("decoder_completed")!=true)NextRequested?.Invoke(); });
+        {
+            if(playingIdle) { StartIdleDemo();return; }
+            if(CommandOverride?.Invoke("decoder_completed")!=true)NextRequested?.Invoke();
+        });
         if (File.Exists(stateFile)) Decoder.SetOutputVolumeStep(JsonSerializer.Deserialize<PlaybackPreferences>(File.ReadAllText(stateFile))!.Volume);
     }
     public void ShowTelevision(Window panel)
     { Television.Show(); }
+    public bool StartIdleDemo()
+    {
+        // BroadcastListManager / USBSetBroadcastDialog: Demo.mp4 is a separate
+        // idle broadcast, not the APK's grade_video.mp4 scoring animation.
+        var paths=new[] { Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
+            Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),
+            Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4") };
+        var demo=paths.FirstOrDefault(File.Exists);
+        playingIdle=false;Player.Stop();CurrentMedia=null;ResetPreview();
+        Television.Overlay.SetSong("");
+        if(demo is null)return false;
+        Decoder.PreserveStereo=true;Player.SetTrackInfo(0,1);Player.SetVolume(1);
+        playingIdle=Player.SetSource(demo)==0 && Player.Play()==0;
+        return playingIdle;
+    }
+    private void ResetPreview()
+    {
+        pendingPreview=null;previewVideo=null;
+        Television.Overlay.SetPaused(false);
+    }
     public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false)
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
         LocalMediaRequested?.Invoke();
-        Player.Stop(); CurrentMedia = metadata;
+        playingIdle=false;Player.Stop(); CurrentMedia = metadata;ResetPreview();
         Decoder.PreserveStereo=preserveStereo;
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
         // KmPlayerCtrlImpl.getMediaVolume; configured HDD scale defaults to 1.
@@ -214,6 +267,8 @@ public sealed class NativePlayback : IDisposable
             case "play_imv": case "pause_imv":
                 if (Player.State == OriginalVideoState.Play) Player.Pause();
                 else if (Player.State == OriginalVideoState.Pause) Player.Play();
+                Television.Overlay.SetPaused(Player.State==OriginalVideoState.Pause);
+                if(Player.State==OriginalVideoState.Play)Television.Overlay.ShowControl("play");
                 break;
             case "ori_imv": case "accp_imv":
                 if (CurrentMedia is { OriginalTrack: 0, AccompanyTrack: 5 } or { OriginalTrack: 5, AccompanyTrack: 0 }) break;
@@ -222,15 +277,40 @@ public sealed class NativePlayback : IDisposable
             case "replay_imv":
                 if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path)
                     PlayMedia(path, CurrentMedia,Decoder.PreserveStereo);
+                Television.Overlay.ShowControl("replay");
                 break;
             case "cut_song_imv": Player.Stop(); NextRequested?.Invoke(); break;
             case "volinc": case "voldec":
                 Decoder.SetOutputVolumeStep(Decoder.OutputVolumeStep + (command == "volinc" ? 1 : -1));
                 Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
                 File.WriteAllText(stateFile, JsonSerializer.Serialize(new PlaybackPreferences(Decoder.OutputVolumeStep)));
+                Television.Overlay.ShowControl("play_ctrl_audio_bg",Decoder.OutputVolumeStep);
                 break;
         }
     }
-    public void Dispose() { Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
+    private void RefreshPreview()
+    {
+        if(PreviewFrameChanged is null)return;
+        try
+        {
+            if(pendingPreview is not null && DateTime.UtcNow-pendingPreviewAt>TimeSpan.FromSeconds(3))pendingPreview=null;
+            if(pendingPreview is not null && File.Exists(pendingPreview) && new FileInfo(pendingPreview).Length>0)
+            {
+                using var stream=File.OpenRead(pendingPreview);var image=new BitmapImage();image.BeginInit();
+                image.CacheOption=BitmapCacheOption.OnLoad;image.StreamSource=stream;image.EndInit();image.Freeze();
+                previewVideo=image;pendingPreview=null;DecodedPreviewFrames++;
+            }
+            PreviewFrame=Television.CompositePreview(previewVideo);PreviewFrameChanged?.Invoke(PreviewFrame);
+            if(pendingPreview is null && !Television.BlackVisible)
+            {
+                var path=Path.GetFullPath(Path.Combine(previewDirectory,"frame-"+(previewSequence++%2)+".png"));
+                if(File.Exists(path))File.Delete(path);
+                if(Decoder.Native.TakeSnapshot(0,path,640,360)) { pendingPreview=path;pendingPreviewAt=DateTime.UtcNow; }
+            }
+        }
+        catch(IOException) { }
+        catch(System.NotSupportedException) { }
+    }
+    public void Dispose() { previewTimer.Stop();Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
     private sealed record PlaybackPreferences(int Volume);
 }
