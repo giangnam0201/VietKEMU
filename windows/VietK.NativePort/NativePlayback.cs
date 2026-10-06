@@ -35,6 +35,9 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public Action<bool>? ConfirmedTrack { get; set; }
     public Action? Started { get; set; }
     public int OutputVolumeStep { get; private set; } = 15;
+    public bool Muted { get; private set; }
+    private readonly DispatcherTimer unmuteFade;
+    private int fadeStep;
     public int LastAudioTrackCount { get; private set; }
     public bool LastTrackSwitchSucceeded { get; private set; }
     public bool PreserveStereo { get; set; }
@@ -50,6 +53,13 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
         LibVLCSharp.Shared.Core.Initialize(directory);
         library = new LibVLC("--no-video-title-show", "--no-osd");
         Native = new MediaPlayer(library) { EnableKeyInput = false, EnableMouseInput = false };
+        unmuteFade=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(100) };
+        unmuteFade.Tick+=(_,_)=>
+        {
+            fadeStep=Math.Min(OutputVolumeStep,fadeStep+1);
+            if(fadeStep>=OutputVolumeStep)unmuteFade.Stop();
+            ApplyVolume();
+        };
         frames=new SharedVideoFrames(Native,dispatcher);frames.Updated+=()=>VideoFrameChanged?.Invoke();
         Native.Playing += (_, _) => Post(() => { if(firstFrame)ConfirmedPause?.Invoke(false); });
         Native.Paused += (_, _) => Post(() => ConfirmedPause?.Invoke(true));
@@ -139,12 +149,19 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
         return changed;
     }
     public void SetVolume(float volume) { mediaVolume = volume; ApplyVolume(); }
-    public void SetOutputVolumeStep(int step) { OutputVolumeStep = Math.Clamp(step, 0, 20); ApplyVolume(); }
-    private void ApplyVolume() => Native.Volume = (int)Math.Clamp(mediaVolume * OutputVolumeStep / 20 * 100, 0, 200);
+    public void SetOutputVolumeStep(int step) { unmuteFade.Stop();OutputVolumeStep = Math.Clamp(step, 0, 20); ApplyVolume(); }
+    public void SetMuted(bool value)
+    {
+        if(Muted==value)return;
+        Muted=value;unmuteFade.Stop();fadeStep=0;
+        if(!value&&OutputVolumeStep>0)unmuteFade.Start();
+        ApplyVolume();
+    }
+    private void ApplyVolume() => Native.Volume = Muted?0:(int)Math.Clamp(mediaVolume * (unmuteFade.IsEnabled?fadeStep:OutputVolumeStep) / 20 * 100, 0, 200);
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; generation++; Native.Stop(); Native.Dispose();frames.Dispose(); media?.Dispose(); library.Dispose();
+        disposed = true; generation++;unmuteFade.Stop(); Native.Stop(); Native.Dispose();frames.Dispose(); media?.Dispose(); library.Dispose();
     }
 }
 
@@ -346,11 +363,19 @@ public sealed class NativePlayback : IDisposable
                 break;
             case "cut_song_imv": Player.Stop(); NextRequested?.Invoke(); break;
             case "volinc": case "voldec":
+                // BottomMenuBarView -> KmPlayCtrlUtil.updateVolume clears mute.
+                SetMuted(false,showFeedback:false);
                 Decoder.SetOutputVolumeStep(Decoder.OutputVolumeStep + (command == "volinc" ? 1 : -1));
                 SavePreferences();
                 Television.Overlay.ShowControl("play_ctrl_audio_bg",Decoder.OutputVolumeStep);
                 break;
+            case "mute":SetMuted(!Decoder.Muted);break;
         }
+    }
+    public void SetMuted(bool value,bool showFeedback=true)
+    {
+        Decoder.SetMuted(value);Television.Overlay.SetMuted(value);
+        if(!value&&showFeedback)Television.Overlay.ShowMuteOff();
     }
     public void SaveVideoFrame(string path)
     {

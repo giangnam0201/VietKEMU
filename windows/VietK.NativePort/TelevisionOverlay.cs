@@ -20,7 +20,12 @@ public sealed class TelevisionOverlay
     public TelevisionQr Qr { get; }=new();
     private readonly string root;
     private readonly TvOsdContract contract;
-    private readonly Image control,pause;
+    private readonly Image control,pause,mute;
+    private readonly DispatcherTimer muteRepeat;
+    private int muteCount;
+    public bool Muted { get; private set; }
+    public bool MuteVisible=>mute.Visibility==Visibility.Visible;
+    internal string? MuteResourceDirectory { get; set; }
     private readonly Canvas expression=new() { Width=330,Height=330,Visibility=Visibility.Collapsed };
     private readonly Image expressionImage=new() { Width=318,Height=318,Stretch=Stretch.Uniform };
     public bool ExpressionVisible=>expression.Visibility==Visibility.Visible;
@@ -57,6 +62,8 @@ public sealed class TelevisionOverlay
         pause=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Source=Bitmap("player/pause.png"),Visibility=Visibility.Collapsed };
         Put(control,(1280-contract.ControlWidth)/2,contract.ControlY);
         Put(pause,(1280-contract.ControlWidth)/2,contract.ControlY);
+        mute=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Visibility=Visibility.Collapsed };
+        Put(mute,(1280-contract.ControlWidth)/2,contract.ControlY);
         number=Text("",contract.NumberSize);number.Width=300;number.TextAlignment=TextAlignment.Center;
         number.Visibility=Visibility.Collapsed;Put(number,490,contract.NumberY);
         timeout=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(contract.TimeoutMs) };
@@ -65,6 +72,8 @@ public sealed class TelevisionOverlay
         timeout.Tick+=(_,_)=> { timeout.Stop();control.Visibility=Visibility.Collapsed;number.Visibility=Visibility.Collapsed; };
         pauseRepeat=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(contract.TimeoutMs/6) };
         pauseRepeat.Tick+=(_,_)=>RepeatPause();
+        muteRepeat=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(contract.TimeoutMs/6) };
+        muteRepeat.Tick+=(_,_)=>RepeatMute();
     }
     public void SetSong(string current,string next="",string advertisement="")
     {
@@ -93,6 +102,7 @@ public sealed class TelevisionOverlay
     {
         if(Paused==value)return;
         Paused=value;pauseCount=0;pauseRepeat.Stop();pause.Visibility=Visibility.Collapsed;
+        if(value)mute.Visibility=Visibility.Collapsed;
         if(value)
         {
             // KmOSDMessageView.ShowPauseTime: 7 visible ticks, 2 hidden;
@@ -108,15 +118,51 @@ public sealed class TelevisionOverlay
         else if(pause.Visibility!=Visibility.Visible)pause.Visibility=Visibility.Visible;
         pauseCount=(pauseCount+1)%9;
     }
+    public void SetMuted(bool value)
+    {
+        if(Muted==value)return;
+        Muted=value;muteCount=0;muteRepeat.Stop();mute.Visibility=Visibility.Collapsed;
+        if(value)
+        {
+            mute.Source=MuteBitmap("mute");
+            timeout.Stop();control.Visibility=Visibility.Collapsed;number.Visibility=Visibility.Collapsed;
+            RepeatMute();muteRepeat.Start();
+        }
+    }
+    private BitmapImage? MuteBitmap(string name)
+    {
+        var file=Path.Combine(MuteResourceDirectory??Path.Combine(OriginalSupplement.Root,"ambience","player"),name+".png");
+        return File.Exists(file)?new BitmapImage(new Uri(Path.GetFullPath(file))):null;
+    }
+    private void RepeatMute()
+    {
+        if(ControlVisible) { mute.Visibility=Visibility.Collapsed;muteCount=7; }
+        if(muteCount>6)mute.Visibility=Visibility.Collapsed;
+        else if(!MuteVisible)
+        {
+            // ShowMuteTime returns without advancing the counter while paused.
+            if(Paused)return;
+            control.Visibility=Visibility.Collapsed;number.Visibility=Visibility.Collapsed;
+            mute.Visibility=mute.Source is null?Visibility.Collapsed:Visibility.Visible;
+        }
+        muteCount=(muteCount+1)%9;
+    }
+    public void ShowMuteOff()
+    {
+        LastControl="unmute";control.Source=MuteBitmap("unmute");
+        control.Visibility=control.Source is null?Visibility.Collapsed:Visibility.Visible;
+        number.Visibility=Visibility.Collapsed;timeout.Stop();timeout.Start();
+    }
     public void ShowControl(string name,int? value=null)
     {
         LastControl=name;control.Source=Bitmap("player/"+name+".png");control.Visibility=Visibility.Visible;
         if(Paused) { pause.Visibility=Visibility.Collapsed;pauseCount=7; }
+        if(Muted) { mute.Visibility=Visibility.Collapsed;muteCount=7; }
         number.Text=value?.ToString()??"";number.Visibility=value.HasValue?Visibility.Visible:Visibility.Collapsed;
         control.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(.3,1,TimeSpan.FromMilliseconds(150)));
         timeout.Stop();timeout.Start();
     }
-    public void Stop() { timeout.Stop();pauseRepeat.Stop();Barrage.Dispose();marqueeShift.BeginAnimation(TranslateTransform.XProperty,null); }
+    public void Stop() { timeout.Stop();pauseRepeat.Stop();muteRepeat.Stop();Barrage.Dispose();marqueeShift.BeginAnimation(TranslateTransform.XProperty,null); }
     public void ShowExpression(BitmapSource picture,string avatarPath)
     {
         expressionImage.Source=picture;

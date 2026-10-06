@@ -102,7 +102,7 @@ public sealed class MobileRemoteServer : IDisposable
                 }
                 else if(request.Action=="command")
                 {
-                    if(request.Id is not ("play_imv" or "pause_imv" or "cut_song_imv" or "replay_imv" or "volinc" or "voldec"))throw new ArgumentException();
+                    if(request.Id is not ("play_imv" or "pause_imv" or "cut_song_imv" or "replay_imv" or "volinc" or "voldec" or "mute"))throw new ArgumentException();
                     playback.Command(request.Id);
                 }
                 else if(request.Action=="expression")

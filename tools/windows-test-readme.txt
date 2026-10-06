@@ -12,6 +12,9 @@ Firefox/options > Ket noi dieu khien bang dien thoai shows LAN addresses.
 Ngat dien thoai cu / tao QR moi revokes paired phones and generates a new QR.
 This local remote replaces the unavailable cloud route; it is not the original
 manufacturer website. Expressions/wishes require the local original supplement.
+Phone footer and Firefox/options > Tat / Bat tieng control audio mute.
+Mute preserves the volume setting; increasing/decreasing volume clears mute.
+The original blinking mute/unmute TV graphics require the local supplement.
 
 Main music source: YouTube (yt-dlp + native TV decoder)
 - Search a song name, or paste a YouTube video link into the search field.

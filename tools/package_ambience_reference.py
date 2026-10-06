@@ -42,6 +42,8 @@ for name in ['ic_cut_song','ic_cut_song_press','ic_delete','ic_delete_press','ic
     add(panel, f'res/drawable-mdpi-v4/{name}.png', f'ambience/playlist/{name}.png', 'dualkmbox.apk')
 for name in ['barrage_ellipse','barrage_rocket']:
     add(tv, f'res/drawable-tvdpi-v4/{name}.png', f'ambience/{name}.png', 'daulkmboxosdtv.apk')
+for name in ['mute','unmute']:
+    add(tv, f'res/drawable-tvdpi-v4/{name}.png', f'ambience/player/{name}.png', 'daulkmboxosdtv.apk')
 avatar = next(n for n in tv.namelist() if Path(n).name == 'osd_local_defaultfig.png')
 add(tv, avatar, 'ambience/osd_local_defaultfig.png', 'daulkmboxosdtv.apk')
 for name in ['dialog_ambience_view','ambience_expression_view','ambience_barrage_view','ambience_tv_screen_view']:

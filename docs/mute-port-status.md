@@ -1,0 +1,11 @@
+# Original mute controls and TV feedback
+
+Original `PlayControlAction.volumeControl` dispatches value 10 to a mute toggle, separate from values 3/4 for volume changes. `AudioManagerUtil` retains its 0–20 volume in memory while muted. `BottomMenuBarView` calls `KmPlayCtrlUtil.updateVolume`, which clears mute before applying an increment/decrement. The native decoder now keeps mute separate from media gain and stored output volume, including across source changes.
+
+The phone footer and the panel Firefox/options menu expose the toggle. Phone state includes the actual decoder's mute flag. Explicit unmute restores the output through one volume step every 100 ms, following the panel's `CrossFadeInTask`; a normal volume adjustment cancels the fade and applies its new level. The port affects VietK's decoder output, not other Windows applications or a hardware microphone/mixer.
+
+The TV layer follows `KmOSDMessageView.ShowMuteTime`: seven visible counts, two hidden counts, ticking at the original 6000/6 ms interval. A transient playback control suppresses the mute image. Pause takes priority, and the mute counter does not advance when its hidden image is blocked by pause. Unmute stops the repeating indicator and shows the original transient unmute image. TV and panel preview share this layer.
+
+Recovered tvdpi `mute.png` and `unmute.png` are stored only in the local supplemental bundle under `ambience/player`, with APK paths and SHA-256 provenance. They are not uploaded to the public repository or release. Native tests use synthetic PNGs. Without the local supplement, audio mute and phone status work but the original TV graphic is absent; no fabricated replacement icon is presented as an original asset.
+
+Verification measures decoded PCM silence/restoration, retains the volume setting, observes the real repeating indicator and pause priority, and checks volume-induced unmute. HTTP and phone-sized Chromium tests exercise the actual native mute route. Android system-output routing, hardware fade amplitude calibration and microphone control remain unverified.

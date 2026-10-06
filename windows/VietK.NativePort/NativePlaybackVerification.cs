@@ -169,6 +169,30 @@ public static class NativePlaybackVerification
                 Require(playback.Decoder.OutputVolumeStep == volume, "Volume decrement did not restore level");
                 var restoredPower=await UntilPower(tap,440,value=>value>=quietPower*.8 && value<=quietPower*1.2,
                     "Volume decrement did not restore actual output PCM amplitude");
+                // Synthetic TV graphics exercise presentation without uploading
+                // the newly recovered proprietary mute/unmute PNGs.
+                var muteDirectory=Path.Combine(output,"mute-fixture");Directory.CreateDirectory(muteDirectory);
+                var mutePixels=new byte[32*32*4];
+                for(var pixel=0;pixel<mutePixels.Length;pixel+=4) { mutePixels[pixel]=255;mutePixels[pixel+3]=255; }
+                foreach(var name in new[]{"mute","unmute"})
+                {
+                    var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(BitmapSource.Create(32,32,96,96,PixelFormats.Bgra32,null,mutePixels,32*4)));
+                    using var file=File.Create(Path.Combine(muteDirectory,name+".png"));png.Save(file);
+                }
+                marquee.MuteResourceDirectory=muteDirectory;
+                playback.Player.Seek(0);playback.Command("mute");
+                Require(playback.Decoder.Muted&&playback.Decoder.OutputVolumeStep==volume&&marquee.MuteVisible,"Mute lost stored volume or original TV indicator");
+                await UntilPower(tap,440,value=>value<quietPower*.001,"Mute did not silence decoded PCM");
+                await Until(()=>!marquee.MuteVisible,"Mute indicator did not enter the original two-hidden-tick interval");
+                await Until(()=>marquee.MuteVisible,"Mute indicator did not return after its hidden interval");
+                playback.Command("pause_imv");await Task.Delay(1100);
+                Require(marquee.Paused&&!marquee.MuteVisible,"Pause did not take priority over mute indicator");
+                playback.Command("play_imv");playback.Command("mute");
+                Require(!playback.Decoder.Muted&&marquee.LastControl=="unmute","Unmute did not show its original feedback");
+                await UntilPower(tap,440,value=>value>=quietPower*.8&&value<=quietPower*1.2,"Unmute fade did not restore the actual PCM level");
+                playback.Command("mute");playback.Command("volinc");
+                Require(!playback.Decoder.Muted&&!marquee.Muted&&playback.Decoder.OutputVolumeStep==volume+1,"Volume increment failed to clear mute");
+                playback.Command("voldec");
 
                 Require(playback.PlayMedia(stereo,preserveStereo:true), "YouTube-style stereo media rejected");
                 await Stereo(tap);
@@ -340,7 +364,7 @@ public static class NativePlaybackVerification
                 {
                     nativeWindowsDecoder = "bundled libVLC", androidRuntimeUsed = false,
                     independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
-                    decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,
+                    decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,actualMutePcmSilenceVerified=true,muteBlinkAndPausePriorityVerified=true,unmutePcmRestoredVerified=true,
                     originalPauseRepeatAndConfirmedTrackFeedbackVerified=true,
                     audioEndingAt45PercentRejected=true,fullMkvAndTsAudioCoverageVerified=true,
                     continuousMarqueeMovementAndRefreshVerified=true,
