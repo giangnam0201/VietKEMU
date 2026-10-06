@@ -73,7 +73,7 @@ internal static class NativeBroadcastVolumeVerification
     private static async Task Ready(NativePlayback playback,int expectedVolume)
     {
         var deadline=DateTime.UtcNow.AddSeconds(12);
-        while(playback.Player.State!=OriginalVideoState.Play||playback.Decoder.Position<=0||playback.Decoder.Native.Volume!=expectedVolume) { if(DateTime.UtcNow>=deadline)throw new TimeoutException($"Idle-volume output not ready: source={playback.Source}, state={playback.Player.State}, step={playback.Decoder.OutputVolumeStep}, native={playback.Decoder.Native.Volume}, expected={expectedVolume}, tracks={playback.Decoder.Native.AudioTrackDescription.Count(t=>t.Id>=0)}");await Task.Delay(50); }
+        while(playback.Player.State!=OriginalVideoState.Play||playback.Decoder.Position<=0||playback.Decoder.Native.Volume!=expectedVolume) { if(DateTime.UtcNow>=deadline)throw new TimeoutException($"Idle-volume output not ready: source={playback.Source}, state={playback.Player.State}, step={playback.Decoder.OutputVolumeStep}, applied={playback.Decoder.AppliedVolumePercent}, appMuted={playback.Decoder.Muted}, nativeMuted={playback.Decoder.Native.Mute}, native={playback.Decoder.Native.Volume}, expected={expectedVolume}, tracks={playback.Decoder.Native.AudioTrackDescription.Count(t=>t.Id>=0)}");await Task.Delay(50); }
     }
     private static void Click(OriginalBroadcastVolumeDialog dialog,string name)=>Descendants(dialog.Overlay).Single(x=>Equals(x.Tag,"broadcast-volume:"+name)).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
     private static IEnumerable<FrameworkElement> Descendants(DependencyObject parent)

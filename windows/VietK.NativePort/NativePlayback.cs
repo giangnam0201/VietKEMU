@@ -159,7 +159,14 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
         if(!value&&OutputVolumeStep>0)unmuteFade.Start();
         ApplyVolume();
     }
-    private void ApplyVolume() => Native.Volume = Muted?0:(int)Math.Clamp(mediaVolume * (unmuteFade.IsEnabled?fadeStep:OutputVolumeStep) / 20 * 100, 0, 200);
+    internal int AppliedVolumePercent { get; private set; }
+    private void ApplyVolume()
+    {
+        AppliedVolumePercent=Muted?0:(int)Math.Clamp(mediaVolume*(unmuteFade.IsEnabled?fadeStep:OutputVolumeStep)/20*100,0,200);
+        // The native output owns a mute flag independently of its numeric
+        // volume. Reconcile both when applying this decoder's app state.
+        Native.Mute=Muted;Native.Volume=AppliedVolumePercent;
+    }
     public void Dispose()
     {
         if (disposed) return;
