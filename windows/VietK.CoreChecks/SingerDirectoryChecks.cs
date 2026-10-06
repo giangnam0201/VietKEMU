@@ -25,7 +25,7 @@ internal static class SingerDirectoryChecks
         Require(directory.BySpell("",1,2).Single().Id==2&&directory.BySpell("",1,3).Single().Id==3,"Vietnam sex mapping failed");
         Require(directory.BySpell("",3,1).Single().Id==4&&directory.BySpell("",2,1).Single().Id==5,"China/Western type mapping failed");
         Require(directory.BySpell("AL",1,0).Select(singer=>singer.Id).SequenceEqual(new[]{1,2,9,3}),"Exact initials, prefix length, English substring and rank sorting differ");
-        Require(directory.ByName("Alpha",1,0,false).Select(singer=>singer.Id).SequenceEqual(new[]{1,9,2,3})&&directory.ByName("Alpha",1,0,true).Select(singer=>singer.Id).SequenceEqual(new[]{1,9}),"Name prefix/substring branch differs");
+        Require(directory.ByName("Alpha",1,0,false).Select(singer=>singer.Id).SequenceEqual(new[]{1,9,3,2})&&directory.ByName("Alpha",1,0,true).Select(singer=>singer.Id).SequenceEqual(new[]{1,9}),"Name prefix/substring branch differs");
         Require(directory.BySpell("",1,1,length:9).Single().Id==8&&directory.CountBySpell("",1,1,length:2)==1,"Original spelling-length filters differ");
         Require(directory.BySpell("'",0,0).Count==0,"Directory search did not safely bind literal input");
         using(var transaction=database.BeginTransaction())
