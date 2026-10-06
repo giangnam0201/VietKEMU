@@ -59,7 +59,9 @@ public sealed class OriginalSongPreview : IDisposable
         if(string.IsNullOrEmpty(path)||!File.Exists(path)) { tip.Text="Tải video không thành công";return; }
         try
         {
-            decoder=new WindowsVideoDecoder(host.Dispatcher);var player=decoder;
+            // A preview has no audio path. Disabling it at decoder creation also
+            // prevents a startup burst before an audio output accepts mute.
+            decoder=new WindowsVideoDecoder(host.Dispatcher,disableAudio:true);var player=decoder;
             player.SetMuted(true);player.Native.Mute=true;surface.Source=player.VideoSurface;
             player.VideoFrameChanged+=()=> { if(current==generation)Frames++; };
             player.Started=()=>

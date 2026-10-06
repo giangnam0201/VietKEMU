@@ -26,7 +26,7 @@ internal static class NativeSongPreviewVerification
             preview.Show(song);
             Require(preview.IsOpen&&Application.Current.Windows.Count==2,"Song preview introduced another native window");
             await Until(()=>preview.Frames>5&&preview.VideoVisible,"Preview did not render after original 800ms reveal delay");
-            Require(preview.Decoder!.Muted&&preview.Decoder.Native.Mute,"Preview was not muted independently of TV");
+            Require(preview.Decoder!.Muted&&preview.Decoder.AudioDisabled&&preview.Decoder.Native.AudioTrack==-1,"Preview retained an active audio track");
             Require(television.DecodedPreviewFrames>tvFrames,"Opening song preview stopped TV frame delivery");
             var order=Descendants<Button>(panel).Single(button=>Equals(button.Tag,"preview-order"));
             order.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -40,7 +40,7 @@ internal static class NativeSongPreviewVerification
             // End the real media to exercise the independent loop, not a mocked callback.
             preview.Decoder.Native.Time=preview.Decoder.Native.Length-500;
             await Until(()=>preview.LoopCount>0&&preview.Decoder.Position<5000,"Song preview did not loop from its beginning");
-            Require(preview.Decoder.Native.Mute,"Loop restarted preview with audible output");
+            Require(preview.Decoder.AudioDisabled&&preview.Decoder.Native.AudioTrack==-1,"Loop restarted preview with an active audio track");
             Descendants<Button>(panel).Single(button=>Equals(button.Tag,"preview-close")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Require(!preview.IsOpen&&preview.Decoder is null&&panel.Children.Count==0,"Preview close did not remove and release its decoder");
             using var missing=new OriginalSongPreview(()=>panel,_=>null,_=>false,_=>{},_=>{});

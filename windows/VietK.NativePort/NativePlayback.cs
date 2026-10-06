@@ -36,6 +36,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public Action? Started { get; set; }
     public int OutputVolumeStep { get; private set; } = 15;
     public bool Muted { get; private set; }
+    public bool AudioDisabled { get; }
     private readonly DispatcherTimer unmuteFade;
     private int fadeStep;
     public int LastAudioTrackCount { get; private set; }
@@ -44,14 +45,15 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public int Position => (int)Math.Clamp(Native.Time, 0, int.MaxValue);
     public int Duration => (int)Math.Clamp(Native.Length, 0, int.MaxValue);
 
-    public WindowsVideoDecoder(Dispatcher dispatcher)
+    public WindowsVideoDecoder(Dispatcher dispatcher,bool disableAudio=false)
     {
         this.dispatcher = dispatcher;
         var directory = Path.Combine(AppContext.BaseDirectory, "libvlc", "win-x64");
         if (!File.Exists(Path.Combine(directory, "libvlc.dll")))
             throw new FileNotFoundException("Bundled Windows decoder missing", directory);
         LibVLCSharp.Shared.Core.Initialize(directory);
-        library = new LibVLC("--no-video-title-show", "--no-osd");
+        AudioDisabled=disableAudio;
+        library = new LibVLC(disableAudio?["--no-video-title-show","--no-osd","--no-audio"]:["--no-video-title-show","--no-osd"]);
         Native = new MediaPlayer(library) { EnableKeyInput = false, EnableMouseInput = false };
         unmuteFade=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(100) };
         unmuteFade.Tick+=(_,_)=>
