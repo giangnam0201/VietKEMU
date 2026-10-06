@@ -17,8 +17,13 @@ public sealed class OriginalSingerNavigation(string root,SongBrowserContract con
     public event Action<string>? YoutubeRequested;
     public bool Open(string name)
     {
-        var singer=database.Singers.Find(name);var window=host();
-        if(singer is null||window?.Content is not Viewbox)return false;
+        var singer=database.Singers.Find(name);
+        return singer is not null&&Open(singer);
+    }
+    public bool Open(OriginalSinger singer)
+    {
+        var window=host();
+        if(window?.Content is not Viewbox)return false;
         var browser=new SongBrowser(root,contract,more,database,grid,context,singer) { Playback=playback() };
         browser.SetConfirmedQueuedSongs(queued());browser.SetConfirmedCollectedSongs(collected());
         browser.SingerRequested+=next=>Open(next);

@@ -9,6 +9,7 @@ public sealed class LocalSongDatabase : IDisposable
     private readonly SqliteConnection connection;
     public SongSearch Search { get; }
     public OriginalSingerSongs Singers { get; }
+    public OriginalSingerDirectory SingerDirectory { get; }
     public SelectedListStore SelectedList { get; }
     public DownloadListStore DownloadList { get; }
 
@@ -28,6 +29,7 @@ public sealed class LocalSongDatabase : IDisposable
             UpgradeSingerColumns(connection);
             Search = new SongSearch(connection);
             Singers=new OriginalSingerSongs(connection);
+            SingerDirectory=new OriginalSingerDirectory(connection);
             SelectedList = new SelectedListStore(connection);
             DownloadList = new DownloadListStore(connection);DownloadList.UpgradeSchema();
         }

@@ -187,6 +187,7 @@ public static class Program
                 id=>selectedQueue.Snapshot().Any(item=>item.SongMetadata.Id==id),
                 id=>songOrder.Request(id,false),collectionControls.Collect);
             songPreview=previewScreen;previewScreen.Feedback+=collectionControls.Feedback;
+            var singerDirectory=new OriginalSingerDirectoryBrowser(root,songContract,moreContract,songState,gridContract);
             collectionScreen.ActionRequested+=(song,action)=>
             { if(action is "order" or "top")songOrder.Request(song.Id,action=="top");else if(action=="preview")previewScreen.Show(song); };
             musicServer.ConnectionChanged+=collectionScreen.RefreshMedia;
@@ -200,7 +201,7 @@ public static class Program
             {
                 singerNavigation?.Clear();
                 var panel = screen switch { 34 when youtube is not null => youtube.Create(),
-                    38 => more.Create(), 14 => collectionScreen.Create(), 2 => browser.Create(), _ => renderer.Create() };
+                    38 => more.Create(), 14 => collectionScreen.Create(), 1=>singerDirectory.Create(),2 => browser.Create(), _ => renderer.Create() };
                 TextElement.SetFontFamily(panel, OriginalFont.Family);
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
@@ -509,6 +510,7 @@ public static class Program
             using var nativePlayback = new NativePlayback(bottom, stateDirectory);
             using var ambienceExpressions=new AmbienceExpressions(nativePlayback.Television.Overlay,nativePlayback.Television,nativePlayback);
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
+            singerDirectory.Playback=nativePlayback;
             playback = nativePlayback;
             singerNavigation=new OriginalSingerNavigation(root,songContract,moreContract,songState,gridContract,()=>window,
                 panel=> { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);panel.Children.Add(bar);panel.Children.Add(top.Create()); },
@@ -516,7 +518,9 @@ public static class Program
                 ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).Select(item=>item.SongMetadata.Id).ToHashSet(),()=>collectionProfiles.Snapshot().ToHashSet());
             browser.SingerRequested+=name=>singerNavigation.Open(name);
             collectionScreen.SingerRequested+=name=>singerNavigation.Open(name);
-            singerNavigation.FragmentRequested+=fragment=>System.Diagnostics.Trace.WriteLine($"Original singer directory fragment {fragment} requested; directory UI pending");
+            singerNavigation.FragmentRequested+=fragment=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(fragment) };
+            singerDirectory.SingerRequested+=singer=>singerNavigation.Open(singer);
+            singerDirectory.HomeRequested+=()=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel() };
             singerNavigation.SongActionRequested+=(song,action)=>
             {
                 if(action is "order" or "top")songOrder.Request(song.Id,action=="top");
@@ -585,7 +589,7 @@ public static class Program
             };
             renderer.NavigationRequested += fragment =>
             {
-                if (fragment is 38 or 2 or 34) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment==2?34:fragment) };
+                if (fragment is 1 or 38 or 2 or 34) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment==2?34:fragment) };
             };
             more.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
             more.NavigationRequested+=fragment=> { if(fragment==14)window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(14) }; };

@@ -45,13 +45,20 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
 
     public Canvas Create()=>CreateCore(null);
     internal Canvas CreateVerificationFixture(IReadOnlyList<CatalogueSong> songs)=>CreateCore(songs);
+    // The directory uses the same SearchBySpellManager keyboard and phantom.
+    internal Canvas CreateSearchShell()
+    {
+        var panel=CreateCore([]);
+        foreach(var child in panel.Children.OfType<FrameworkElement>().Where(child=>child.Tag is "song-browser-area" or "song-browser-back").ToArray())panel.Children.Remove(child);
+        return panel;
+    }
 
     private Canvas CreateCore(IReadOnlyList<CatalogueSong>? fixtureSongs)
     {
         Alphabetic = true;
         var canvas = new Canvas { Width = 1280, Height = 800, ClipToBounds = true,
             Background = new ImageBrush(Bitmap("main_bg.jpg")) { Stretch = Stretch.UniformToFill } };
-        var area = new Grid { Width = contract.ContainerWidth, Height = contract.ContainerHeight,
+        var area = new Grid { Tag="song-browser-area",Width = contract.ContainerWidth, Height = contract.ContainerHeight,
             Background = new LinearGradientBrush(new GradientStopCollection {
                 new(Color("#33fb00cb"),0), new(Color("#33490ba6"),.5), new(Color("#33c01be2"),1) },
                 new Point(0,1), new Point(1,0)) };

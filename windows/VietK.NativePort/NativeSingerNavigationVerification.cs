@@ -94,12 +94,59 @@ internal static class NativeSingerNavigationVerification
             navigation.Open("Fixture one");host.UpdateLayout();
             await ClickElement(Descendants<StackPanel>((Viewbox)host.Content).Single(element=>Equals(element.Tag,"singer-category-home")));
             Require(home==1&&navigation.Active?.Singer?.Id==9,"Singer category did not request the original directory fragment");
+            navigation.Clear();
+            using(var fixture=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=state,Pooling=false }.ToString()))
+            {
+                fixture.Open();using var transaction=fixture.BeginTransaction();
+                for(var index=0;index<91;index++)
+                {
+                    using var command=fixture.CreateCommand();command.Transaction=transaction;
+                    command.CommandText="INSERT INTO tblSinger(SongsterID,SongsterName,SongsterPy,SongsterTypeID,SongsterOrderRank,singer_name_en,Pic_FileID_L) VALUES($id,$name,'ZZ',8,$rank,'Directory',0)";
+                    command.Parameters.AddWithValue("$id",100+index);command.Parameters.AddWithValue("$name",index==0?"Fixture one":"Directory fixture "+index);
+                    command.Parameters.AddWithValue("$rank",1000-index);command.ExecuteNonQuery();
+                }
+                using(var female=fixture.CreateCommand())
+                { female.Transaction=transaction;female.CommandText="INSERT INTO tblSinger(SongsterID,SongsterName,SongsterPy,SongsterTypeID,SongsterOrderRank,singer_name_en,Pic_FileID_L) VALUES(200,'Directory female','DF',9,100,'Female',0)";female.ExecuteNonQuery(); }
+                transaction.Commit();
+            }
+            var singerDirectory=new OriginalSingerDirectoryBrowser(root,contract,more,database,grid) { Playback=playback };
+            singerDirectory.SingerRequested+=singer=>navigation.Open(singer);
+            var directoryHome=0;singerDirectory.HomeRequested+=()=>directoryHome++;
+            var directoryPanel=singerDirectory.Create();Decorate(directoryPanel);var directoryView=new Viewbox { Child=directoryPanel };host.Content=directoryView;
+            await Until(()=>directoryPanel.IsLoaded,"Directory never loaded");host.UpdateLayout();
+            Require(singerDirectory.LoadedSingers.Count==80&&Descendants<Border>(directoryPanel).Count(element=>element.Tag is string tag&&tag.StartsWith("singer-card:"))==8,"Directory did not display eight singers from its first SQL batch");
+            var firstCard=Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-card:100"));
+            var secondCard=Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-card:101"));
+            Require(Canvas.GetLeft(firstCard)==Canvas.GetLeft(secondCard)&&Canvas.GetTop(secondCard)>Canvas.GetTop(firstCard),"Horizontal directory grid lost its column-first order");
+            await ClickElement(Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-country:1")));
+            Require(singerDirectory.Country==1&&singerDirectory.TypePopup?.IsOpen==true,"Country tab did not filter singers and show sex popup");
+            await ClickElement(Descendants<Border>(singerDirectory.TypePopup!.Child).Single(element=>Equals(element.Tag,"singer-sex:2")));
+            Require(singerDirectory.Sex==2&&singerDirectory.LoadedSingers.Single().Id==200,"Sex popup did not apply the original Vietnam female type");
+            await ClickElement(Descendants<Border>(singerDirectory.TypePopup.Child).Single(element=>Equals(element.Tag,"singer-sex:1")));
+            singerDirectory.TypePopup.IsOpen=false;
+            Require(singerDirectory.Sex==1&&singerDirectory.TotalPages==12,"Vietnam male paging count differs");
+            for(var page=2;page<=8;page++)
+                await ClickElement(Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-page:icon_next_page.png")));
+            Require(singerDirectory.CurrentPage==8&&singerDirectory.LoadedSingers.Count==91,"Directory did not prefetch its second SQL batch two pages before the boundary");
+            Capture(directoryPanel,"original-singer-directory.png");
+            singerDirectory.Input!.Letter("Z");singerDirectory.Input.Letter("Z");
+            await Until(()=>singerDirectory.CurrentPage==1&&singerDirectory.LoadedSingers.Count==80,"Shared directory keyboard did not reset its initial batch");
+            await ClickElement(Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-card:100")));
+            Require(navigation.Active?.Singer?.Id==100,"Directory resolved a duplicate singer name instead of its exact ID");
+            await ClickBack();Require(ReferenceEquals(host.Content,directoryView)&&singerDirectory.Input.Text=="ZZ"&&singerDirectory.Country==1&&singerDirectory.Sex==1,"Directory Back lost its filter/input state");
+            singerDirectory.Input.Clear();await Task.Delay(100);singerDirectory.Input.Letter("NOMATCH");
+            await Until(()=>singerDirectory.LoadedSingers.Count==0,"Directory zero-result query did not finish");
+            Require(singerDirectory.TotalPages==0,"Empty directory retained old page count");
+            await ClickElement(Descendants<TextBlock>(directoryPanel).Single(element=>Equals(element.Tag,"singer-directory-home")));
+            Require(directoryHome==1,"Directory title did not request Home");
             Require(Application.Current.Windows.Count==2,"Singer routing introduced an extra native window");
             File.WriteAllText(Path.Combine(output,"singer-navigation-verification.json"),JsonSerializer.Serialize(new {
                 referencedSingerImport=true,individualDuetSpans=true,exactSingerMembership=true,originalInitialPageSize=true,
                 continuousNextPage=true,singerScopedSearch=true,shortResultListTopAligned=true,confirmedFavoriteState=true,sharedActionCallback=true,
                 unknownSingerNoOp=true,restoresPreviousViewAndInput=true,restoredFooterUsesCurrentState=true,nestedSingerBack=true,collectionSingerRoute=true,
-                categoryDirectoryRequest=true,directoryScreen=false,twoWindows=true,manufacturerSingerPictures=false
+                categoryDirectoryRequest=true,directoryScreen=true,directoryEightCards=true,directoryColumnFirst=true,
+                directoryCountrySexFilters=true,directoryBatchPrefetch=true,directoryExactIdRoute=true,directoryRetainedState=true,
+                directoryKeyboard=true,directoryZeroResults=true,twoWindows=true,manufacturerSingerPictures=false,directoryPopupArtwork=false
             },new JsonSerializerOptions { WriteIndented=true }));
             T Read<T>(string file)=>JsonSerializer.Deserialize<T>(File.ReadAllText(Path.Combine(root,file)),new JsonSerializerOptions { PropertyNameCaseInsensitive=true })!;
             void Decorate(Canvas canvas) { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);canvas.Children.Add(bar); }
