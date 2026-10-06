@@ -87,6 +87,7 @@ def package(decoded, destination, firmware_ui):
     package_song_browser(app, destination, entries, strings, values)
     package_song_grid(app, destination, entries)
     package_order_dependencies(decoded, destination, strings)
+    package_player_reference(decoded, destination)
     seed = app / 'apktool/assets/kmbox.jpg'
     seed_digest = hashlib.sha256(seed.read_bytes()).hexdigest()
     if entries['assets/kmbox.jpg']['sha256'] != seed_digest:
@@ -394,6 +395,23 @@ def package_bottom(app, destination, entries, strings):
         'textSize': 16, 'textColor': colors['system_singer_name_color']}
     (destination / 'bottom.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
     (destination / 'bottom-provenance.json').write_text(json.dumps(provenance, indent=2))
+
+
+def package_player_reference(decoded, destination):
+    app = decoded / 'daulkmboxosdtv'
+    entries = {entry['path']: entry for entry in json.loads((app / 'original-entries.json').read_text())}
+    original = app / 'apktool/assets/grade_video.mp4'
+    payload = original.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+    if entries['assets/grade_video.mp4']['sha256'] != digest:
+        raise RuntimeError('Original TV reference video differs')
+    output = destination / 'player'
+    output.mkdir(exist_ok=True)
+    (output / original.name).write_bytes(payload)
+    shutil.copy2(app / 'apktool/res/layout/activity_osd.xml', output / 'activity_osd.xml')
+    (output / 'provenance.json').write_text(json.dumps({
+        'app': app.name, 'asset': 'assets/grade_video.mp4', 'sha256': digest,
+        'scope': 'Original grading video retained for actual Windows decode verification and eventual grading UI; not a karaoke song library.'}, indent=2))
 
 
 def package_fonts(source, destination):

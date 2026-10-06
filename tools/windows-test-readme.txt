@@ -8,13 +8,22 @@ Available to test:
 - Home and More screens using extracted original resources.
 - Song browser, Vietnamese keyboard, song grid and catalogue search.
 - Native database and queue logic translated from the original app.
+- Independent panel and TV windows with bundled Windows video decoder.
+- Server login/media-request transport and music file download to playback queue.
+- Pause, replay, seek, original/accompaniment and output volume controls.
 
 Still incomplete:
-- Karaoke playback and the second TV/output screen.
-- Music downloads and live server integration.
+- Live music-server authorization requires a registered device identity; firmware
+  alone does not contain the hardware chip ID. Live server playback is unverified.
+- Encrypted karaoke, complete TV overlays, subtitles/scoring and microphone DSP.
 - Other screens, controls and full original UI/UX parity.
 Song catalogue entries are metadata; this package does not include playable music.
 Some controls remain unimplemented. This is not yet a complete 1:1 port.
 
 App state: %LOCALAPPDATA%\VietKNativePort
+Server configuration: %LOCALAPPDATA%\VietKNativePort\music-server.json
+Fill ChipId, Mac and UserAgent with your authorized device information and restart.
+LoginUrl defaults to the original firmware's http://viet.duochang.cc/login.
+MusicDirectory may specify your song cache folder (500 MiB free required).
+No fabricated device identity, token or authentication success is supplied.
 If startup fails: %TEMP%\vietk-native-startup-error.txt

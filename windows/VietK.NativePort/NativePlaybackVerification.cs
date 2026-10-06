@@ -1,0 +1,188 @@
+using System.IO;
+using System.Net;
+using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
+using LibVLCSharp.Shared;
+using VietK.Core;
+
+namespace VietK.NativePort;
+
+public static class NativePlaybackVerification
+{
+    public static int Run(Application app, Canvas panel, BottomBar bottom, string root, string fixtures, string output)
+    {
+        Directory.CreateDirectory(output);
+        app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        var host = new Window { Title = "VietK playback verification", Width = 1280, Height = 800,
+            Content = new Viewbox { Child = panel } };
+        app.MainWindow = host;
+        using var playback = new NativePlayback(bottom, output);
+        using var tap = new PcmTap(playback.Decoder.Native);
+        var result = 1;
+        host.Loaded += async (_, _) =>
+        {
+            try
+            {
+                playback.ShowTelevision(host);
+                Require(new WindowInteropHelper(host).Handle != IntPtr.Zero &&
+                    new WindowInteropHelper(playback.Television).Handle != IntPtr.Zero &&
+                    playback.Television.Owner is null, "Independent panel/TV window handles missing");
+                var played = 0; playback.Player.Played += () => played++;
+                var clip = Path.GetFullPath(Path.Combine(root, "player", "grade_video.mp4"));
+                Require(playback.PlayMedia(clip), "Original APK grading video rejected");
+                await Until(() => played > 0 && playback.Decoder.Position > 0, "Original video did not decode/render");
+                Require(!playback.Television.BlackVisible, "Original black cover stayed above playing media");
+                var snapshot = Path.GetFullPath(Path.Combine(output, "original-tv-video.png"));
+                Require(playback.Decoder.Native.TakeSnapshot(0, snapshot, 0, 0), "Native video snapshot request failed");
+                await Until(() => File.Exists(snapshot) && new FileInfo(snapshot).Length > 1024, "Decoded video snapshot missing");
+
+                var sourceStereo = Path.GetFullPath(Path.Combine(fixtures, "stereo.mkv"));
+                var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
+                string stereo;
+                try
+                {
+                    var url="http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port+"/stereo.mkv";
+                    var serving=Task.Run(async()=>
+                    {
+                        using var socket=await listener.AcceptTcpClientAsync();
+                        await using var stream=socket.GetStream();
+                        using var reader=new StreamReader(stream,Encoding.ASCII,false,1024,true);
+                        while(!string.IsNullOrEmpty(await reader.ReadLineAsync())) { }
+                        await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: "+new FileInfo(sourceStereo).Length+"\r\nConnection: close\r\n\r\n"));
+                        await using var file=File.OpenRead(sourceStereo);await file.CopyToAsync(stream);
+                    });
+                    using var transfer=new OriginalMusicTransfer();
+                    stereo=await transfer.Download(101000,url,Path.Combine(output,"downloaded"),(_,_)=>{},CancellationToken.None);
+                    await serving.WaitAsync(TimeSpan.FromSeconds(15));
+                    Require(SHA256.HashData(File.ReadAllBytes(stereo)).SequenceEqual(SHA256.HashData(File.ReadAllBytes(sourceStereo))),
+                        "HTTP download changed media bytes");
+                }
+                finally { listener.Stop(); }
+                Require(playback.PlayMedia(stereo, Metadata(stereo, 0, 1)), "Stereo test media rejected");
+                await Until(() => playback.Player.State == OriginalVideoState.Play && playback.Decoder.Native.AudioTrackDescription.Count(t => t.Id >= 0) == 1,
+                    "Single audio track did not start");
+                await Tone(tap, 880, 440, "Original channel should duplicate the right channel");
+                playback.Command("ori_imv");
+                await Tone(tap, 440, 880, "Accompaniment channel should duplicate the left channel");
+                await Until(() => !bottom.OriginalVocal, "Panel track icon did not observe the decoder");
+                playback.Command("pause_imv");
+                await Until(() => bottom.Paused && playback.Decoder.Native.State == VLCState.Paused, "Pause button did not pause decoder");
+                var pausedAt = playback.Decoder.Position;
+                await Task.Delay(350);
+                Require(Math.Abs(playback.Decoder.Position - pausedAt) < 100, "Paused decoder clock kept running");
+                playback.Command("play_imv");
+                await Until(() => !bottom.Paused && playback.Decoder.Position > pausedAt, "Play button did not resume decoder");
+                Require(playback.Player.Seek(6000) == 0, "Valid original seek rejected");
+                await Until(() => playback.Decoder.Position >= 5800, "Native seek did not reach target");
+                Require(playback.Player.Seek(-1) == -1 && playback.Player.Seek(playback.Decoder.Duration + 1) == -1,
+                    "Original seek bounds were bypassed");
+                playback.Command("replay_imv");
+                await Until(() => playback.Player.State == OriginalVideoState.Play && playback.Decoder.Position is > 0 and < 2000,
+                    "Replay did not restart actual media");
+                var volume = playback.Decoder.OutputVolumeStep;
+                playback.Command("volinc");
+                Require(playback.Decoder.OutputVolumeStep == volume + 1 && playback.Decoder.Native.Volume == (volume + 1) * 5,
+                    "Original 0..20 volume step not applied to decoder");
+                playback.Command("voldec");
+                Require(playback.Decoder.OutputVolumeStep == volume, "Volume decrement did not restore level");
+
+                var multi = Path.GetFullPath(Path.Combine(fixtures, "multiple.ts"));
+                Require(playback.PlayMedia(multi, Metadata(multi, 1, 0)), "Multiple-track MPEG media rejected");
+                await Until(() => playback.Player.State == OriginalVideoState.Play && playback.Decoder.Native.AudioTrackDescription.Count(t => t.Id >= 0) == 2,
+                    "Two MPEG audio streams not available");
+                await Tone(tap, 1200, 480, "Original stream must select audio ordinal 1");
+                playback.Command("accp_imv");
+                await Tone(tap, 480, 1200, "Accompaniment stream must select audio ordinal 0");
+                var next = 0; playback.NextRequested += () => next++;
+                playback.Command("cut_song_imv");
+                Require(next == 1 && playback.Player.State == OriginalVideoState.Idle && playback.Television.BlackVisible,
+                    "Next button did not stop decoder and request queue advance");
+                // Verify actual decoder end-of-stream, not a timer-generated
+                // completion. Seek close to the end of the same MPEG file.
+                Require(playback.PlayMedia(multi, Metadata(multi, 1, 0)), "Completion media failed to restart");
+                await Until(() => playback.Player.State == OriginalVideoState.Play && playback.Decoder.Duration > 0, "Completion media did not start");
+                playback.Player.Seek(playback.Decoder.Duration - 800);
+                await Until(() => next == 2, "Actual decoder completion did not request queue advance");
+                Require(playback.Player.State == OriginalVideoState.Idle, "Original completion state not idle");
+                File.WriteAllText(Path.Combine(output, "playback-verification.json"), JsonSerializer.Serialize(new
+                {
+                    nativeWindowsDecoder = "bundled libVLC", androidRuntimeUsed = false,
+                    independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
+                    stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,
+                    pauseResumeClockVerified = true, nativeSeekReplayVerified = true,
+                    panelPlaybackObserverVerified = true, volumeStepVerified = true,
+                    nextAndDecoderCompletionVerified = true,
+                    httpDownloadedVideoHashAndDecoderVerified = true,
+                    scope = "Real video pixels and decoded PCM, with original player/control rules. Audio-device playback, full TV OSD, encrypted karaoke, storage, scoring and live downloads remain unverified."
+                }, new JsonSerializerOptions { WriteIndented = true }));
+                result = 0;
+            }
+            catch (Exception error) { File.WriteAllText(Path.Combine(output, "playback-error.txt"), error.ToString()); }
+            finally { app.Shutdown(); }
+        };
+        app.Run(host);
+        return result;
+    }
+    private static SongMedia Metadata(string path, int original, int accompaniment) =>
+        new(1, 101000, path, 100, original, accompaniment, "0", "0", 1, "", "", "", "", 0, null, null, "decoder-fixture");
+    private static void Require(bool value, string message) { if (!value) throw new InvalidDataException(message); }
+    private static async Task Until(Func<bool> condition, string message)
+    {
+        var stop = DateTime.UtcNow.AddSeconds(15);
+        while (!condition()) { if (DateTime.UtcNow >= stop) throw new TimeoutException(message); await Task.Delay(50); }
+    }
+    private static async Task Tone(PcmTap tap, int expected, int unwanted, string message)
+    {
+        var stop = DateTime.UtcNow.AddSeconds(5);
+        double signal = 0, other = 0;
+        do
+        {
+            tap.Reset(); await Task.Delay(300);
+            var samples = tap.Read();
+            signal = PcmTap.Power(samples, expected); other = PcmTap.Power(samples, unwanted);
+            if (samples.Length >= 4800 && signal > 0.000001 && signal > other * 25) return;
+        } while (DateTime.UtcNow < stop);
+        throw new InvalidDataException($"{message}; decoded power expected={signal}, unwanted={other}");
+    }
+    // Native audio output tap enables CI without an audio device, while checking
+    // the actual downmix/stream-selection result in the decoder's PCM output.
+    private sealed class PcmTap : IDisposable
+    {
+        private readonly object gate = new();
+        private readonly List<short> samples = new();
+        private readonly MediaPlayer.LibVLCAudioPlayCb callback;
+        public PcmTap(MediaPlayer player)
+        {
+            callback = (_, data, count, _) =>
+            {
+                var values = new short[checked((int)count * 2)];
+                Marshal.Copy(data, values, 0, values.Length);
+                lock (gate) { if (samples.Count < 96000) samples.AddRange(values); }
+            };
+            player.SetAudioFormat("S16N", 48000, 2);
+            player.SetAudioCallbacks(callback, null!, null!, null!, null!);
+        }
+        public void Reset() { lock (gate) samples.Clear(); }
+        public short[] Read() { lock (gate) return samples.ToArray(); }
+        public static double Power(short[] data, int frequency)
+        {
+            var count = data.Length / 2;
+            if (count == 0) return 0;
+            double sin = 0, cos = 0;
+            for (var i = 0; i < count; i++)
+            {
+                var sample = (data[i * 2] + data[i * 2 + 1]) / 65536.0;
+                var phase = 2 * Math.PI * frequency * i / 48000;
+                sin += sample * Math.Sin(phase); cos += sample * Math.Cos(phase);
+            }
+            return (sin * sin + cos * cos) / (count * (double)count);
+        }
+        public void Dispose() => GC.KeepAlive(callback);
+    }
+}

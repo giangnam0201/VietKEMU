@@ -32,6 +32,13 @@ jobs:
         run: gh run download 37417309368 -n original-firmware-ui-assets -D firmware-ui-fonts
       - name: Package the original home and bottom bar resources
         run: python tools/package_native_home.py decoded original --firmware-ui firmware-ui-fonts
+      - name: Create decoder verification signals
+        run: python tools/create_playback_fixtures.py playback-fixtures
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playback-decoder-fixtures
+          path: playback-fixtures/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: original-native-home-resources
@@ -52,10 +59,19 @@ jobs:
           path: windows/VietK.NativePort/Original/
       - name: Compile native Windows executable
         run: dotnet publish windows/VietK.NativePort -c Release -r win-x64 --self-contained true -o artifacts/native-windows
+      - uses: actions/download-artifact@v4
+        with:
+          name: playback-decoder-fixtures
+          path: artifacts/playback-fixtures/
       - name: Render original home component on Windows
         run: |
           $process = Start-Process -FilePath artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Native rendering failed: $($process.ExitCode)" }
+      - name: Verify real Windows video and karaoke audio controls
+        run: |
+          $process = Start-Process -FilePath artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-playback', 'artifacts/playback-fixtures', 'artifacts/native-verification/playback' -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(180000)) { $process.Kill(); throw 'Native playback verification timed out' }
+          if ($process.ExitCode -ne 0) { throw "Native playback verification failed: $($process.ExitCode)" }
       - name: Retain native failure diagnostics
         if: failure()
         run: |
@@ -82,7 +98,7 @@ jobs:
           ### Windows test build
           Download **VietK-Windows-test-build** from this run's Artifacts section.
           Extract the artifact, then extract the contained VietK-Windows ZIP completely and open **VietK.NativePort.exe**.
-          Windows x64; .NET is included. This is a partial native UI port; playback, downloads and TV output are still incomplete.
+          Windows x64; .NET and the native decoder are included. This is a partial native port: a video player and TV window are implemented; song storage/download integration and full original OSD are still incomplete.
           '@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4
         with:

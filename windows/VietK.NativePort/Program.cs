@@ -41,7 +41,8 @@ public static class Program
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Missing original song browser contract");
             var capturing = args.Length == 2 && args[0] == "--capture";
-            var stateDirectory = capturing ? args[1] : Path.Combine(
+            var verifyingPlayback = args.Length == 3 && args[0] == "--verify-playback";
+            var stateDirectory = capturing || verifyingPlayback ? args[^1] : Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
                 Path.Combine(stateDirectory,"song-browser-state.db"));
@@ -55,6 +56,22 @@ public static class Program
             SongBrowser? queueBrowser=null;
             OriginalSelectedQueue? selectedQueue=null;
             OriginalDownloadQueue? downloadQueue=null;
+            NativePlayback? playback=null;
+            using var musicServer=new NativeMusicServer(app.Dispatcher,stateDirectory,id=>songState.GetSongById(id));
+            IReadOnlyList<SongMedia> AvailableMedia(int id)=>musicServer.Get(id) is { } cached?
+                new[]{cached.Metadata}.Concat(songState.GetMedia(id)).ToArray():songState.GetMedia(id);
+            void StartQueuedMedia()
+            {
+                app.Dispatcher.BeginInvoke(() =>
+                {
+                    var item = selectedQueue?.Snapshot().FirstOrDefault();
+                    if (item is null) { playback?.Player.Stop(); return; }
+                    var cached=musicServer.Get(item.SongMetadata.Id);
+                    var path=string.IsNullOrEmpty(item.PlayUrl)?cached?.Path:item.PlayUrl;
+                    if(item.PlayType!="normal" || string.IsNullOrEmpty(path))return;
+                    playback?.PlayMedia(path,cached?.Metadata??item.VideoMedia);
+                });
+            }
             void QueueChanged()
             {
                 var combined=(selectedQueue?.Snapshot()??Array.Empty<SelectedPlaylistItem>())
@@ -65,21 +82,43 @@ public static class Program
             selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
                 command=> { if(!queueDispatcher.Post(command))throw new InvalidOperationException("Playlist database worker stopped"); },
                 QueueChanged,
-                ()=>System.Diagnostics.Trace.WriteLine("Original queue requests start-play; playback port pending"));
+                StartQueuedMedia);
             selectedQueue.Initialize(songState.SelectedList,()=>SelectedPlaylistItem.Restore(
-                songState.SelectedList.ReadStoredEntries(),id=>songState.GetSongById(id),songState.GetMedia,_=>null));
+                songState.SelectedList.ReadStoredEntries(),id=>songState.GetSongById(id),AvailableMedia,musicServer.LocalPath));
             OriginalDownloadSelection? downloadSelection=null;
             downloadQueue=new OriginalDownloadQueue(
                 command=> { if(!downloadDispatcher.Post(command))throw new InvalidOperationException("Download database worker stopped"); },
                 QueueChanged,()=>downloadSelection!.DownloadFirst(),
-                ()=> { System.Diagnostics.Trace.WriteLine("Original cancel-transfer request; transfer port pending");downloadSelection!.Reset(); },
+                ()=> { musicServer.Cancel();downloadSelection!.Reset(); },
                 id=>System.Diagnostics.Trace.WriteLine($"Original progress-registry removal {id}; registry port pending"),
                 id=>System.Diagnostics.Trace.WriteLine($"Original song-update removal {id}; updater port pending"));
             downloadSelection=new(downloadQueue,QueueChanged,
-                id=>System.Diagnostics.Trace.WriteLine($"Original media URL request {id}; DCDomain network port pending"),
+                musicServer.Request,
                 (item,action)=>System.Diagnostics.Trace.WriteLine($"Original non-Evideo download request {item.PlayType}, action {action}; handler port pending"));
             downloadQueue.Initialize(()=>songState.DownloadList.Clear(),
-                ()=>songState.DownloadList.Restore(id=>songState.GetSongById(id),songState.GetMedia,_=>null),onlineNeeded:true);
+                ()=>songState.DownloadList.Restore(id=>songState.GetSongById(id),AvailableMedia,musicServer.LocalPath),onlineNeeded:true);
+            musicServer.Progress+=(id,received,total)=> { downloadQueue.SetProgressBySong(id,total,received);QueueChanged(); };
+            musicServer.Completed+=(id,cached)=>
+            {
+                // LocalOnlineSongManager.handleDownloadSuccess/moveItem: reverse
+                // matching entries, transfer to local list, then remove download.
+                for(var index=downloadQueue.Count-1;index>=0;index--)
+                {
+                    var item=downloadQueue.At(index)!;if(item.SongMetadata.Id!=id)continue;
+                    item.DownloadState=203;item.LocalFlag=item.SongMetadata.HasRemote!=0?item.SongMetadata.HasRemote:1;
+                    item.PlayUrl=cached.Path;
+                    if(item.Stage>0)selectedQueue.Top(item,false,false);else selectedQueue.Add(item);
+                    downloadQueue.DeleteByIndex(index);
+                }
+                downloadSelection.Reset();downloadSelection.DownloadFirst();QueueChanged();
+            };
+            musicServer.Failed+=(id,code,detail)=>
+            {
+                downloadQueue.SetError(id,code);downloadSelection.Reset();
+                if(code==1015)downloadSelection.Stop();
+                QueueChanged();
+                MessageBox.Show($"Song {id}: download error {code}\n\n{detail}","VietK music server",MessageBoxButton.OK,MessageBoxImage.Error);
+            };
             QueueChanged();
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
@@ -103,12 +142,10 @@ public static class Program
                 _=>System.Diagnostics.Trace.WriteLine("Original countAllOrderSong call; stat observer pending"),Feedback,
                 id=>songState.GetSongById(id));
             var songOrder=new NativeSongOrder(songState,orderDependencies,orderExecutor,
-                // Storage/network services have not been translated. No scanned
-                // karaoke volumes are registered; don't count Windows disks as
-                // the original scanned volume list or bypass its admission gate.
-                ()=>new OrderContext(QueueCount:selectedQueue.Count+downloadQueue.Count),_=>null,()=>false,
+                ()=>new OrderContext(NetworkConnected:musicServer.NetworkConnected,
+                    ScannedVolumes:musicServer.StorageAvailable?1:0,QueueCount:selectedQueue.Count+downloadQueue.Count),musicServer.LocalPath,()=>false,
                 text=>System.Diagnostics.Trace.WriteLine(text),
-                (action,mode)=>System.Diagnostics.Trace.WriteLine($"Original report plugin request {action}, mode {mode}; plugin execution pending"));
+                (action,mode)=>System.Diagnostics.Trace.WriteLine($"Original report plugin request {action}, mode {mode}; plugin execution pending"),AvailableMedia);
             browser.SongActionRequested+=(song,action)=>
             { if(action is "order" or "top")songOrder.Request(song.Id,action=="top"); };
             Canvas Panel(int screen = 0)
@@ -120,6 +157,8 @@ public static class Program
                 panel.Children.Add(top.Create());
                 return panel;
             }
+            if (verifyingPlayback)
+                return NativePlaybackVerification.Run(app, Panel(), bottom, root, args[1], args[2]);
             if (args.Length == 2 && args[0] == "--capture")
             {
                 Directory.CreateDirectory(args[1]);
@@ -380,7 +419,7 @@ public static class Program
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     header = "original VietK logo and header template restored; control services pending",
                     originalFirmwareRobotoLoaded = true,
-                    navigation = "pending", television = "pending", playback = "pending", servers = "pending",
+                    navigation = "pending", television = "native video window; complete OSD pending", playback = "native decoder; separate real-media verification required", servers = "pending",
                     fullFidelity = "unverified"
                 }, new JsonSerializerOptions { WriteIndented = true }));
                 return 0;
@@ -389,17 +428,33 @@ public static class Program
             // Pending handlers are deliberately not represented as implemented.
             var window = new Window
             {
-                Title = "VietK — native home component (port in development)",
+                Title = "VietK — control panel",
                 Width = 1280, Height = 800, Background = Brushes.Black,
                 FontFamily = OriginalFont.Family,
                 Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() }
+            };
+            app.MainWindow = window;
+            app.ShutdownMode = ShutdownMode.OnMainWindowClose;
+            using var nativePlayback = new NativePlayback(bottom, stateDirectory);
+            playback = nativePlayback;
+            nativePlayback.NextRequested += () =>
+            {
+                if (selectedQueue.Count > 0) selectedQueue.DeleteByIndex(0);
+            };
+            window.Loaded += (_, _) =>
+            {
+                nativePlayback.ShowTelevision(window);
+                // Developer probe, separate from the original song-library UI.
+                if (args.Length == 2 && args[0] == "--play-media" && !nativePlayback.PlayMedia(Path.GetFullPath(args[1])))
+                    throw new InvalidDataException("Playback probe source is unavailable");
             };
             bottom.CommandRequested += command =>
             {
                 if (command == "home_imv")
                     window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
-                // Playback, queue and ambience requests need their real backends.
-                // They are not translated into invented playback success/state.
+                else nativePlayback.Command(command);
+                // Queue/ambience dialogs and complete service admission checks
+                // still need their original ports.
             };
             top.CommandRequested += command =>
             {

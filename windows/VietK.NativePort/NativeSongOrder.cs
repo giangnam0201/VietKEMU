@@ -15,7 +15,8 @@ public sealed record OrderDependencies(FirmwareManifest[] Manifests,FirmwarePlug
 // Toast rendering, order animation and report plugin execution are separate ports.
 public sealed class NativeSongOrder(LocalSongDatabase local,OrderDependencies dependencies,
     OriginalOrderExecutor executor,Func<OrderContext> context,Func<SongMedia,string?> localPath,
-    Func<bool> nasConnected,Action<string> feedback,Action<string,int> launchReport)
+    Func<bool> nasConnected,Action<string> feedback,Action<string,int> launchReport,
+    Func<int,IReadOnlyList<SongMedia>>? mediaLookup=null)
 {
     public OriginalReportTableRoute ReportTable { get; }=new();
     public OrderExecution? LastExecution { get; private set; }
@@ -24,7 +25,9 @@ public sealed class NativeSongOrder(LocalSongDatabase local,OrderDependencies de
         LastExecution=null;var song=local.GetSongById(songId);
         if(song is null)return false;
         if(ReportTable.Check(song,top,true,dependencies.ReportTableActivityCount,launchReport))return true;
-        var media=local.GetMedia(songId);
+        var media=mediaLookup?.Invoke(songId)??local.GetMedia(songId);
+        if(media.Any(entry=>localPath(entry) is { } path && System.IO.File.Exists(path)))
+            song=song with { LocalFlag=song.HasRemote!=0?song.HasRemote:1 };
         if(!nasConnected() && OriginalOrderExecutor.IsNasSong(media))
         { feedback(dependencies.Feedback["add_song_from_nas_error"]);return false; }
         var item=OriginalOrderExecutor.CreateSongItem(song,"",media,localPath);
