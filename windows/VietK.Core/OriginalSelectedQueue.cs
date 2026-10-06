@@ -82,7 +82,7 @@ public sealed class OriginalSelectedQueue
                 var size=items.Count;var result=Add(item);
                 return size<2?result:result|TopByIndex(size);
             }
-            var index=item.PlayId=="0"
+            var index=item.PlayId=="-1"
                 ?Find(item.CloudKey is { Length:>0 }?item.CloudKey:item.PlayName,
                     item.CloudKey is { Length:>0 }?entry=>entry.FlowId:entry=>entry.PlayName)
                 :Find(item.PlayId,entry=>entry.PlayId);

@@ -263,6 +263,11 @@ using(var queueDb=new SqliteConnection("Data Source=:memory:"))
     var cloud=Item(80,"soundcloud");cloud.CloudKey="cloud-key";queue.Add(cloud);
     var cloudDuplicate=Item(90,"mixcloud");cloudDuplicate.CloudKey="cloud-key";
     Require(queue.Snapshot().Last().FlowId=="cloud-key" && queue.Exists(cloudDuplicate),"Cloud key identity differs");
+    cloudDuplicate.PlayId="-1";Require(queue.Top(cloudDuplicate,true,false) && queue.Snapshot()[1].FlowId=="cloud-key",
+        "Original -1 play-ID sentinel did not select Top by cloud flow ID");
+    var named=Item(100);named.PlayId="-1";queue.Add(named);
+    Require(queue.Top(named,true,false) && queue.Snapshot()[1].PlayName==named.PlayName,
+        "Original -1 play-ID sentinel did not select Top by play name");
     effects.Clear();Require(queue.DeleteByIndex(0) && effects.SequenceEqual(new[]{"post1","start","changed"}) &&
         commands.Last()==new SelectedQueueCommand(1,1),"Playing-song deletion notifications/one-based DAO dispatch differs");
     effects.Clear();Require(!queue.DeleteByIndex(-1) && effects.SequenceEqual(new[]{"changed"}),
