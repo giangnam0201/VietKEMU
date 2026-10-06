@@ -539,7 +539,8 @@ public static class Program
             };
             musicServer.ConnectionChanged+=singerNavigation.Refresh;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
-            IReadOnlyList<LocalSong> BroadcastSearch(string text,int page)=>songState.Search.ByBroadcastSpell(text,new SongPage(page,50),new SongQueryContext(true,musicServer.IsConnected))
+            var broadcastRank=new OriginalBroadcastRankCache(stateDirectory,id=>songState.GetSongById(id));
+            IReadOnlyList<LocalSong> BroadcastSearch(string text,int page)=>text.Length==0?broadcastRank.Page(page,new SongQueryContext(true,musicServer.IsConnected)):songState.Search.ByBroadcastSpell(text,new SongPage(page,50),new SongQueryContext(true,musicServer.IsConnected))
                 .Select(song=>songState.GetSongById(song.Id)).OfType<LocalSong>().ToArray();
             bool BroadcastIsLocal(int id)=>AvailableMedia(id).Any(media=>musicServer.LocalPath(media) is { } path&&File.Exists(path));
             var broadcastControl=new OriginalBroadcastControl(nativePlayback.IdlePlaylist,id=>songState.GetSongById(id),BroadcastIsLocal,

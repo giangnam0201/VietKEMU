@@ -20,7 +20,7 @@ public sealed class OriginalBroadcastControl(OriginalBroadcastPlaylist playlist,
         new("0",playlist.Entries.Select(entry=>entry.SongId).Where(id=>id>0).Distinct().Select(lookup).OfType<LocalSong>().Select(Info).ToArray(),[]);
     public IReadOnlyList<OriginalBroadcastSong> Search(string value,int page)
     {
-        if(value.Length is <1 or >200||page<0||page>int.MaxValue/50)throw new ArgumentException();
+        if(value.Length>200||page<0||page>int.MaxValue/50)throw new ArgumentException();
         return search(value,page).Select(Info).ToArray();
     }
     public OriginalBroadcastListReply Save(IReadOnlyList<int> ids)

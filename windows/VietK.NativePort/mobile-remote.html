@@ -72,19 +72,20 @@ function playlistShowAdded(){playlistStopSearch();$('playlistSearchResults').cla
 $('playlistCreate').onclick=()=>{if(playlistLocked)return;playlistAdded=[];$('playlistQuery').value='';$('playlistEditor').classList.add('hidden');$('playlistAdd').classList.remove('hidden');playlistShowAdded();};
 $('playlistBack').onclick=()=>{playlistAdded=[];playlistShowParent();};
 $('playlistAddConfirm').onclick=()=>{playlistDraft.push(...playlistAdded);playlistAdded=[];playlistShowParent();};
-async function playlistFind(next=false){
- const query=$('playlistQuery').value;if(!query){playlistShowAdded();return;}if(next&&(playlistSearchBusy||!playlistHasMore))return;
+async function playlistFind(next=false,allowEmpty=false){
+ const query=$('playlistQuery').value;if(!query&&!allowEmpty&&!next){playlistShowAdded();return;}if(next&&(playlistSearchBusy||!playlistHasMore))return;
  if(!next){playlistStopSearch();playlistPage=0;$('playlistSearchRows').replaceChildren();$('playlistSearchResults').scrollTop=0;}
  const request=++playlistSearchRequest;playlistSearching=new AbortController();playlistSearchBusy=true;$('playlistMore').disabled=true;
  $('playlistSearchResults').classList.remove('hidden');$('playlistAddedArea').classList.add('hidden');$('playlistSearchStatus').textContent='Đang tìm…';
  try{const items=await api('settings/broadcast-playlist/search?q='+encodeURIComponent(query)+'&page='+playlistPage,null,playlistSearching.signal);if(request!==playlistSearchRequest)return;
   for(const song of items){const result=button(song.songname+' — '+song.singername,()=>{playlistAdded.push(song);playlistShowAdded();});result.dataset.songid=String(song.songid);result.style.cssText='display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;margin:6px 0';$('playlistSearchRows').append(result);}
-  ++playlistPage;playlistHasMore=items.length===50;$('playlistMore').classList.toggle('hidden',!playlistHasMore);$('playlistSearchStatus').textContent=$('playlistSearchRows').children.length?'Chọn bài để thêm vào danh sách.':'Không tìm thấy bài hát có thể chọn.';
+  ++playlistPage;playlistHasMore=items.length>0;$('playlistMore').classList.toggle('hidden',!playlistHasMore);$('playlistSearchStatus').textContent=$('playlistSearchRows').children.length?'Chọn bài để thêm vào danh sách.':'Không tìm thấy bài hát có thể chọn.';
  }catch(error){if(request===playlistSearchRequest&&error.name!=='AbortError'){$('playlistSearchStatus').textContent=error.message;playlistHasMore=false;$('playlistMore').classList.add('hidden');}}
  finally{if(request===playlistSearchRequest){playlistSearchBusy=false;$('playlistMore').disabled=false;}}
 }
-$('playlistSearch').onsubmit=event=>{event.preventDefault();playlistFind();};
-$('playlistQuery').oninput=()=>playlistFind();$('playlistQuery').onfocus=()=>{if($('playlistQuery').value)playlistFind();};
+$('playlistSearch').onsubmit=event=>{event.preventDefault();playlistFind(false,true);};
+$('playlistQuery').oninput=()=>playlistFind();$('playlistQuery').onfocus=()=>playlistFind(false,true);
+$('playlistQuery').onclick=()=>{if($('playlistSearchResults').classList.contains('hidden'))playlistFind(false,true);};
 $('playlistSearchClear').onclick=()=>{$('playlistQuery').value='';playlistShowAdded();};
 $('playlistMore').onclick=()=>playlistFind(true);
 $('playlistSearchResults').onscroll=()=>{const list=$('playlistSearchResults');if(list.scrollTop+list.clientHeight>=list.scrollHeight-2)playlistFind(true);};

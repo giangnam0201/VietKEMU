@@ -140,7 +140,7 @@ public sealed class OriginalBroadcastAddDialog
         Input=new TextBox { Width=620,Height=45,FontFamily=OriginalFont.Family,FontSize=18,Foreground=Brushes.White,Background=BroadcastDialogUi.EditorBrush,BorderThickness=new(0),Padding=new(10,8,45,0),ContextMenu=null,Tag="broadcast-add:input" };
         BroadcastDialogUi.Put(content,Input,30,119);
         var placeholder=BroadcastDialogUi.Label("Vui lòng nhập tên bài hát vài tìm kiếm",540,45,18);placeholder.Foreground=new SolidColorBrush(Color.FromArgb(204,255,255,255));placeholder.IsHitTestVisible=false;BroadcastDialogUi.Put(content,placeholder,40,119);
-        var inputAction=BroadcastDialogUi.Action("⌕",45,45,24,()=>Input.Clear(),"broadcast-add:clear");BroadcastDialogUi.Put(content,inputAction,605,119);
+        var inputAction=BroadcastDialogUi.Action("⌕",45,45,24,()=> { Input.Clear();ShowDraft(); },"broadcast-add:clear");BroadcastDialogUi.Put(content,inputAction,605,119);
         searchList.Content=results;searchList.Background=BroadcastDialogUi.EditorBrush;BroadcastDialogUi.ScrollStyle(searchList);BroadcastDialogUi.Put(content,searchList,30,164);
         searchList.ScrollChanged+=(_,e)=> { if(!loading&&more&&e.ExtentHeightChange==0&&e.VerticalChange>0&&searchList.VerticalOffset+searchList.ViewportHeight>=searchList.ExtentHeight-1)LoadNext(); };
         BroadcastDialogUi.Put(content,draftArea,30,164);
@@ -155,15 +155,16 @@ public sealed class OriginalBroadcastAddDialog
         confirm=BroadcastDialogUi.Action("Xác nhận tạo mới",140,46,16,()=>Close(true),"broadcast-add:confirm",true);
         BroadcastDialogUi.Put(content,back,162.5,461);BroadcastDialogUi.Put(content,confirm,377.5,461);
         Input.TextChanged+=(_,_)=> { placeholder.Visibility=Input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;if(inputAction is Border { Child:TextBlock symbol })symbol.Text=Input.Text.Length==0?"⌕":"×";Search(); };
-        Input.PreviewKeyDown+=(_,e)=> { if(e.Key==Key.Enter) { Search();e.Handled=true; } };
+        Input.PreviewKeyDown+=(_,e)=> { if(e.Key==Key.Enter) { Search(allowEmpty:true);e.Handled=true; } };
+        Input.PreviewMouseLeftButtonUp+=(_,_)=> { if(searchList.Visibility!=Visibility.Visible)Search(allowEmpty:true); };
         Input.GotKeyboardFocus+=(_,_)=> { if(Input.Text.Length>0)Search(); };
         Overlay.MouseLeftButtonDown+=(_,e)=> { if(ReferenceEquals(e.OriginalSource,Overlay)) { Close(false,returnToParent:false);e.Handled=true; } };
         Overlay.PreviewKeyDown+=(_,e)=> { if(e.Key==Key.Escape) { Close(false,returnToParent:false);e.Handled=true; } };
         ShowDraft();Panel.SetZIndex(Overlay,1000);host.Children.Add(Overlay);Keyboard.Focus(Overlay);
     }
-    private void Search()
+    private void Search(bool allowEmpty=false)
     {
-        if(Input.Text.Length==0) { ShowDraft();return; }
+        if(Input.Text.Length==0&&!allowEmpty) { ShowDraft();return; }
         searchList.Visibility=Visibility.Visible;draftArea.Visibility=back.Visibility=confirm.Visibility=Visibility.Collapsed;
         page=0;results.Children.Clear();more=true;LoadNext();searchList.ScrollToTop();
     }
@@ -172,7 +173,8 @@ public sealed class OriginalBroadcastAddDialog
         if(loading||!more)return;loading=true;
         try
         {
-            var songs=search(Input.Text,page++);more=songs.Count==50;
+            // The original presenter can load after a filtered/partial page.
+            var songs=search(Input.Text,page++);more=songs.Count>0;
             foreach(var song in songs)
             {
                 var row=new Canvas { Width=600,Height=45,Background=Brushes.Transparent,Tag="broadcast-add:result:"+song.Id };

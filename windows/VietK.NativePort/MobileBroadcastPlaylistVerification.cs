@@ -38,10 +38,12 @@ internal static class MobileBroadcastPlaylistVerification
         using(var state=JsonDocument.Parse(await client.GetStringAsync("api/settings/broadcast-playlist")))Require(state.RootElement.GetProperty("publishMusicMode").GetString()=="0"&&state.RootElement.GetProperty("publishMusicOfLocal").GetArrayLength()==2,"Status did not use the runtime list");
         using(var first=JsonDocument.Parse(await client.GetStringAsync("api/settings/broadcast-playlist/search?q=Page&page=0")))Require(first.RootElement.GetArrayLength()==50,"HTTP search did not expose original 50-result pages");
         using(var second=JsonDocument.Parse(await client.GetStringAsync("api/settings/broadcast-playlist/search?q=Page&page=1")))Require(second.RootElement.GetArrayLength()==10,"HTTP search next-page mapping differs");
+        using(var rank=JsonDocument.Parse(await client.GetStringAsync("api/settings/broadcast-playlist/search?q=&page=0")))Require(rank.RootElement.EnumerateArray().Select(s=>s.GetProperty("songid").GetInt32()).SequenceEqual(new[]{101002,101001,101002}),"Blank HTTP search did not use original rank-cache order/duplicates");
+        using(var nextRank=JsonDocument.Parse(await client.GetStringAsync("api/settings/broadcast-playlist/search?q=&page=1")))Require(nextRank.RootElement.GetArrayLength()==10,"Rank pagination shifted after filtering missing database rows");
         var saved=string.Join(',',playback.IdlePlaylist.Entries.Select(e=>e.SongId));
         foreach(var json in new[]{"[]","{\"publishMusicOfLocal\":{}}","{\"publishMusicOfLocal\":[null]}","{\"publishMusicOfLocal\":[{\"songid\":\"101001\"}]}","{\"publishMusicOfLocal\":[{\"songid\":101001.5}]}","{\"publishMusicOfLocal\":[{\"songid\":101001,\"singername\":{}}]}"})
         { using var response=await client.PostAsync("api/settings/broadcast-playlist",new StringContent(json,Encoding.UTF8,"application/json"));Require(response.StatusCode==HttpStatusCode.BadRequest&&string.Join(',',playback.IdlePlaylist.Entries.Select(e=>e.SongId))==saved,"Invalid playlist request changed saved configuration"); }
-        foreach(var route in new[]{"?q=Page&page=-1","?q=Page&page=x","?q=&page=0","?q=Page&page=2147483647"})Require((await client.GetAsync("api/settings/broadcast-playlist/search"+route)).StatusCode==HttpStatusCode.BadRequest,"Invalid playlist search admitted");
+        foreach(var route in new[]{"?q=Page&page=-1","?q=Page&page=x","?q=Page&page=2147483647"})Require((await client.GetAsync("api/settings/broadcast-playlist/search"+route)).StatusCode==HttpStatusCode.BadRequest,"Invalid playlist search admitted");
         var large=new { publishMusicOfLocal=Enumerable.Range(101100,150).Select(id=>new { songid=id,songname=new string('x',100),singername="Library" }).ToArray() };
         using(var response=await client.PostAsJsonAsync("api/settings/broadcast-playlist",large))Require(response.IsSuccessStatusCode&&playback.IdlePlaylist.Entries.Count==150,"Legitimate list above generic 8KB action limit rejected");
         using(var empty=await client.PostAsJsonAsync("api/settings/broadcast-playlist",new { publishMusicOfLocal=Array.Empty<object>() }))Require(empty.IsSuccessStatusCode&&playback.IdlePlaylist.Entries.Count==0,"Explicit empty list did not persist");
@@ -49,7 +51,7 @@ internal static class MobileBroadcastPlaylistVerification
         using(var seed=await client.PostAsJsonAsync("api/settings/broadcast-playlist",new { publishMusicOfLocal=new[]{new { songid=101001,songname="",singername="" }} }))Require(seed.IsSuccessStatusCode,"Browser playlist seed failed");
         File.WriteAllText(Path.Combine(output,"broadcast-playlist-http-verification.json"),JsonSerializer.Serialize(new {
             originalSavedAndRuntimeFields=true,duplicateAndMissingIdSemantics=true,databaseMetadataAuthoritative=true,
-            searchPagination=true,invalidRequestsPreserveConfig=true,pairedAuthorizationAndOrigin=true,largeListAccepted=true,
+            searchPagination=true,blankRankCacheOrderAndDuplicates=true,invalidRequestsPreserveConfig=true,pairedAuthorizationAndOrigin=true,largeListAccepted=true,
             explicitEmptyListPersists=true,liveDecoderSourceFlowAndGainUnchanged=true
         },new JsonSerializerOptions { WriteIndented=true }));return original;
     }

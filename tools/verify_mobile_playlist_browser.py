@@ -9,6 +9,18 @@ def verify(page, output, volume):
     expect(page.locator('#playlistRows .row')).to_contain_text('Playlist fixture A')
     expect(page.locator('#playlistCreate')).to_be_enabled()
     page.locator('#playlistCreate').click()
+    page.locator('#playlistQuery').click()
+    expect(page.locator('#playlistSearchRows button')).to_have_count(3)
+    assert page.locator('#playlistSearchRows button').evaluate_all('buttons => buttons.map(b => b.dataset.songid)') == ['101002', '101001', '101002'], 'Blank click lost original rank order/duplicates'
+    expect(page.locator('#playlistQuery')).to_have_value('')
+    page.locator('#playlistMore').click()
+    expect(page.locator('#playlistSearchRows button')).to_have_count(13)
+    assert page.locator('#playlistSearchRows button').last.get_attribute('data-songid') == '101109', 'Filtered rank page incorrectly prevented loading the next raw page'
+    page.screenshot(path=str(output / 'phone-playlist-rank-search.png'), full_page=True)
+    page.locator('#playlistSearchRows [data-songid="101001"]').click()
+    expect(page.locator('#playlistAddedRows .row')).to_have_count(1)
+    expect(page.locator('#playlistAddedRows h3')).to_have_text('Playlist fixture A')
+    page.locator('#playlistAddedRows button').click()
     page.locator('#playlistQuery').fill('Page')
     expect(page.locator('#playlistSearchRows button')).to_have_count(50)
     page.locator('#playlistSearchResults').evaluate('element => element.scrollTop = element.scrollHeight')

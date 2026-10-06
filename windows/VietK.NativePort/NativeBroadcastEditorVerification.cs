@@ -27,7 +27,9 @@ internal static class NativeBroadcastEditorVerification
             playback.ResolveIdleSong=id=>new(fixture,new(id,id,fixture,100,0,5,"","",0,"","","","",0,null,null,null));playback.IdleSongExists=_=>true;
             Require(playback.StartIdleDemo(),"Editor fixture idle rejected");var timer=Stopwatch.StartNew();
             while(playback.Player.State!=OriginalVideoState.Play||playback.Player.Position<=0) { if(timer.ElapsedMilliseconds>12000)throw new InvalidDataException("Editor fixture did not start real idle playback");await Task.Delay(30); }
-            IReadOnlyList<LocalSong> Search(string text,int page)=>text=="Page"?Enumerable.Range(1000+page*50,page==0?50:10).Select(id=>Song(id,"Page song "+id)).ToArray():songs.Where(s=>s.Name.StartsWith(text,StringComparison.OrdinalIgnoreCase)).ToArray();
+            Directory.CreateDirectory(Path.Combine(folder,"rankcache"));File.WriteAllText(Path.Combine(folder,"rankcache","0.txt"),"[2/0, 1/0, 2/1]");
+            var rank=new OriginalBroadcastRankCache(folder,id=>songs.FirstOrDefault(s=>s.Id==id));
+            IReadOnlyList<LocalSong> Search(string text,int page)=>text.Length==0?rank.Page(page,new()):text=="Page"?Enumerable.Range(1000+page*50,page==0?49:page==1?10:0).Select(id=>Song(id,"Page song "+id)).ToArray():songs.Where(s=>s.Name.StartsWith(text,StringComparison.OrdinalIgnoreCase)).ToArray();
             var control=new OriginalBroadcastControl(playback.IdlePlaylist,id=>songs.FirstOrDefault(s=>s.Id==id),id=>id!=3,requests.Add,json=>playback.ImportIdlePlaylist(json,restartIdle:false),Search);
             OriginalBroadcastPlaylistDialog Open()=>new(panel,playback,id=>songs.FirstOrDefault(s=>s.Id==id),Search,id=>id!=3,requests.Add,control:control);
             var dialog=Open();host.UpdateLayout();RequireFits(dialog.Overlay,"broadcast:add");Click(dialog.Overlay,"broadcast:top:2");host.UpdateLayout();
@@ -38,7 +40,11 @@ internal static class NativeBroadcastEditorVerification
             Require(!panel.Children.Contains(dialog.Overlay)&&playback.IdlePlaylist.Entries.Count==3&&playback.IdleSongId==1,"Cancel changed saved list or current playback");
             dialog=Open();host.UpdateLayout();Click(dialog.Overlay,"broadcast:add");host.UpdateLayout();var add=dialog.AddDialog!;
             Require(!panel.Children.Contains(dialog.Overlay)&&panel.Children.Contains(add.Overlay)&&add.Draft.Count==0,"Create-new did not open a fresh add screen");
-            add.Input.Text="Page";host.UpdateLayout();Require(Elements(add.Overlay).Any(x=>Equals(x.Tag,"broadcast-add:result:1049")),"Original 50-result search page missing");
+            add.Input.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.PreviewMouseLeftButtonUpEvent });host.UpdateLayout();
+            Require(Elements(add.Overlay).Where(x=>x.Tag is string tag&&tag.StartsWith("broadcast-add:result:")).Select(x=>x.Tag).SequenceEqual(new[]{"broadcast-add:result:2","broadcast-add:result:1","broadcast-add:result:2"}),"Blank click did not show actual rank-cache order/duplicates");
+            Capture(host,panel,output,"synthetic-broadcast-rank-search.png");Click(add.Overlay,"broadcast-add:result:1");host.UpdateLayout();Require(add.Draft.Single().Id==1&&add.Input.Text.Length==0,"Blank rank selection did not retain the empty input/draft");
+            Click(add.Overlay,"broadcast-add:delete:0");host.UpdateLayout();
+            add.Input.Text="Page";host.UpdateLayout();Require(Elements(add.Overlay).Any(x=>Equals(x.Tag,"broadcast-add:result:1048")),"Filtered search page missing");
             Capture(host,panel,output,"synthetic-broadcast-add-search.png");
             var scrolling=Elements(add.Overlay).OfType<ScrollViewer>().First(x=>x.Height==320);scrolling.ScrollToBottom();await Task.Delay(100);host.UpdateLayout();
             Require(Elements(add.Overlay).Any(x=>Equals(x.Tag,"broadcast-add:result:1059")),"Bottom scrolling did not load the next search page");
@@ -61,8 +67,8 @@ internal static class NativeBroadcastEditorVerification
             playback.ImportIdlePlaylist("{\"play_list\":[]}",restartIdle:false);dialog=Open();host.UpdateLayout();Capture(host,panel,output,"synthetic-broadcast-editor-empty.png");Outside(dialog.Overlay);
             Require(!panel.Children.Contains(dialog.Overlay)&&playback.IdlePlaylist.Entries.Count==0,"Outside parent dismissal saved or retained UI");
             File.WriteAllText(Path.Combine(output,"broadcast-editor-verification.json"),JsonSerializer.Serialize(new {
-                originalLocalGeometry=true,topAndDeleteStageOnly=true,cancelDiscardsDraft=true,freshAddDraft=true,
-                realUiSearchAndScrollPagination=true,searchSelectionRetainsInput=true,addDeleteAndBack=true,
+                originalLocalGeometry=true,topAndDeleteStageOnly=true,cancelDiscardsDraft=true,freshAddDraft=true,blankClickRankCacheOrderAndSelection=true,
+                realUiSearchAndScrollPagination=true,partialFilteredPageStillPaginates=true,searchSelectionRetainsInput=true,addDeleteAndBack=true,
                 duplicateSelectionPreserved=true,addConfirmationStagesParent=true,parentConfirmationPersistsOriginalFormat=true,
                 nonlocalSongRoutesToOriginalOrder=true,savingDoesNotInterruptIdlePlayback=true,outsideDismissalDiscards=true,
                 emptyListHint=true,createAndConfirmLabelsFit=true,usbFileChooserAdapted=true,originalUsbCopyDeleteDialogPorted=false,linkedCloudEditorPorted=false,

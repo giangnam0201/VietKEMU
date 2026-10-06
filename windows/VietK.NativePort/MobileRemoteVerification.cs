@@ -36,8 +36,10 @@ internal static class MobileRemoteVerification
         }
         finally { bottom.CommandRequested-=playback.Command; }
         Checkpoint("Original selected-queue button opened successfully");
+        Directory.CreateDirectory(Path.Combine(directory,"rankcache"));File.WriteAllText(Path.Combine(directory,"rankcache","0.txt"),"["+string.Join(", ",new[]{"101002/0","101001/0","101002/1"}.Concat(Enumerable.Repeat("999999/0",47)).Concat(Enumerable.Range(101100,10).Select(id=>id+"/0")))+"]");
+        var broadcastRank=new OriginalBroadcastRankCache(directory,MobileBroadcastPlaylistVerification.Lookup);
         var broadcastControl=new OriginalBroadcastControl(playback.IdlePlaylist,MobileBroadcastPlaylistVerification.Lookup,_=>true,_=>{},
-            json=>playback.ImportIdlePlaylist(json,restartIdle:false),MobileBroadcastPlaylistVerification.Search);
+            json=>playback.ImportIdlePlaylist(json,restartIdle:false),(text,page)=>text.Length==0?broadcastRank.Page(page,new()):MobileBroadcastPlaylistVerification.Search(text,page));
         var originalUsbIdle=playback.UsbIdleVideo;
         using var server=new MobileRemoteServer(Dispatcher.CurrentDispatcher,music,playback,0,true,broadcasts:broadcastControl);
         Checkpoint("Native HTTP server constructed");
@@ -167,7 +169,7 @@ internal static class MobileRemoteVerification
             marqueeReadWriteAndPersistence=true,marqueeAuthorizationOriginAndRevocation=true,marqueeValidationAndCloudRejection=true,
             marqueeSongIdleAndLocalQueueTitlesPreserved=true,marqueeSharedTvTextUpdated=true,
             broadcastVolumeOriginalFieldsAndValidation=true,broadcastVolumeLeavesSessionAndSongsUnchanged=true,broadcastVolumeAuthorizationOriginAndRevocation=true,
-            broadcastPlaylistSavedRuntimeAndSearch=true,broadcastPlaylistSharedConfigurationAndValidation=true,broadcastPlaylistAuthorizationOriginAndRevocation=true,
+            broadcastPlaylistSavedRuntimeAndSearch=true,broadcastPlaylistSharedConfigurationAndValidation=true,broadcastPlaylistAuthorizationOriginAndRevocation=true,broadcastBlankRankCacheBrowserVerified=true,
             phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
     }
