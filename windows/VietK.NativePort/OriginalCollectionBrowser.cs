@@ -151,7 +151,7 @@ public sealed class OriginalCollectionBrowser : IDisposable
         var favorite=Icon(collected?"button_add_song_item_collected_normal":"button_add_song_item_collect",34);favorite.Tag="collection-favorite:"+song.Id;
         Wire(favorite,()=>controls.Collect(song.Id),collected?"button_add_song_item_collected_select":"button_add_song_item_collect_selected");Put(row,favorite,690,20);
         if(!local)Put(row,Icon("icon_online_bg",30),447,27);
-        row.MouseLeftButtonUp+=(_,e)=> { Order(song,row,index,"order");e.Handled=true; };return row;
+        row.MouseLeftButtonUp+=(_,e)=> { e.Handled=true;Order(song,row,index,"order"); };return row;
     }
     private void Order(LocalSong song,Canvas source,int index,string action)
     {
@@ -183,7 +183,7 @@ public sealed class OriginalCollectionBrowser : IDisposable
         { var transform=(ScaleTransform)target.RenderTransform;var animation=new DoubleAnimation(value,TimeSpan.FromMilliseconds(25)) { EasingFunction=new SineEase { EasingMode=EasingMode.EaseInOut } };transform.BeginAnimation(ScaleTransform.ScaleXProperty,animation);transform.BeginAnimation(ScaleTransform.ScaleYProperty,animation); }
         target.MouseLeftButtonDown+=(_,e)=> { target.CaptureMouse();Scale(.9);if(pressed is not null&&target is Image image)image.Source=Bitmap(icons.Icons[pressed].File);e.Handled=true; };
         target.LostMouseCapture+=(_,_)=> { Scale(1);if(target is Image image)image.Source=saved; };
-        target.MouseLeftButtonUp+=(_,e)=> { var inside=new Rect(0,0,target.ActualWidth,target.ActualHeight).Contains(e.GetPosition(target));target.ReleaseMouseCapture();Scale(1);if(inside)action();e.Handled=true; };
+        target.MouseLeftButtonUp+=(_,e)=> { var inside=new Rect(0,0,target.ActualWidth,target.ActualHeight).Contains(e.GetPosition(target));e.Handled=true;target.ReleaseMouseCapture();Scale(1);if(inside)action(); };
     }
     public void RefreshMedia()
     { Rows=Rows.Select(song=>lookup(song.Id)??song).ToArray();Refresh(); }

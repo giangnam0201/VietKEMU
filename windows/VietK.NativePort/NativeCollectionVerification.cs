@@ -85,6 +85,7 @@ internal static class NativeCollectionVerification
                 {
                     host.Activate();host.UpdateLayout();var point=target.PointToScreen(new Point(target.ActualWidth/2,target.ActualHeight/2));
                     Require(SetCursorPos((int)point.X,(int)point.Y),"Could not position browser fixture pointer");await Task.Delay(70);
+                    Require(new Rect(0,0,target.ActualWidth,target.ActualHeight).Contains(Mouse.GetPosition(target)),"Browser fixture pointer is outside "+target.Tag);
                     target.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
                 }
                 async Task Login(string user,string password)
@@ -116,7 +117,9 @@ internal static class NativeCollectionVerification
                 Require(actions.SequenceEqual(new[]{(2,"top"),(1,"order")}),"Collection action icon ordered twice or dispatched the wrong song");
                 Require(Descendants<Canvas>(browserPanel!).Count(canvas=>Equals(canvas.Tag,"collection-order-animation"))==2,"Original collection order animations did not appear");
                 await Task.Delay(600);Require(!Descendants<Canvas>(browserPanel!).Any(canvas=>Equals(canvas.Tag,"collection-order-animation")),"Completed collection order animation was not removed");
-                await Click(Tagged("collection-favorite:2"));Require(!model.Contains(2)&&browser.Rows.Any(song=>song.Id==2),"Collection removal did not preserve the original adapter row until reload");
+                Require(model.Contains(2),"Collection fixture lost its favorite before the removal click");
+                await Click(Tagged("collection-favorite:2"));
+                Require(!model.Contains(2)&&browser.Rows.Any(song=>song.Id==2),$"Collection removal: saved={model.Contains(2)}, row={browser.Rows.Any(song=>song.Id==2)}, feedback={browserControls.LastFeedback}");
                 host.UpdateLayout();Require(((BitmapImage)((Image)Tagged("collection-favorite:2")).Source).UriSource.LocalPath==Path.GetFullPath(Path.Combine(root,contract.Icons["button_add_song_item_collect"].File)),"Removed collection row retained the filled star");
                 await Click(Tagged("collection-favorite:2"));Require(model.Contains(2),"Retained collection row could not be collected again");
                 var scroller=(ScrollViewer)Tagged("collection-scroll");scroller.ScrollToEnd();host.UpdateLayout();await Task.Delay(50);
