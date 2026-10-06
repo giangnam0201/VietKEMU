@@ -228,7 +228,7 @@ public sealed class MobileRemoteServer : IDisposable
             if(adapters.SelectedItem is not string address||Port==0)return;
             var uri=$"http://{address}:{Port}/#token={token}";
             var pixels=OriginalMobileQr.RenderCompact(uri,true,60);
-            image.Width=image.Height=pixels.Width;
+            image.Width=image.Height=pixels.Width*TelevisionQr.DisplayScale;
             image.Source=System.Windows.Media.Imaging.BitmapSource.Create(pixels.Width,pixels.Height,96,96,System.Windows.Media.PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
             ShowPairing(IPAddress.Parse(address));
         }

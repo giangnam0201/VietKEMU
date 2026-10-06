@@ -15,6 +15,7 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        var startupElapsed=System.Diagnostics.Stopwatch.StartNew();
         try
         {
             var root = Path.Combine(AppContext.BaseDirectory, "Original");
@@ -44,7 +45,8 @@ public static class Program
             var capturing = args.Length == 2 && args[0] == "--capture";
             var verifyingPlayback = args.Length == 3 && args[0] == "--verify-playback";
             var verifyingYouTube = args.Length == 3 && args[0] is "--verify-youtube" or "--verify-youtube-firefox";
-            var stateDirectory = capturing || verifyingPlayback || verifyingYouTube ? args[^1] : Path.Combine(
+            var verifyingStartup=args.Length==2&&args[0]=="--verify-startup";
+            var stateDirectory = capturing || verifyingPlayback || verifyingYouTube || verifyingStartup ? args[^1] : Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
                 Path.Combine(stateDirectory,"song-browser-state.db"));
@@ -586,7 +588,7 @@ public static class Program
             {
                 nativePlayback.ShowTelevision(window);
                 nativePlayback.StartIdleDemo();
-                try { await mobileRemote.StartAsync(); }
+                try { await mobileRemote.StartAsync(advertise:!verifyingStartup); }
                 catch(Exception) { System.Diagnostics.Trace.WriteLine("Local mobile remote failed to start; see connection status menu."); }
                 // Developer probe, separate from the original song-library UI.
                 if (args.Length == 2 && args[0] == "--play-media" && !nativePlayback.PlayMedia(Path.GetFullPath(args[1])))
@@ -594,6 +596,7 @@ public static class Program
                 // YouTube is the user-selected primary source. Original server
                 // credentials remain available only through the legacy route.
             };
+            if(verifyingStartup)NativeStartupVerification.Attach(app,window,nativePlayback,mobileRemote,songState,stateDirectory,startupElapsed);
             bottom.CommandRequested += command =>
             {
                 if (command == "home_imv")
@@ -623,7 +626,7 @@ public static class Program
         {
             var log = Path.Combine(Path.GetTempPath(), "vietk-native-startup-error.txt");
             File.WriteAllText(log, error.ToString());
-            if (!args.Contains("--capture")) MessageBox.Show(error.Message, "VietK native component");
+            if (!args.Contains("--capture")&&!args.Contains("--verify-startup")) MessageBox.Show(error.Message, "VietK native component");
             return 1;
         }
     }

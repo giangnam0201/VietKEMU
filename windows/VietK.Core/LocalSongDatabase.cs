@@ -51,7 +51,9 @@ public sealed class LocalSongDatabase : IDisposable
     {
         const string columns="SongsterID,SongsterName,SongsterPy,SongsterLove,SongsterTypeID,SongsterOrderRank,LastUpdateTime,Pic_FileID_H,Pic_FileID_L,Pic_FileID_M,Pic_FileID_S,Imitate_Pic_FileID_0,Imitate_Pic_FileID_1,Imitate_Pic_FileID_2,photopath,isGroup,gender,country,singer_name_en";
         using var command=connection.CreateCommand();
-        command.CommandText=$"INSERT OR IGNORE INTO tblSinger({columns}) SELECT {string.Join(",",columns.Split(',').Select(column=>"s."+column))} FROM wholedb.tblSinger s WHERE EXISTS(SELECT 1 FROM tblSong song WHERE s.SongsterID IN(song.SongsterID1,song.SongsterID2,song.SongsterID3,song.SongsterID4))";
+        // Materialize referenced IDs once. The correlated EXISTS performed a
+        // complete song scan for each catalogue singer, including on warm starts.
+        command.CommandText=$"INSERT OR IGNORE INTO tblSinger({columns}) SELECT {string.Join(",",columns.Split(',').Select(column=>"s."+column))} FROM wholedb.tblSinger s WHERE s.SongsterID IN(SELECT SongsterID1 FROM tblSong UNION SELECT SongsterID2 FROM tblSong UNION SELECT SongsterID3 FROM tblSong UNION SELECT SongsterID4 FROM tblSong)";
         return command.ExecuteNonQuery();
     });
 

@@ -709,6 +709,7 @@ MobileQrChecks.Run();
 CollectionProfileChecks.Run();
 SingerSongChecks.Run();
 SingerDirectoryChecks.Run();
+SingerImportChecks.Run();
 SearchSettingsChecks.Run();
 DefaultVolumeChecks.Run();
 BroadcastVolumeChecks.Run();

@@ -17,8 +17,9 @@ public sealed class TelevisionQr
     public OriginalTvQrState State { get; }=new();
     public MobileQrBinding Binding { get; private set; }=new();
     private const double OriginalQrSize=91*4d/3*.25;
-    private readonly Image image=new() { Width=OriginalQrSize,Height=OriginalQrSize,Stretch=Stretch.Fill };
-    private readonly TextBlock code=new() { Width=OriginalQrSize,Height=12.5,FontSize=9,FontWeight=FontWeights.Bold,
+    internal const double DisplayScale=2.5;
+    private readonly Image image=new() { Width=OriginalQrSize*DisplayScale,Height=OriginalQrSize*DisplayScale,Stretch=Stretch.Fill };
+    private readonly TextBlock code=new() { Width=OriginalQrSize*DisplayScale,Height=12.5*DisplayScale,FontSize=9*DisplayScale,FontWeight=FontWeights.Bold,
         TextAlignment=TextAlignment.Center,Foreground=Brushes.White,Background=new SolidColorBrush(Color.FromArgb(224,21,21,21)) };
     private readonly TranslateTransform slide=new();
     private readonly string modeFile;
@@ -46,7 +47,7 @@ public sealed class TelevisionQr
         // Keep at least two whole pixels per module when the requested
         // quarter-size is too small. Never resample a larger QR into lost modules.
         var pixels=OriginalMobileQr.RenderCompact(OriginalMobileQr.TelevisionPayload(binding),true,(int)Math.Ceiling(OriginalQrSize));
-        image.Width=image.Height=pixels.Width;code.Width=pixels.Width;
+        image.Width=image.Height=pixels.Width*DisplayScale;code.Width=image.Width;
         System.Windows.Controls.Canvas.SetTop(code,image.Height);
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
@@ -56,9 +57,9 @@ public sealed class TelevisionQr
     }
     public void ConfigureLocalRemote(string url)
     {
-        // User requested 75% smaller QR codes: 45 on TV and 60 in the pairing panel.
+        // Compact readable matrix, enlarged 2.5x at the user's request.
         var pixels=OriginalMobileQr.RenderCompact(url,true,45);
-        image.Width=image.Height=pixels.Width;
+        image.Width=image.Height=pixels.Width*DisplayScale;
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
         code.Text="";code.Visibility=Visibility.Collapsed;Canvas.Visibility=Visibility.Visible;Refresh();

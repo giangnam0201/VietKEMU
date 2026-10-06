@@ -44,6 +44,15 @@ jobs:
         run: |
           $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Native rendering failed: $($process.ExitCode)" }
+      - name: Verify normal cold and warm startup
+        run: |
+          foreach ($phase in @('cold', 'warm')) {
+            $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-startup', 'artifacts/native-verification/startup' -WindowStyle Hidden -PassThru
+            if (!$process.WaitForExit(45000)) { $process.Kill(); throw "Normal $phase startup timed out" }
+            if ($process.ExitCode -ne 0) { throw "Normal $phase startup failed: $($process.ExitCode)" }
+            Copy-Item artifacts/native-verification/startup/startup-verification.json "artifacts/native-verification/startup/$phase-startup-verification.json"
+            Get-Content "artifacts/native-verification/startup/$phase-startup-verification.json"
+          }
       - name: Verify shared frames and playback before download completion
         env:
           VIETK_MOBILE_BROWSER_CHECK: '1'
