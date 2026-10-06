@@ -33,6 +33,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
     private TextBlock? empty;
     private string spell="";
     private int batch;
+    private Point? drag;
     public Canvas Create()
     {
         Country=Sex=0;CurrentPage=1;spell="";
@@ -62,7 +63,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
         Click(back,()=>HomeRequested?.Invoke());Put(canvas,back,contract.BackX,530);
         popup=new Popup { Placement=PlacementMode.Bottom,PlacementTarget=categories,StaysOpen=false,AllowsTransparency=true };
         canvas.Unloaded+=(_,_)=>popup.IsOpen=false;
-        Point? drag=null;
+        drag=null;
         tiles.PreviewMouseLeftButtonDown+=(_,e)=>drag=e.GetPosition(tiles);
         tiles.PreviewMouseLeftButtonUp+=(_,e)=>
         {

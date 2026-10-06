@@ -157,7 +157,9 @@ internal static class NativeSingerNavigationVerification
             }
             async Task ClickElement(FrameworkElement element)
             {
-                host.Activate();host.UpdateLayout();var point=element.PointToScreen(new Point(element.ActualWidth/2,element.ActualHeight/2));
+                host.Activate();host.UpdateLayout();
+                await Until(()=>element.IsLoaded&&element.ActualWidth>0&&element.ActualHeight>0,"Singer fixture control was not laid out");
+                var point=element.PointToScreen(new Point(element.ActualWidth/2,element.ActualHeight/2));
                 Require(SystemParameters.WorkArea.Contains(point)&&SetCursorPos((int)point.X,(int)point.Y),"Singer fixture control lay outside the desktop");await Task.Delay(70);
                 element.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount,System.Windows.Input.MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
             }
