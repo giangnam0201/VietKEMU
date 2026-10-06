@@ -62,7 +62,38 @@ with sync_playwright() as p:
     expect(page.locator('#vocal')).to_have_text('Nguyên xướng')
     page.locator('#vocal').click()
     expect(page.locator('#vocal')).to_have_text('Ngắt lời')
+    # Keep the finite decoder fixture paused during settings editing and verify
+    # that saving messages/settings does not resume playback behind the user.
+    page.locator('#pause').click()
+    expect(page.locator('#pause')).to_have_text('Tiếp tục')
     page.locator('#defaultVolumeSettings summary').click()
+    page.locator('#marqueeSettings summary').click()
+    expect(page.locator('#marqueeText')).to_have_value('Phone marquee fixture')
+    expect(page.locator('#marqueeText')).to_be_enabled()
+    page.locator('#marqueeClear').click()
+    expect(page.locator('#marqueeCount')).to_have_text('240/240')
+    assert page.evaluate("async()=> (await api('settings/marquee')).localText") == 'Phone marquee fixture', 'Clear saved before confirmation'
+    page.locator('#marqueeCancel').click()
+    expect(page.locator('#marqueeText')).to_have_value('Phone marquee fixture')
+    expect(page.locator('#marqueeText')).to_be_enabled()
+    marquee = 'Chào mừng <b>fixture</b> 🎵'
+    page.locator('#marqueeText').fill(marquee)
+    expect(page.locator('#marqueeCount')).to_have_text(f'{240-len(marquee.encode("utf-16-le"))//2}/240')
+    page.locator('#marqueeConfirm').click()
+    expect(page.locator('#marqueeSaved')).to_have_text('Đã lưu: '+marquee)
+    assert page.evaluate("async()=> (await api('settings/marquee')).localText") == marquee, 'Phone marquee save lost Unicode or literal text'
+    expect(page.locator('#marqueeSaved b')).to_have_count(0)
+    expect(page.locator('#marqueeText')).to_be_enabled()
+    page.locator('#marqueeText').fill('x'*240)
+    page.locator('#marqueeConfirm').click()
+    expect(page.locator('#marqueeSaved')).to_have_text('Đã lưu: '+'x'*240)
+    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Long marquee overflows mobile page'
+    expect(page.locator('#marqueeText')).to_be_enabled()
+    page.locator('#marqueeText').fill('Phone marquee fixture')
+    page.locator('#marqueeConfirm').click()
+    expect(page.locator('#marqueeSaved')).to_have_text('Đã lưu: Phone marquee fixture')
+    page.screenshot(path=str(output / 'phone-marquee-settings.png'), full_page=True)
+    page.locator('#marqueeSettings summary').click()
     expect(page.locator('#defaultVolumeSaved')).to_have_text('Đã lưu: 7/20')
     expect(page.locator('#defaultVolume')).to_be_enabled()
     page.locator('#defaultVolume').focus()
@@ -86,10 +117,13 @@ with sync_playwright() as p:
     page.locator('#defaultVolumeConfirm').click()
     expect(page.locator('#defaultVolumeSaved')).to_have_text('Đã lưu: 7/20')
     page.locator('#defaultVolumeSettings summary').click()
+    expect(page.locator('#pause')).to_have_text('Tiếp tục')
+    page.locator('#pause').click()
+    expect(page.locator('#pause')).to_have_text('Dừng')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflows horizontally'
     page.screenshot(path=str(output / 'phone-queue.png'), full_page=True)
     page.locator('#songsTab').click()
     page.screenshot(path=str(output / 'phone-search.png'), full_page=True)
     assert not errors, 'Mobile page JavaScript errors'
     browser.close()
-print('Real phone-sized Chromium pairing, search, queue, staged default-volume save/cancel and layout verified.')
+print('Real phone-sized Chromium pairing, queue, staged default volume and local marquee save/cancel, paused-state preservation and layout verified.')

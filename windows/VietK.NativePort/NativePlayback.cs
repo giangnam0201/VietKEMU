@@ -177,13 +177,13 @@ public sealed class TelevisionWindow : Window
     public Grid VideoLayers { get; }
     public TelevisionOverlay Overlay { get; }
     public bool BlackVisible => black.Visibility == Visibility.Visible;
-    public TelevisionWindow(BitmapSource surface)
+    public TelevisionWindow(BitmapSource surface,OriginalMarqueeSettings? marqueeSettings=null)
     {
         Title = "VietK — TV output"; Width = 960; Height = 540; Background = Brushes.Black;
         // activity_osd: full video surface, black cover above it, then loading,
         // playback hint and grading containers. Missing OSD layers stay absent.
         black = new Border { Background = Brushes.Black };
-        Overlay=new TelevisionOverlay(Path.Combine(AppContext.BaseDirectory,"Original"));
+        Overlay=new TelevisionOverlay(Path.Combine(AppContext.BaseDirectory,"Original"),marqueeSettings);
         VideoLayers=new Grid { Width=1280,Height=720,Background=Brushes.Black };
         VideoLayers.Children.Add(new Image { Source=surface,Stretch=Stretch.Uniform });
         VideoLayers.Children.Add(black);VideoLayers.Children.Add(Overlay.Canvas);
@@ -263,13 +263,16 @@ public sealed class NativePlayback : IDisposable
     public bool CanSwitchVocal=>VocalUnavailableReason.Length==0;
     public string? IdleVideoSource { get; private set; }
     public OriginalDefaultVolumeSettings DefaultVolumeSettings { get; }
+    public OriginalMarqueeSettings MarqueeSettings { get; }
+    public void SetLocalMarquee(string text) { MarqueeSettings.SaveLocal(text);Television.Overlay.RefreshAdvertisement(); }
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
         this.bottom = bottom;
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
         DefaultVolumeSettings=new OriginalDefaultVolumeSettings(stateDirectory);
+        MarqueeSettings=new OriginalMarqueeSettings(stateDirectory);
         Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
-        Television = new TelevisionWindow(Decoder.VideoSurface);
+        Television = new TelevisionWindow(Decoder.VideoSurface,MarqueeSettings);
         Decoder.VideoFrameChanged+=()=> { DecodedPreviewFrames++;PreviewFrameChanged?.Invoke(Decoder.VideoSurface); };
         Player = new OriginalVideoPlayer(Decoder, Television.SetBlack);
         Decoder.Original = Player;

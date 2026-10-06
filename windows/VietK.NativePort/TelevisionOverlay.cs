@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using VietK.Core;
 
 namespace VietK.NativePort;
 
@@ -39,17 +40,20 @@ public sealed class TelevisionOverlay
     private readonly DispatcherTimer pauseRepeat;
     private int pauseCount;
     private readonly Dictionary<string,string> messages;
-    private readonly string advertisementFile;
+    private readonly OriginalMarqueeSettings marqueeSettings;
+    private string currentSong="",nextSong="";
     public string MarqueeText=>marqueeValue;
+    internal string CurrentSong=>currentSong;
+    internal string NextSong=>nextSong;
     public string LastControl { get; private set; }="";
     public bool Paused { get; private set; }
     public bool PauseVisible=>pause.Visibility==Visibility.Visible;
     public bool ControlVisible => control.Visibility==Visibility.Visible;
-    public TelevisionOverlay(string root)
+    public TelevisionOverlay(string root,OriginalMarqueeSettings? marqueeSettings=null)
     {
         this.root=root;
         messages=JsonSerializer.Deserialize<Dictionary<string,string>>(File.ReadAllText(Path.Combine(root,"player","marquee.json")))!;
-        advertisementFile=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VietKNativePort","tv-marquee.txt");
+        this.marqueeSettings=marqueeSettings??new OriginalMarqueeSettings(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VietKNativePort"));
         contract=JsonSerializer.Deserialize<TvOsdContract>(File.ReadAllText(Path.Combine(root,"player","osd.json")),
             new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original TV OSD contract");
         var logo=new Image { Source=Bitmap("top-logo.png"),Width=135,Height=64,Stretch=Stretch.Uniform };
@@ -77,7 +81,8 @@ public sealed class TelevisionOverlay
     }
     public void SetSong(string current,string next="",string advertisement="")
     {
-        if(string.IsNullOrWhiteSpace(advertisement) && File.Exists(advertisementFile))advertisement=File.ReadAllText(advertisementFile);
+        currentSong=current;nextSong=next;
+        if(string.IsNullOrWhiteSpace(advertisement))advertisement=marqueeSettings.LocalText;
         var key=string.IsNullOrWhiteSpace(current)?"marquee_not_demand_tip":
             string.IsNullOrWhiteSpace(next)?"marquee_current_playing_tip":"marquee_current_playing_and_next_play_tip";
         var value=messages[key].Replace("%1$s",current).Replace("%2$s",next)+
@@ -98,6 +103,7 @@ public sealed class TelevisionOverlay
         marqueeShift.BeginAnimation(TranslateTransform.XProperty,new DoubleAnimation(phase,phase-pitch,
             TimeSpan.FromSeconds(pitch/(2.0/.030))) { RepeatBehavior=RepeatBehavior.Forever });
     }
+    public void RefreshAdvertisement()=>SetSong(currentSong,nextSong);
     public void SetPaused(bool value)
     {
         if(Paused==value)return;

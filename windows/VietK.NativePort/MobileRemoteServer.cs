@@ -88,6 +88,17 @@ public sealed class MobileRemoteServer : IDisposable
             var result=await Ui(()=> { playback.DefaultVolumeSettings.Save(volume);return DefaultVolume(); });
             await context.Response.WriteAsJsonAsync(result);
         });
+        object Marquee()=>new { mode="1",localText=playback.MarqueeSettings.LocalText,maxLength=OriginalMarqueeSettings.MaximumLength,cloudAvailable=false };
+        web.MapGet("/api/settings/marquee",async context=>await context.Response.WriteAsJsonAsync(await Ui(Marquee)));
+        web.MapPost("/api/settings/marquee",async context=>
+        {
+            using var request=await JsonDocument.ParseAsync(context.Request.Body,cancellationToken:context.RequestAborted);
+            if(request.RootElement.ValueKind!=JsonValueKind.Object||!request.RootElement.TryGetProperty("mode",out var mode)||
+                mode.ValueKind!=JsonValueKind.String||mode.GetString()!="1"||!request.RootElement.TryGetProperty("localText",out var text)||
+                text.ValueKind!=JsonValueKind.String)throw new ArgumentException();
+            var result=await Ui(()=> { playback.SetLocalMarquee(text.GetString()!);return Marquee(); });
+            await context.Response.WriteAsJsonAsync(result);
+        });
         web.MapGet("/api/search",async context=>
         {
             var query=context.Request.Query["q"].ToString().Trim();

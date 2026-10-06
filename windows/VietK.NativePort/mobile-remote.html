@@ -19,6 +19,10 @@
 <p class="status">Đang chọn: <output id="defaultVolumeDraft" for="defaultVolume">15</output>/20</p>
 <div class="actions"><button type="button" id="defaultVolumeCancel" disabled>Hủy</button><button type="submit" id="defaultVolumeConfirm" disabled>Xác nhận</button></div>
 </form></details>
+<details id="marqueeSettings"><summary>Chữ chạy trên TV</summary><p class="status">Văn bản cục bộ · tối đa 240 ký tự</p>
+<form id="marqueeForm" style="display:block"><textarea id="marqueeText" maxlength="240" rows="3" aria-label="Chữ chạy trên TV" style="width:100%;font:inherit;color:white;background:#180c31;border:2px solid #5c3589;border-radius:12px;padding:12px;resize:vertical" disabled></textarea>
+<p class="status" id="marqueeCount">240/240</p><p class="status" id="marqueeSaved" aria-live="polite" style="overflow-wrap:anywhere;white-space:pre-wrap"></p>
+<div class="actions"><button type="button" id="marqueeClear" disabled>Xóa</button><button type="button" id="marqueeCancel" disabled>Hủy</button><button type="submit" id="marqueeConfirm" disabled>Xác nhận</button></div></form></details>
 <p class="status" id="vocalHint"></p><p class="status" id="state"></p><p class="status" id="offline"></p>
 </main>
 <footer><div class="controls"><button data-command="voldec">− Giảm âm</button><button data-command="play_imv" id="pause">Dừng / Tiếp tục</button><button data-command="volinc">+ Tăng âm</button><button data-command="replay_imv">Phát lại</button><button data-command="cut_song_imv">Qua bài</button><button data-command="mute" id="mute">Tắt tiếng</button><button data-command="ori_imv" id="vocal" disabled>Ngắt lời</button><span class="status" id="volume"></span></div></footer>
@@ -42,6 +46,16 @@ $('defaultVolumeMinus').onclick=()=>defaultVolumeDraft(Number($('defaultVolume')
 $('defaultVolumePlus').onclick=()=>defaultVolumeDraft(Number($('defaultVolume').value)+1);
 $('defaultVolumeCancel').onclick=()=>loadDefaultVolume();
 $('defaultVolumeForm').onsubmit=async event=>{event.preventDefault();const request=++defaultVolumeRequest;const defaultVolume=Number($('defaultVolume').value);defaultVolumeBusy(true);try{const value=await api('settings/default-volume',{defaultVolume});if(request===defaultVolumeRequest){defaultVolumeSaved(value);notice('Đã lưu âm lượng mặc định.');}}catch(error){if(request===defaultVolumeRequest)notice(error.message);}finally{if(request===defaultVolumeRequest)defaultVolumeBusy(savedDefaultVolume===null);}};
+let savedMarquee=null,marqueeRequest=0;
+function marqueeBusy(busy){for(const id of ['marqueeText','marqueeClear','marqueeCancel','marqueeConfirm'])$(id).disabled=busy;}
+function marqueeCount(){$('marqueeCount').textContent=(240-$('marqueeText').value.length)+'/240';}
+function marqueeSaved(value){savedMarquee=value.localText;$('marqueeText').value=savedMarquee;marqueeCount();$('marqueeSaved').textContent='Đã lưu: '+savedMarquee;}
+async function loadMarquee(){const request=++marqueeRequest;marqueeBusy(true);try{const value=await api('settings/marquee');if(request===marqueeRequest)marqueeSaved(value);}catch(error){if(request===marqueeRequest)notice(error.message);}finally{if(request===marqueeRequest)marqueeBusy(savedMarquee===null);}}
+$('marqueeSettings').ontoggle=()=>{if($('marqueeSettings').open)loadMarquee();else{++marqueeRequest;if(savedMarquee!==null){$('marqueeText').value=savedMarquee;marqueeCount();}}};
+$('marqueeText').oninput=marqueeCount;
+$('marqueeClear').onclick=()=>{$('marqueeText').value='';marqueeCount();};
+$('marqueeCancel').onclick=()=>loadMarquee();
+$('marqueeForm').onsubmit=async event=>{event.preventDefault();const request=++marqueeRequest;const localText=$('marqueeText').value;marqueeBusy(true);try{const value=await api('settings/marquee',{mode:'1',localText});if(request===marqueeRequest){marqueeSaved(value);notice('Đã lưu chữ chạy trên TV.');}}catch(error){if(request===marqueeRequest)notice(error.message);}finally{if(request===marqueeRequest)marqueeBusy(savedMarquee===null);}};
 function button(text,callback){const result=document.createElement('button');result.textContent=text;result.onclick=callback;return result;}
 function showTab(queue){$('songs').classList.toggle('hidden',queue);$('queue').classList.toggle('hidden',!queue);$('songsTab').classList.toggle('active',!queue);$('queueTab').classList.toggle('active',queue);}
 $('queueBank').onchange=()=>{bank=$('queueBank').value;bankChosen=true;lastQueue='';refresh();};

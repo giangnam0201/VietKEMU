@@ -221,11 +221,10 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private void EditMarquee()
     {
-        var path=Path.Combine(Path.GetDirectoryName(queueFile)!,"tv-marquee.txt");
-        var text=new TextBox { Text=File.Exists(path)?File.ReadAllText(path):"",AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=150 };
+        var text=new TextBox { Text=playback.MarqueeSettings.LocalText,MaxLength=OriginalMarqueeSettings.MaximumLength,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=150 };
         var area=new StackPanel { Margin=new(15) };area.Children.Add(text);
         var window=new Window { Title="VietK — Chữ chạy trên TV",Width=500,Height=270,Content=area,Owner=Application.Current.MainWindow };
-        area.Children.Add(Button("Lưu",()=> { File.WriteAllText(path,text.Text);UpdateMarquee();window.Close(); }));window.ShowDialog();
+        area.Children.Add(Button("Lưu",()=> { playback.SetLocalMarquee(text.Text);window.Close(); }));window.ShowDialog();
     }
     private void UpdateMarquee()=>playback.Television.Overlay.SetSong(active?queue.FirstOrDefault()?.Title??"":"",
         active?queue.Skip(1).FirstOrDefault()?.Title??"":"");

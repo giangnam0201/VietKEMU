@@ -47,6 +47,9 @@ internal static class MobileRemoteVerification
         Require((await client.GetAsync("api/settings/default-volume")).StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone read default volume");
         using(var unpaired=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=0 }))
             Require(unpaired.StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone changed default volume");
+        Require((await client.GetAsync("api/settings/marquee")).StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone read marquee");
+        using(var unpaired=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText="Unpaired" }))
+            Require(unpaired.StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone changed marquee");
         Require((await client.GetStringAsync("/")).Contains("sessionStorage.setItem"),"Mobile browser page missing");
         Checkpoint("Unauthorized request and mobile page checked");
         client.DefaultRequestHeaders.Authorization=new("Bearer",server.TestToken);
@@ -66,6 +69,8 @@ internal static class MobileRemoteVerification
         Checkpoint("Authenticated native search checked");
         var originalDefault=await VerifyDefaultVolume(playback,client,panel,output);
         Checkpoint("Phone default-volume HTTP, validation and shared desktop preference checked");
+        var originalMarquee=await VerifyMarquee(playback,client,output);
+        Checkpoint("Phone local marquee HTTP, validation and preserved TV song/idle text checked");
         if(Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1")
         {
             var start=new System.Diagnostics.ProcessStartInfo("python") { UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };
@@ -86,6 +91,10 @@ internal static class MobileRemoteVerification
             Require(saved.RootElement.GetProperty("defaultVolume").GetInt32()==7,"Phone browser did not restore its verified default volume");
         using(var restore=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=originalDefault }))
             Require(restore.IsSuccessStatusCode,"Default-volume fixture could not restore its initial preference");
+        Require(playback.MarqueeSettings.LocalText=="Phone marquee fixture","Browser did not restore its verified marquee fixture");
+        using(var restore=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText=originalMarquee.Text }))
+            Require(restore.IsSuccessStatusCode,"Marquee fixture could not restore its initial preference");
+        playback.Television.Overlay.SetSong(originalMarquee.Current,originalMarquee.Next);
         await Send(new { action="add",id="fixture0003" });Require((await Queue()).Length==3,"Phone add did not reach actual panel queue");
         await Send(new { action="top",id="fixture0003" });Require((await Queue())[1]=="fixture0003","Phone priority failed");
         await Send(new { action="move",id="fixture0003",target=2 });Require((await Queue())[2]=="fixture0003","Phone reorder failed");
@@ -126,6 +135,8 @@ internal static class MobileRemoteVerification
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
         using(var revoked=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=0 }))
             Require(revoked.StatusCode==HttpStatusCode.Unauthorized,"Revoked phone changed default volume");
+        using(var revoked=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText="Revoked" }))
+            Require(revoked.StatusCode==HttpStatusCode.Unauthorized,"Revoked phone changed marquee");
         Checkpoint("Native commands and pairing revocation passed");
         // RePair uses live adapters only to make a local QR; remove it before other tests/captures.
         playback.Television.Overlay.Qr.Configure(new());
@@ -136,8 +147,46 @@ internal static class MobileRemoteVerification
             localNextLeavesYouTubeQueueIntact=true,originalDownloadProgressAndCancel=true,
             defaultVolumeReadWrite=true,defaultVolumeBoundsAndInvalidBodyRejection=true,defaultVolumePersistsAndSharesDesktop=true,
             defaultVolumeLeavesLivePlaybackUnchanged=true,defaultVolumeAuthorizationOriginAndRevocation=true,
+            marqueeReadWriteAndPersistence=true,marqueeAuthorizationOriginAndRevocation=true,marqueeValidationAndCloudRejection=true,
+            marqueeSongIdleAndLocalQueueTitlesPreserved=true,marqueeSharedTvTextUpdated=true,
             phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
+    }
+    private static async Task<(string Text,string Current,string Next)> VerifyMarquee(NativePlayback playback,HttpClient client,string output)
+    {
+        void Require(bool value,string error) { if(!value)throw new InvalidDataException(error); }
+        var overlay=playback.Television.Overlay;var initial=(Text:playback.MarqueeSettings.LocalText,Current:overlay.CurrentSong,Next:overlay.NextSong);
+        var source=playback.Source;var live=playback.Decoder.OutputVolumeStep;var state=playback.Player.State;
+        using(var get=JsonDocument.Parse(await client.GetStringAsync("api/settings/marquee")))
+            Require(get.RootElement.GetProperty("mode").GetString()=="1"&&get.RootElement.GetProperty("localText").GetString()==initial.Text&&
+                !get.RootElement.GetProperty("cloudAvailable").GetBoolean(),"Marquee original fields or local mode differ");
+        using(var cross=new HttpRequestMessage(HttpMethod.Post,"api/settings/marquee"))
+        {
+            cross.Headers.Add("Origin","https://example.invalid");cross.Content=JsonContent.Create(new { mode="1",localText="Cross origin" });
+            using var response=await client.SendAsync(cross);Require(response.StatusCode==HttpStatusCode.Forbidden,"Cross-origin marquee accepted");
+        }
+        overlay.SetSong("Phone current fixture","Phone next fixture");
+        foreach(var value in new[]{new string('x',240),"Chào mừng <b>literal</b> "+char.ConvertFromUtf32(0x1f3b5)})
+        {
+            using var response=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText=value });
+            Require(response.IsSuccessStatusCode,"Paired phone could not save bounded marquee");
+            Require(new OriginalMarqueeSettings(output).LocalText==value,"Phone marquee did not persist exactly");
+            Require(overlay.MarqueeText.Contains(value)&&overlay.MarqueeText.Contains("Phone current fixture")&&overlay.MarqueeText.Contains("Phone next fixture"),"Marquee save lost current/next song text");
+            Require(playback.Source==source&&playback.Decoder.OutputVolumeStep==live&&playback.Player.State==state,"Marquee save changed playback source, volume or state");
+        }
+        var saved=playback.MarqueeSettings.LocalText;
+        foreach(var invalid in new object[]{new { mode="0",localText="Cloud" },new { mode="9",localText="Invalid" },new { mode="1",localText=new string('x',241) },new { mode="1",localText="bad\0text" },new { mode="1" },new { mode="1",localText=42 }})
+        { using var response=await client.PostAsJsonAsync("api/settings/marquee",invalid);Require(response.StatusCode==HttpStatusCode.BadRequest,"Invalid or unavailable cloud marquee was accepted"); }
+        Require(playback.MarqueeSettings.LocalText==saved,"Rejected marquee changed saved text");
+        using(var clear=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText="" }))Require(clear.IsSuccessStatusCode,"Local marquee could not be cleared");
+        overlay.SetSong("");var idle=overlay.MarqueeText;
+        using(var save=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText="Phone marquee fixture" }))Require(save.IsSuccessStatusCode,"Idle marquee save failed");
+        Require(overlay.MarqueeText.Contains(idle)&&overlay.MarqueeText.Contains("Phone marquee fixture"),"Phone message replaced the idle prompt");
+        overlay.SetSong("Phone current fixture","Phone next fixture");
+        Require(Texts(overlay.Canvas).Any(text=>text.Text.Contains("Phone marquee fixture")),"Shared TV overlay did not render updated marquee text");
+        return initial;
+        static IEnumerable<System.Windows.Controls.TextBlock> Texts(System.Windows.DependencyObject parent)
+        { for(var index=0;index<System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);index++) { var child=System.Windows.Media.VisualTreeHelper.GetChild(parent,index);if(child is System.Windows.Controls.TextBlock text)yield return text;foreach(var nested in Texts(child))yield return nested; } }
     }
     private static async Task<int> VerifyDefaultVolume(NativePlayback playback,HttpClient client,Canvas panel,string output)
     {
@@ -204,6 +253,14 @@ internal static class MobileRemoteVerification
             while(playback.Player.State!=OriginalVideoState.Play) { if(DateTime.UtcNow>deadline)throw new TimeoutException("Original phone queue did not start");await Task.Delay(50); }
             remote.Refresh();
             Require(bottom.QueueCount==4,"Original selected/download badge differs");
+            var savedMarquee=playback.MarqueeSettings.LocalText;var currentTitle=playback.Television.Overlay.CurrentSong;var nextTitle=playback.Television.Overlay.NextSong;
+            using(var message=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText="Local queue marquee fixture" }))
+                Require(message.IsSuccessStatusCode,"Local queue marquee update failed");
+            Require(playback.Source==PlaybackSource.LocalKaraoke&&currentTitle.Length>0&&nextTitle.Length>0&&
+                playback.Television.Overlay.CurrentSong==currentTitle&&playback.Television.Overlay.NextSong==nextTitle&&
+                playback.Television.Overlay.MarqueeText.Contains("Local queue marquee fixture"),"Phone marquee update replaced original local queue titles or source");
+            using(var restore=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText=savedMarquee }))
+                Require(restore.IsSuccessStatusCode,"Local queue marquee fixture restore failed");
             var local=selected.Snapshot();var first="local:"+local[0].FlowId;var repeated="local:"+local[1].FlowId;var third="local:"+local[2].FlowId;
             Require(first!=repeated&&playback.CurrentFlowId==first[6..],"Repeated original song orders lost their distinct playing flow ID");
             using(var state=JsonDocument.Parse(await client.GetStringAsync("api/state")))
