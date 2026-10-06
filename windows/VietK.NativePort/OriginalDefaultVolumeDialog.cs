@@ -40,7 +40,14 @@ public sealed class OriginalDefaultVolumeDialog
         }
         void Button(string title,double x,Action action,string tag)
         {
-            var element=new Border { Width=140,Height=46,CornerRadius=new(23),Background=new SolidColorBrush(Color.FromRgb(105,45,123)),Child=Label(title,140,46,24),Tag="default-volume:"+tag };
+            // shape_dialog_cancel_btn_bg / shape_dialog_ok_btn_bg: 90-degree
+            // Android gradients run from bottom (start) to top (end).
+            var background=new LinearGradientBrush { StartPoint=new(0,1),EndPoint=new(0,0) };
+            if(tag=="cancel")
+            { background.GradientStops.Add(new(Color.FromRgb(216,216,254),0));background.GradientStops.Add(new(Color.FromRgb(236,237,242),.5));background.GradientStops.Add(new(Colors.White,1)); }
+            else { background.GradientStops.Add(new(Color.FromRgb(4,160,227),0));background.GradientStops.Add(new(Color.FromRgb(0,250,246),1)); }
+            var label=Label(title,140,46,24);if(tag=="cancel")label.Foreground=new SolidColorBrush(Color.FromRgb(38,41,100));
+            var element=new Border { Width=140,Height=46,CornerRadius=new(26),Background=background,Child=label,Tag="default-volume:"+tag };
             OriginalPressFeedback.Bind(element,.9);element.MouseLeftButtonUp+=(_,e)=> { action();e.Handled=true; };Put(content,element,x,270);
         }
     }
