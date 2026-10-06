@@ -25,7 +25,7 @@ public sealed class AmbienceExpressions : IDisposable
     private readonly DispatcherTimer expiry=new() { Interval=TimeSpan.FromMilliseconds(6000) };
     public string ActiveExpression { get; private set; }="";
     private readonly NativePlayback? playback;
-    private bool muted;
+    private volatile bool muted;
     public AmbienceExpressions(TelevisionOverlay overlay,TelevisionWindow? television=null,NativePlayback? playback=null)
     {
         this.playback=playback;muted=playback?.Decoder.Muted??false;
@@ -33,6 +33,9 @@ public sealed class AmbienceExpressions : IDisposable
         this.overlay=overlay;library=new LibVLC("--no-video","--no-video-title-show");
         Sound=new LibVLCSharp.Shared.MediaPlayer(library) { Volume=50 };
         Sound.Playing+=(_,_)=>Sound.Volume=muted?0:50;
+        // As with the main decoder, Playing can precede creation of the audio
+        // output. Reapply gain when real audio timing confirms readiness.
+        Sound.TimeChanged+=(_,args)=> { if(args.Time>0)Sound.Volume=muted?0:50; };
         if(playback is not null)playback.MuteChanged+=SetMuted;
         expiry.Tick+=(_,_)=>Hide();
     }

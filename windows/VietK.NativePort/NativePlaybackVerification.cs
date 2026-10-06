@@ -307,7 +307,7 @@ public static class NativePlaybackVerification
                     playback.SetMuted(true);
                     await UntilEnergy(expressionTap,power=>power<expressionPower*.001,"Mute left expression WAV audible");
                     playback.SetMuted(false);
-                    await UntilEnergy(expressionTap,power=>power>=expressionPower*.8&&power<=expressionPower*1.2,"Expression audio did not recover its original level after unmute");
+                    await UntilEnergy(expressionTap,power=>power>=expressionPower*.8&&power<=expressionPower*1.2,"Expression audio did not recover its original level after unmute; baseline="+expressionPower);
                     Require(playback.Decoder.Position>before+1000 && playback.Decoder.PreserveStereo,"Expression replaced or interrupted karaoke playback");
                     var dialog=(Canvas)panel.Children[panel.Children.Count-1];var content=(Canvas)((Border)dialog.Children[0]).Child;
                     var tvHeading=content.Children.OfType<Border>().Single(child=>child.Child is TextBlock { Text:"TV" });
