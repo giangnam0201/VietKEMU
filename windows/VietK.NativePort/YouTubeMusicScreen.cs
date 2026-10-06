@@ -143,6 +143,10 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Chữ chạy trên TV…",EditMarquee);
+        Add("Chế độ hiển thị mã QR lên TV…",()=>
+        {
+            if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new TvQrModeDialog(panel,playback.Television.Overlay.Qr);
+        });
         Add("Chọn video chờ (Demo.mp4)…",ChooseIdleVideo);
         Add("Dùng video chờ gốc",()=> { playback.UseFactoryIdleVideo();SetStatus("Đã khôi phục video chờ mặc định."); });menu.IsOpen=true;
     }

@@ -17,6 +17,7 @@ public sealed class TelevisionOverlay
 {
     public Canvas Canvas { get; }=new() { Width=1280,Height=720,IsHitTestVisible=false };
     public TelevisionBarrage Barrage { get; }=new();
+    public TelevisionQr Qr { get; }=new();
     private readonly string root;
     private readonly TvOsdContract contract;
     private readonly Image control,pause;
@@ -51,6 +52,7 @@ public sealed class TelevisionOverlay
         var strip=new Canvas { Width=1060,Height=54,ClipToBounds=true };
         marqueeTrain.RenderTransform=marqueeShift;strip.Children.Add(marqueeTrain);Put(strip,200,10);
         control=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Visibility=Visibility.Collapsed };
+        Put(Qr.Canvas,49*4d/3,55*4d/3);
         Put(Barrage.Canvas,0,0);
         pause=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Source=Bitmap("player/pause.png"),Visibility=Visibility.Collapsed };
         Put(control,(1280-contract.ControlWidth)/2,contract.ControlY);

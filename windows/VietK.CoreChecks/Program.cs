@@ -698,6 +698,7 @@ Console.WriteLine("Original data-center login/request state verified: URI tokens
 BarrageMotionChecks.Run();
 BarrageRetainerChecks.Run();
 QueueOrderChecks.Run();
+MobileQrChecks.Run();
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();
 TransferWriteRecoveryChecks.Run().GetAwaiter().GetResult();

@@ -1,0 +1,13 @@
+# Original mobile QR presentation
+
+The Windows TV layer generates a real QR matrix from supplied binding data. It is part of the same composed TV surface shown in the panel preview. Nothing contacts the manufacturer server or invents a device identity.
+
+Original APK contracts: `dualkmbox` QRCodeManager/QrGenerator and `daulkmboxosdtv` QRCodeManager/OuterCommonPresentation. Both generate 400×400 UTF-8 matrices with margin 1; panel error correction is L, TV is M. The panel fallback URL and inside-network rewrite differ from the TV implementation. The separate TV binding code is displayed below the matrix and is not part of its URL. Generation uses [ZXing.Net](https://github.com/micjahn/ZXing.Net).
+
+Optional local `%LOCALAPPDATA%/VietKNativePort/mobile-binding.json` uses fields `Serial`, `BindingPrefix`, `RandomCode`, `TvBindCode`, `InsideNet`. Missing identity or URL leaves the QR panel hidden. These values are private local configuration, never included in releases. A syntactically valid binding URL is not evidence of authorization or successful phone control.
+
+TV mode selection is available in the existing Firefox/options menu. Selection is staged until confirmation; cancellation preserves the setting. Confirmed mode persists locally in `tv-qr-mode.json`. Mode 0 shows the image. The supplied APK's change-mode branch hides it immediately for modes 1 and 2, despite mode 1's “Ẩn sau 20 giây” label; a separate delay call schedules a 20-second hide and a one-second panel slide. No caller for that delay has yet been established, so the port does not invent an automatic countdown. The binding-code label remains when the image hides, matching the source branch.
+
+Limits: manufacturer binding-code requests, Android binder transport, mobile commands and original settings navigation are not ported. The mode dialog uses source dimensions/text but WPF radio/button styling remains an approximation. The source xhdpi QR dimensions use a 4/3 mapping to the 1280 TV canvas; physical Android density has not been verified. Slide timing is source-derived; interpolation is linear and has not been matched to the Android default curve. This increment is QR presentation, not a working mobile remote.
+
+Verification renders/decodes panel and TV matrices, checks differing fallback and correction levels, exercises source visibility/timer branches, decodes a synthetic `.invalid` binding from the real composed TV/panel preview and checks native dialog confirmation/cancellation. Tests never use a real device identity or visit the QR URL.
