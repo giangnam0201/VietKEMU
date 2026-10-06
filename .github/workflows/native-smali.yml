@@ -28,7 +28,8 @@ jobs:
                      'SongDownListManager', 'SongDownListDAO', 'DownListDAOManager', 'OrderSongManger', 'ReportTableManager',
                      'SongDownloadManager', 'LocalOnlineSongManager', 'BaseOnlineSongManager', 'MsOnlineSongManager', 'NoEvideoOnlineManager',
                      'DCDomain', 'DataCenterMessage', 'DataCenterCommuProxy', 'HttpFile', 'SongManager',
-                     'AppDownloadManager', 'DownLoadTaskItem',
+                     'AppDownloadManager', 'AppDownItem', 'FileDownState', 'DownLoadTaskItem',
+                     'DCCloudMusicLibCommu', 'DCUnlockCloudLibraryCommu', 'CloudMusicUnlockManager',
                      'MuiltCollectListManager', 'SongRecyclerGridViewAdapter', 'UpdateDbManager'}
           entries = {entry['path']: entry for entry in json.loads((app/'original-entries.json').read_text())}
           files = []
@@ -46,7 +47,8 @@ jobs:
                   files.append({'path': relative.as_posix(), 'decodedSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
                                 'originalDex': dex, 'originalDexSha256': entries[dex]['sha256']})
                   found.add(name)
-          missing = {'SongDAO','SongIdDAO','MediaDAO','PlayListManager','KmPlayListItem','Song'} - found
+          missing = {'SongDAO','SongIdDAO','MediaDAO','PlayListManager','KmPlayListItem','Song',
+                     'AppDownItem','DCCloudMusicLibCommu','CloudMusicUnlockManager'} - found
           if missing: raise RuntimeError('Missing original bytecode: ' + ','.join(sorted(missing)))
           (output/'provenance.json').write_text(json.dumps(files, indent=2))
           PY
