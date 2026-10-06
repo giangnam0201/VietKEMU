@@ -139,6 +139,13 @@ checks exercise file reopen, metadata with Vietnamese/apostrophes, ordering,
 repeat deletion and failed-insert results. The Windows capture exercises the
 actual seed schema in an isolated verification database.
 
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37395825408
+passed the selected-list persistence, ordering, repeat-deletion and failed-insert
+checks, original asset packaging, native Windows compilation and capture. The
+downloaded verification report confirms `originalSelectedListStorageVerified`
+and `androidRuntimeUsed: false`. These checks establish storage behavior only;
+they do not establish working panel queue actions or playback.
+
 This is the storage layer. Runtime item reconstruction, manager initialization,
 notification/playback dispatch, download-list integration and panel queue
 handlers remain pending. The manager's default clear-on-start policy must be
