@@ -33,6 +33,8 @@ var offline = new SongQueryContext();
 var offlineIds = Ids(search.BySpell("",0,0,new(),offline));
 Require(offlineIds.SequenceEqual(new[]{2,1,7,8,5}), "Local flags, Vietnamese/Chinese language priority, play counts or exclusions differ");
 Require(!offlineIds.Contains(3), "Offline query exposed unavailable remote media");
+Require(search.BySpell("Al",0,0,new(),offline).Single().LocalState==1,
+    "Search model lost the original local-state flag required by grid controls");
 Require(Ids(search.BySpell("",0,0,new(),new(true,false))).SequenceEqual(offlineIds), "Online switch bypassed disconnected data centre");
 var connected = Ids(search.BySpell("",0,0,new(),new(true,true)));
 Require(connected.Contains(3) && !connected.Contains(4) && !connected.Contains(90000001), "Connected remote/private-ID filtering differs");

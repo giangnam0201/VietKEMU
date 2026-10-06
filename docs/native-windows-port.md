@@ -46,7 +46,7 @@ persistent local database, not the whole catalogue as available songs. Its
 Vietnamese keyboard translates the original four rows, symbol-page toggle,
 pressed outline, space/backspace/clear behavior and delayed spelling queries.
 The original empty-message and YouTube button are present; YouTube navigation,
-Thai/handwriting mode actions, nonempty song tiles/actions and media-index
+Thai/handwriting mode actions, song item handlers and media-index
 import remain pending. Phantom remains an empty original-sized video region.
 This is still a development component, not a working karaoke release.
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37392895683
@@ -83,6 +83,17 @@ traversal/update lifecycle. They never change data-centre connection state or
 download music. The capture checks exercise them in a separate verification
 database using the supplied catalogue; that state is not the interactive app's
 database.
+
+`SongGrid` now renders the default three-column cells from the original layout:
+original fallback image, centered green song name with a white 4px stroke,
+singer strip and remote/preview/collection/top icons. Source bitmap hashes and
+density-derived icon sizes are packaged in `song-grid.json`. Confirmed local
+flags control remote/preview visibility; whole-catalogue lookup models carry
+no local flag and are rejected as grid state. Scrolling the current page works;
+the original seekbar, subsequent page loading, thumbnail URL/cache loading,
+singer spans and item action backends remain pending. A verification-only
+connected query renders real imported metadata in `native-song-grid-fixture.png`;
+it does not set the interactive app's connection or availability state.
 
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,

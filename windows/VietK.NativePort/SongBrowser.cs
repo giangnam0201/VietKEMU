@@ -18,16 +18,20 @@ public sealed record SongBrowserContract(string Title, string EmptyMessage, stri
 // First local SongNameFragment path. Song tiles/actions, alternate input modes,
 // Phantom video and YouTube service navigation are separate unfinished ports.
 public sealed class SongBrowser(string root, SongBrowserContract contract,
-    MoreContract more, LocalSongDatabase local)
+    MoreContract more, LocalSongDatabase local, SongGridContract gridContract)
 {
     public event Action? HomeRequested;
     public event Action<string>? YoutubeRequested;
     public event Action<int>? InputModeRequested;
+    public event Action<CatalogueSong,string>? SongActionRequested;
     public VietnameseSearchInput? Input { get; private set; }
     public IReadOnlyList<CatalogueSong> Results { get; private set; } = [];
     public bool Alphabetic { get; private set; } = true;
 
-    public Canvas Create()
+    public Canvas Create()=>CreateCore(null);
+    internal Canvas CreateVerificationFixture(IReadOnlyList<CatalogueSong> songs)=>CreateCore(songs);
+
+    private Canvas CreateCore(IReadOnlyList<CatalogueSong>? fixtureSongs)
     {
         Alphabetic = true;
         var canvas = new Canvas { Width = 1280, Height = 800, ClipToBounds = true,
@@ -56,6 +60,17 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         var youtube=new Border { Background=Gradient("#ffc037d0","#ff7437e9"), CornerRadius=new(30),
             HorizontalAlignment=HorizontalAlignment.Center,Margin=new(0,15,0,0),Child=youtubeText };
         Click(youtube,()=>YoutubeRequested?.Invoke(Input?.Text ?? "")); empty.Children.Add(youtube); area.Children.Add(empty);
+        var gridFactory=new SongGrid(root,gridContract);
+        gridFactory.ActionRequested+=(song,action)=>SongActionRequested?.Invoke(song,action);
+        ScrollViewer? songGrid=null;
+        void ShowResults(IReadOnlyList<CatalogueSong> songs)
+        {
+            Results=songs;empty.Visibility=songs.Count==0?Visibility.Visible:Visibility.Collapsed;
+            if(songGrid is not null)area.Children.Remove(songGrid);
+            songGrid=gridFactory.Create(songs);songGrid.HorizontalAlignment=HorizontalAlignment.Left;
+            songGrid.VerticalAlignment=VerticalAlignment.Top;songGrid.Margin=new(0,50,6,0);
+            songGrid.Visibility=songs.Count==0?Visibility.Collapsed:Visibility.Visible;area.Children.Add(songGrid);
+        }
         var back=new Border { Width=more.BackWidth,Height=more.BackHeight,CornerRadius=new(more.BackCorner),
             Background=Gradient(more.BackStartColor,more.BackEndColor),Child=Icon("icon_back.png",27,20) };
         Click(back,()=>HomeRequested?.Invoke()); Put(canvas,back,contract.BackX,contract.BackY);
@@ -90,10 +105,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             display.Foreground=input.Text.Length==0?Brush("#33ffffff"):Brushes.White; };
         input.SpellRequested+=spell=>
         {
-            Results=local.Search.BySpell(spell,0,0,new(),new());
-            empty.Visibility=Results.Count==0?Visibility.Visible:Visibility.Collapsed;
-            // Nonempty-grid artwork, item state/actions and scrolling await
-            // their adapter port. Do not substitute generic selectable rows.
+            ShowResults(local.Search.BySpell(spell,0,0,new(),new()));
         };
         canvas.Unloaded+=(_,_)=> { foreach(var timer in timers) timer.Stop();timers.Clear(); };
         void BuildKeys()
@@ -121,8 +133,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             Key("",50,350+2*contract.KeyGap,3,()=>InputModeRequested?.Invoke(2),"icon_pen.png");
             Key("",50,400+3*contract.KeyGap,3,()=>InputModeRequested?.Invoke(10),"keyboard_earth.png");
         }
-        BuildKeys();input.Clear();Results=local.Search.BySpell("",0,0,new(),new());
-        empty.Visibility=Results.Count==0?Visibility.Visible:Visibility.Collapsed;
+        BuildKeys();input.Clear();ShowResults(fixtureSongs??local.Search.BySpell("",0,0,new(),new()));
         return canvas;
     }
 

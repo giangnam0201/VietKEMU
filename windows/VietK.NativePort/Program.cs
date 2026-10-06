@@ -38,7 +38,9 @@ public static class Program
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
                 Path.Combine(stateDirectory,"song-browser-state.db"));
-            var browser = new SongBrowser(root, songContract, moreContract, songState);
+            var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
+            var browser = new SongBrowser(root, songContract, moreContract, songState,gridContract);
             Canvas Panel(int screen = 0)
             {
                 var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
@@ -133,6 +135,15 @@ public static class Program
                         throw new InvalidDataException("Catalogue import claimed local availability or a connected server");
                     if(imported.Search.BySpell("MDH",0,0,new(),new(true,true)).Count==0)
                         throw new InvalidDataException("Explicit connected query fixture lost original remote metadata");
+                    var fixtureSongs=imported.Search.BySpell("",0,0,new(),new(true,true));
+                    if(fixtureSongs.Any(song=>song.LocalState!=0))
+                        throw new InvalidDataException("Remote import fabricated a local-media flag");
+                    var gridFixture=browser.CreateVerificationFixture(fixtureSongs);
+                    var gridBottom=bottom.Create();Canvas.SetTop(gridBottom,bottomContract.Y);gridFixture.Children.Add(gridBottom);
+                    gridFixture.Measure(new Size(1280,800));gridFixture.Arrange(new Rect(0,0,1280,800));gridFixture.UpdateLayout();
+                    var gridImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);gridImage.Render(gridFixture);
+                    var gridEncoder=new PngBitmapEncoder();gridEncoder.Frames.Add(BitmapFrame.Create(gridImage));
+                    using(var file=File.Create(Path.Combine(args[1],"native-song-grid-fixture.png")))gridEncoder.Save(file);
                 }
                 if(!SHA256.HashData(File.ReadAllBytes(wholePath)).SequenceEqual(catalogueHash))
                     throw new InvalidDataException("Local import modified the original whole catalogue");
@@ -177,7 +188,7 @@ public static class Program
                     songBrowserEmptyStateNativeRendering = true,
                     nativeVietnameseInputQueryIntegrationVerified = true,
                     vietnameseKeyboard = "default layout/input translated; Thai and handwriting pending",
-                    songGrid = "nonempty tiles/actions and media-index import pending",
+                    songGrid = "original default tiles rendered; actions, thumbnails, seekbar and pagination pending",
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"

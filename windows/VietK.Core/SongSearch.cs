@@ -62,7 +62,7 @@ public sealed class SongSearch(SqliteConnection database)
         orders.Add("(LanguageTypeID=8 OR LanguageTypeID=4) DESC");
         orders.Add("PlayNum DESC");
         command.CommandText = $"""
-            SELECT SongID,SongName,SongPy,SongWord,songsterName,LanguageTypeID,PlayNum,hasRemote,song_name_en
+            SELECT SongID,SongName,SongPy,SongWord,songsterName,LanguageTypeID,PlayNum,hasRemote,song_name_en,IsLocalExist
             FROM tblSong WHERE {string.Join(" AND ", clauses)}
             ORDER BY {string.Join(",", orders)} LIMIT $count OFFSET $offset
             """;
@@ -77,7 +77,8 @@ public sealed class SongSearch(SqliteConnection database)
             // contain fewer than 60 results. Don't refill/reorder that page.
             if (id >= 100000000 && id <= 100999999) continue;
             songs.Add(new CatalogueSong(id, reader.GetString(1), reader.GetString(2), reader.GetInt32(3),
-                reader.GetString(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.GetString(8)));
+                reader.GetString(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.GetString(8))
+                { LocalState = reader.GetInt32(9) });
         }
         return songs;
     }

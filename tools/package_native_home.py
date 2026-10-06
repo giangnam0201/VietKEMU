@@ -9,6 +9,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import struct
 import zipfile
 from html.parser import HTMLParser
 import xml.etree.ElementTree as ET
@@ -82,6 +83,7 @@ def package(decoded, destination):
     package_bottom(app, destination, entries, strings)
     package_more(app, destination, entries, strings, values)
     package_song_browser(app, destination, entries, strings, values)
+    package_song_grid(app, destination, entries)
     seed = app / 'apktool/assets/kmbox.jpg'
     seed_digest = hashlib.sha256(seed.read_bytes()).hexdigest()
     if entries['assets/kmbox.jpg']['sha256'] != seed_digest:
@@ -96,6 +98,35 @@ def package(decoded, destination):
         'upgrade_source': 'SongManager.addColumn; DAOHelper.addColumn',
         'media_availability': 'flags are preserved; actual media files still require verification'
     }, indent=2))
+
+
+def package_song_grid(app, destination, entries):
+    names = ['icon_song_default', 'icon_online_bg', 'preview_dialog_button',
+             'button_add_song_item_collect', 'button_add_song_item_collect_selected',
+             'button_add_song_item_collected_normal', 'button_add_song_item_collected_select',
+             'ic_top_song', 'ic_top_song_press']
+    icons = {}
+    for name in names:
+        matches = [path for path in (app / 'apktool/res').glob('drawable*/*')
+                   if path.stem == name and path.suffix in ('.png', '.webp')]
+        if len(matches) != 1: raise RuntimeError('Ambiguous original grid bitmap: ' + name)
+        resource = matches[0]
+        digest = hashlib.sha256(resource.read_bytes()).hexdigest()
+        original = [entry for entry in entries.values()
+                    if Path(entry['path']).name == resource.name and entry['sha256'] == digest]
+        if len(original) != 1: raise RuntimeError('Unverified original grid bitmap: ' + name)
+        output = destination / ('grid-' + name + '.png')
+        if resource.suffix == '.webp':
+            subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(resource), '-frames:v', '1', str(output)], check=True)
+        else: shutil.copy2(resource, output)
+        width, height = struct.unpack('>II', output.read_bytes()[16:24])
+        density = 1.5 if '-hdpi' in resource.parent.name else 1
+        icons[name] = {'file': output.name, 'width': width / density, 'height': height / density,
+                       'originalResource': original[0]['path'], 'originalSha256': digest,
+                       'pngSha256': hashlib.sha256(output.read_bytes()).hexdigest()}
+    contract = {'icons': icons,
+                'provenance': 'fragment_song_recycler_gridview_item.xml; SongRecyclerGridViewAdapter; StrokeTextView; GlideUtil'}
+    (destination / 'song-grid.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
 def package_song_browser(app, destination, entries, strings, values):

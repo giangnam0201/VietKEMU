@@ -3,7 +3,11 @@ using Microsoft.Data.Sqlite;
 namespace VietK.Core;
 
 public sealed record CatalogueSong(int Id, string Name, string Spell, int Words,
-    string Singer, int Language, int PlayCount, int HasRemote, string EnglishName);
+    string Singer, int Language, int PlayCount, int HasRemote, string EnglishName)
+{
+    // WholeCatalogue has no local-state field. Only SongSearch populates this.
+    public int? LocalState { get; init; }
+}
 
 // Direct translation of WholeSongDAO's catalogue lookup methods. Read-only:
 // this does not claim that catalogue entries have local or downloadable media.
