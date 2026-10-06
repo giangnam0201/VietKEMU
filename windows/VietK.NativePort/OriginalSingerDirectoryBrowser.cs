@@ -14,6 +14,8 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
     LocalSongDatabase database,SongGridContract grid)
 {
     public NativePlayback? Playback { get; set; }
+    public NativeSingerPictures? Pictures { get; set; }
+    internal bool OriginalPopupArtworkAvailable=>File.Exists(SingerAsset("dialog_category_background.9.png"))&&File.Exists(SingerAsset("dialog_category_selected.9.png"));
     public event Action? HomeRequested;
     public event Action<OriginalSinger>? SingerRequested;
     public VietnameseSearchInput? Input=>keyboard?.Input;
@@ -117,14 +119,14 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
         for(var index=0;index<OriginalSingerDirectory.Sexes.Count;index++)
         {
             var position=index;var text=Label(OriginalSingerDirectory.Sexes[index],16);text.TextAlignment=TextAlignment.Center;text.TextWrapping=TextWrapping.Wrap;
-            var item=new Border { Margin=new(0,7,0,7),Padding=new(15,10,15,10),Tag="singer-sex:"+index,
-                Background=index==Sex?Brush("#663d225b"):Brushes.Transparent,Child=text };
+            var padded=new Border { Padding=new(15,10,15,10),Child=text };
+            var item=new Border { Margin=new(0,7,0,7),Tag="singer-sex:"+index,Background=Brushes.Transparent,
+                Child=index==Sex?OriginalNinePatch.Wrap(padded,SingerAsset("dialog_category_selected.9.png"),Brush("#663d225b")):padded };
             Click(item,()=> { if(Sex==position)return;Sex=position;spell="";Input?.Clear();Reload();ShowSexPopup(); });choices.Children.Add(item);
         }
         content.Children.Add(choices);
-        // Source nine-patch styling is not in the approved public UI bundle.
-        // Its replacement is explicitly tracked separately from the layout.
-        popup.Child=new Border { Width=752,Background=Brush("#ff251136"),Child=content };
+        var background=OriginalNinePatch.Wrap(content,SingerAsset("dialog_category_background.9.png"),Brush("#ff251136"));
+        background.Width=752;popup.Child=background;
         popup.IsOpen=true;
     }
     private void RenderPage()
@@ -136,8 +138,9 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
         for(var index=0;index<visible.Length;index++)
         {
             var singer=visible[index];var column=new StackPanel();
-            column.Children.Add(new Image { Width=180,Height=180,Stretch=Stretch.Fill,
-                Source=File.Exists(portrait)?new BitmapImage(new Uri(Path.GetFullPath(portrait))):null });
+            var image=new Image { Width=180,Height=180,Stretch=Stretch.Fill,
+                Source=File.Exists(portrait)?new BitmapImage(new Uri(Path.GetFullPath(portrait))):null };
+            column.Children.Add(image);Pictures?.Load(image,singer);
             var name=Label(singer.Name,20);name.Height=32;name.Width=180;name.TextAlignment=TextAlignment.Center;
             name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;
             name.Background=Brush("#59000000");column.Children.Add(name);
@@ -153,11 +156,12 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
     }
     private FrameworkElement PageButton(string resource,string fallback,Action action)
     {
-        var path=Path.Combine(root,resource);var button=new Border { Width=24,Height=30,Background=Brushes.Transparent,Tag="singer-page:"+resource,
+        var path=File.Exists(SingerAsset(resource))?SingerAsset(resource):Path.Combine(root,resource);var button=new Border { Width=24,Height=30,Background=Brushes.Transparent,Tag="singer-page:"+resource,
             Child=File.Exists(path)?new Image { Source=new BitmapImage(new Uri(path)),Stretch=Stretch.None }:Label(fallback,24) };
         Click(button,action);return button;
     }
     private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,FontFamily=OriginalFont.Family,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center };
+    private static string SingerAsset(string name)=>Path.Combine(OriginalSupplement.Root,"ambience","singer",name);
     private static SolidColorBrush Brush(string color)=>new((Color)ColorConverter.ConvertFromString(color));
     private static LinearGradientBrush Gradient(string start,string end)=>new(Brush(start).Color,Brush(end).Color,new Point(0,.5),new Point(1,.5));
     private static void Put(Canvas canvas,UIElement child,double x,double y) { Canvas.SetLeft(child,x);Canvas.SetTop(child,y);canvas.Children.Add(child); }

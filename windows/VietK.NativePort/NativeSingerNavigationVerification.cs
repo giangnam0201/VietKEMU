@@ -20,6 +20,7 @@ internal static class NativeSingerNavigationVerification
         Directory.CreateDirectory(directory);
         try
         {
+            await NativeSingerArtworkVerification.Run(directory,output);
             var state=Path.Combine(directory,"local.db");var whole=Path.Combine(directory,"whole.db");
             using var database=new LocalSongDatabase(Path.Combine(root,"local-seed.db"),state);
             using(var catalogue=new LocalSongDatabase(Path.Combine(root,"local-seed.db"),whole)) { }
@@ -146,7 +147,7 @@ internal static class NativeSingerNavigationVerification
                 unknownSingerNoOp=true,restoresPreviousViewAndInput=true,restoredFooterUsesCurrentState=true,nestedSingerBack=true,collectionSingerRoute=true,
                 categoryDirectoryRequest=true,directoryScreen=true,directoryEightCards=true,directoryColumnFirst=true,
                 directoryCountrySexFilters=true,directoryBatchPrefetch=true,directoryExactIdRoute=true,directoryRetainedState=true,
-                directoryKeyboard=true,directoryZeroResults=true,twoWindows=true,manufacturerSingerPictures=false,directoryPopupArtwork=false
+                directoryKeyboard=true,directoryZeroResults=true,twoWindows=true,manufacturerSingerPictures=false,directoryPopupArtwork=singerDirectory.OriginalPopupArtworkAvailable
             },new JsonSerializerOptions { WriteIndented=true }));
             T Read<T>(string file)=>JsonSerializer.Deserialize<T>(File.ReadAllText(Path.Combine(root,file)),new JsonSerializerOptions { PropertyNameCaseInsensitive=true })!;
             void Decorate(Canvas canvas) { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);canvas.Children.Add(bar); }

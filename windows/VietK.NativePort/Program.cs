@@ -187,7 +187,8 @@ public static class Program
                 id=>selectedQueue.Snapshot().Any(item=>item.SongMetadata.Id==id),
                 id=>songOrder.Request(id,false),collectionControls.Collect);
             songPreview=previewScreen;previewScreen.Feedback+=collectionControls.Feedback;
-            var singerDirectory=new OriginalSingerDirectoryBrowser(root,songContract,moreContract,songState,gridContract);
+            using var singerPictures=new NativeSingerPictures(()=>new[]{musicServer.DirectoryPath},stateDirectory);
+            var singerDirectory=new OriginalSingerDirectoryBrowser(root,songContract,moreContract,songState,gridContract) { Pictures=singerPictures };
             collectionScreen.ActionRequested+=(song,action)=>
             { if(action is "order" or "top")songOrder.Request(song.Id,action=="top");else if(action=="preview")previewScreen.Show(song); };
             musicServer.ConnectionChanged+=collectionScreen.RefreshMedia;
@@ -515,7 +516,7 @@ public static class Program
             singerNavigation=new OriginalSingerNavigation(root,songContract,moreContract,songState,gridContract,()=>window,
                 panel=> { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);panel.Children.Add(bar);panel.Children.Add(top.Create()); },
                 ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected),()=>nativePlayback,
-                ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).Select(item=>item.SongMetadata.Id).ToHashSet(),()=>collectionProfiles.Snapshot().ToHashSet());
+                ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).Select(item=>item.SongMetadata.Id).ToHashSet(),()=>collectionProfiles.Snapshot().ToHashSet(),singerPictures);
             browser.SingerRequested+=name=>singerNavigation.Open(name);
             collectionScreen.SingerRequested+=name=>singerNavigation.Open(name);
             singerNavigation.FragmentRequested+=fragment=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(fragment) };

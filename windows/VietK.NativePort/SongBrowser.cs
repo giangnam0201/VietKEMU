@@ -25,6 +25,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     public event Action? BackRequested;
     public event Action<string>? SingerRequested;
     public NativePlayback? Playback { get; set; }
+    public NativeSingerPictures? Pictures { get; set; }
     public event Action<string>? YoutubeRequested;
     public event Action<int>? InputModeRequested;
     public event Action<CatalogueSong,string>? SongActionRequested;
@@ -74,9 +75,10 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         {
             var portrait=Path.Combine(OriginalSupplement.Root,"ambience","singer","defaultsmall.png");
             SingerPortraitAvailable=File.Exists(portrait);
-            category.Children.Add(new Border { Width=27,Height=27,CornerRadius=new(10),ClipToBounds=true,Margin=new(10,0,0,0),
-                Child=SingerPortraitAvailable?new Image { Source=new BitmapImage(new Uri(Path.GetFullPath(portrait))),Stretch=Stretch.Fill,
-                    Clip=new RectangleGeometry(new Rect(0,0,27,27),10,10) }:null });
+            var image=new Image { Source=SingerPortraitAvailable?new BitmapImage(new Uri(Path.GetFullPath(portrait))):null,Stretch=Stretch.Fill,
+                Clip=new RectangleGeometry(new Rect(0,0,27,27),10,10) };
+            category.Children.Add(new Border { Width=27,Height=27,CornerRadius=new(10),ClipToBounds=true,Margin=new(10,0,0,0),Child=image });
+            Pictures?.Load(image,singer);
         }
         var title = Text(singer?.Name??contract.Title,22); title.FontWeight=FontWeights.Bold;
         title.Margin=new(10,0,0,0); title.VerticalAlignment=VerticalAlignment.Center;
