@@ -25,7 +25,7 @@ jobs:
           classes = {'SongDAO', 'SongIdDAO', 'MediaDAO', 'WholeSongDAO', 'SelectedListDAO', 'Song', 'Media',
                      'PlayListDAOManager',
                      'PlayListManager', 'KmPlayListItem', 'SelectedLocalListManager',
-                     'SongDownListManager', 'OrderSongManger', 'ReportTableManager',
+                     'SongDownListManager', 'SongDownListDAO', 'DownListDAOManager', 'OrderSongManger', 'ReportTableManager',
                      'MuiltCollectListManager', 'SongRecyclerGridViewAdapter', 'UpdateDbManager'}
           entries = {entry['path']: entry for entry in json.loads((app/'original-entries.json').read_text())}
           files = []
