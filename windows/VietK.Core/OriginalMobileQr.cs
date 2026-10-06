@@ -38,4 +38,11 @@ public static class OriginalMobileQr
                 ErrorCorrection=television?ErrorCorrectionLevel.M:ErrorCorrectionLevel.L }
         }.Write(payload);
     }
+    public static PixelData RenderCompact(string payload,bool television,int requestedSize)
+    {
+        // Two pixels per module is the scan-tested floor, including the quiet
+        // margin. A long LAN pairing token needs more modules than a short URL.
+        var minimum=Render(payload,television,1).Width*2;
+        return Render(payload,television,Math.Max(requestedSize,minimum));
+    }
 }

@@ -43,9 +43,9 @@ public sealed class TelevisionQr
     {
         Binding=binding;
         if(!binding.CanPresent) { Canvas.Visibility=Visibility.Collapsed;image.Source=null;return; }
-        // ZXing keeps at least one whole pixel per module when the requested
+        // Keep at least two whole pixels per module when the requested
         // quarter-size is too small. Never resample a larger QR into lost modules.
-        var pixels=OriginalMobileQr.Render(OriginalMobileQr.TelevisionPayload(binding),true,(int)Math.Ceiling(OriginalQrSize));
+        var pixels=OriginalMobileQr.RenderCompact(OriginalMobileQr.TelevisionPayload(binding),true,(int)Math.Ceiling(OriginalQrSize));
         image.Width=image.Height=pixels.Width;code.Width=pixels.Width;
         System.Windows.Controls.Canvas.SetTop(code,image.Height);
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
@@ -57,7 +57,7 @@ public sealed class TelevisionQr
     public void ConfigureLocalRemote(string url)
     {
         // User requested 75% smaller QR codes: 45 on TV and 60 in the pairing panel.
-        var pixels=OriginalMobileQr.Render(url,true,45);
+        var pixels=OriginalMobileQr.RenderCompact(url,true,45);
         image.Width=image.Height=pixels.Width;
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);

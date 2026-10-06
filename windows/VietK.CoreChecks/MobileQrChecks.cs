@@ -24,10 +24,10 @@ internal static class MobileQrChecks
         }
         foreach(var text in new[]{OriginalMobileQr.TelevisionPayload(binding),"http://192.168.1.20:9167/#token="+new string('a',64)})
         {
-            var compact=OriginalMobileQr.Render(text,true,31);
+            var compact=OriginalMobileQr.RenderCompact(text,true,31);
             var decoded=new BarcodeReaderGeneric { Options=new ZXing.Common.DecodingOptions { TryHarder=true } }
                 .Decode(compact.Pixels,compact.Width,compact.Height,RGBLuminanceSource.BitmapFormat.BGRA32);
-            Require(compact.Width<80&&decoded?.Text==text,"Compact QR lost modules or changed its connection payload");
+            Require(compact.Width<100&&decoded?.Text==text,"Compact QR lost modules or changed its connection payload");
         }
         var state=new OriginalTvQrState();state.ChangeMode(0);Require(state.ImageVisible,"Always-show mode hidden");
         state.ChangeMode(1);Require(!state.ImageVisible,"Mode-one source branch was replaced with an automatic timer");
