@@ -75,6 +75,19 @@ public sealed class MobileRemoteServer : IDisposable
             await stream.CopyToAsync(context.Response.Body,context.RequestAborted);
         });
         web.MapGet("/api/state",async context=>await context.Response.WriteAsJsonAsync(await Ui(()=>music.RemoteState())));
+        // SettingAction.getDefaultVolume/setDefaultVolume, over the paired local
+        // transport. Updating this preference never adjusts the current decoder.
+        object DefaultVolume()=>new { defaultVolume=playback.DefaultVolumeSettings.Volume,maxDefaultVolume=20,
+            defaultVolumeSettingTip=OriginalDefaultVolumeSettings.SettingTip };
+        web.MapGet("/api/settings/default-volume",async context=>await context.Response.WriteAsJsonAsync(await Ui(DefaultVolume)));
+        web.MapPost("/api/settings/default-volume",async context=>
+        {
+            using var request=await JsonDocument.ParseAsync(context.Request.Body,cancellationToken:context.RequestAborted);
+            if(request.RootElement.ValueKind!=JsonValueKind.Object||!request.RootElement.TryGetProperty("defaultVolume",out var value)||
+                value.ValueKind!=JsonValueKind.Number||!value.TryGetInt32(out var volume)||volume is <0 or >20)throw new ArgumentException();
+            var result=await Ui(()=> { playback.DefaultVolumeSettings.Save(volume);return DefaultVolume(); });
+            await context.Response.WriteAsJsonAsync(result);
+        });
         web.MapGet("/api/search",async context=>
         {
             var query=context.Request.Query["q"].ToString().Trim();

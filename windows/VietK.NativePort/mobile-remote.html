@@ -12,6 +12,13 @@
 <section id="songs"><p class="status">Tìm bài hát, rồi chọn “Thêm bài” hoặc “Hát ngay”. Video phát trên TV của PC.</p><div id="results" class="cards"></div></section>
 <section id="queue" class="hidden"><label for="queueBank">Hàng chờ: </label><select id="queueBank"><option value="youtube">YouTube</option><option value="original">VietK</option></select><div class="actions"><button id="shuffle">Xáo trộn</button><button id="clear">Xóa bài chờ</button><button id="retry">Thử tải lại</button></div><div id="rows"></div></section>
 <details><summary>Vui nhộn / TV</summary><div class="actions" id="effects"></div><form id="wish"><input id="wishText" maxlength="30" placeholder="Lời chúc (30 ký tự)"><button>Gửi</button></form><div class="actions"><button id="screen">Bật / Tắt hình TV</button></div></details>
+<details id="defaultVolumeSettings"><summary>Âm lượng mặc định</summary>
+<p class="status" id="defaultVolumeTip"></p><p id="defaultVolumeSaved" class="status" aria-live="polite"></p>
+<form id="defaultVolumeForm" style="display:block">
+<div class="actions"><button type="button" id="defaultVolumeMinus" aria-label="Giảm âm lượng mặc định" disabled>−</button><input type="range" id="defaultVolume" min="0" max="20" step="1" value="15" aria-label="Âm lượng mặc định" disabled><button type="button" id="defaultVolumePlus" aria-label="Tăng âm lượng mặc định" disabled>+</button></div>
+<p class="status">Đang chọn: <output id="defaultVolumeDraft" for="defaultVolume">15</output>/20</p>
+<div class="actions"><button type="button" id="defaultVolumeCancel" disabled>Hủy</button><button type="submit" id="defaultVolumeConfirm" disabled>Xác nhận</button></div>
+</form></details>
 <p class="status" id="vocalHint"></p><p class="status" id="state"></p><p class="status" id="offline"></p>
 </main>
 <footer><div class="controls"><button data-command="voldec">− Giảm âm</button><button data-command="play_imv" id="pause">Dừng / Tiếp tục</button><button data-command="volinc">+ Tăng âm</button><button data-command="replay_imv">Phát lại</button><button data-command="cut_song_imv">Qua bài</button><button data-command="mute" id="mute">Tắt tiếng</button><button data-command="ori_imv" id="vocal" disabled>Ngắt lời</button><span class="status" id="volume"></span></div></footer>
@@ -24,6 +31,17 @@ const token=sessionStorage.getItem('vietk-token')||'';let stateBusy=false,lastQu
 function notice(message){$('notice').textContent=message;$('notice').style.display='block';clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('notice').style.display='none',5000);}
 async function api(path,body,signal){const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store',signal});if(!response.ok){if(response.status===401)throw Error('Kết nối hết hạn. Quét lại QR trên TV.');if(response.status===429)throw Error('Đang tìm bài khác. Thử lại sau.');let error;try{error=(await response.json()).error;}catch{}throw Error(error||'Không kết nối được VietK.');}return response.json();}
 async function action(value){try{await api('action',value);await refresh();}catch(error){notice(error.message);}}
+let savedDefaultVolume=null,defaultVolumeRequest=0;
+function defaultVolumeBusy(busy){for(const id of ['defaultVolume','defaultVolumeMinus','defaultVolumePlus','defaultVolumeCancel','defaultVolumeConfirm'])$(id).disabled=busy;}
+function defaultVolumeDraft(value){$('defaultVolume').value=String(Math.max(0,Math.min(20,value)));$('defaultVolumeDraft').textContent=$('defaultVolume').value;}
+function defaultVolumeSaved(value){savedDefaultVolume=value.defaultVolume;$('defaultVolumeTip').textContent=value.defaultVolumeSettingTip;$('defaultVolumeSaved').textContent='Đã lưu: '+savedDefaultVolume+'/20';defaultVolumeDraft(savedDefaultVolume);}
+async function loadDefaultVolume(){const request=++defaultVolumeRequest;defaultVolumeBusy(true);try{const value=await api('settings/default-volume');if(request===defaultVolumeRequest)defaultVolumeSaved(value);}catch(error){if(request===defaultVolumeRequest)notice(error.message);}finally{if(request===defaultVolumeRequest)defaultVolumeBusy(savedDefaultVolume===null);}}
+$('defaultVolumeSettings').ontoggle=()=>{if($('defaultVolumeSettings').open)loadDefaultVolume();else{++defaultVolumeRequest;if(savedDefaultVolume!==null)defaultVolumeDraft(savedDefaultVolume);}};
+$('defaultVolume').oninput=()=>defaultVolumeDraft(Number($('defaultVolume').value));
+$('defaultVolumeMinus').onclick=()=>defaultVolumeDraft(Number($('defaultVolume').value)-1);
+$('defaultVolumePlus').onclick=()=>defaultVolumeDraft(Number($('defaultVolume').value)+1);
+$('defaultVolumeCancel').onclick=()=>loadDefaultVolume();
+$('defaultVolumeForm').onsubmit=async event=>{event.preventDefault();const request=++defaultVolumeRequest;const defaultVolume=Number($('defaultVolume').value);defaultVolumeBusy(true);try{const value=await api('settings/default-volume',{defaultVolume});if(request===defaultVolumeRequest){defaultVolumeSaved(value);notice('Đã lưu âm lượng mặc định.');}}catch(error){if(request===defaultVolumeRequest)notice(error.message);}finally{if(request===defaultVolumeRequest)defaultVolumeBusy(savedDefaultVolume===null);}};
 function button(text,callback){const result=document.createElement('button');result.textContent=text;result.onclick=callback;return result;}
 function showTab(queue){$('songs').classList.toggle('hidden',queue);$('queue').classList.toggle('hidden',!queue);$('songsTab').classList.toggle('active',!queue);$('queueTab').classList.toggle('active',queue);}
 $('queueBank').onchange=()=>{bank=$('queueBank').value;bankChosen=true;lastQueue='';refresh();};

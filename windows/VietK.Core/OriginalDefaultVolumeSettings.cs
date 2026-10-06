@@ -6,6 +6,7 @@ namespace VietK.Core;
 public sealed class OriginalDefaultVolumeSettings
 {
     public const string Key="key_vga_room_default_volume";
+    public const string SettingTip="Sau khi hệ thống khởi động và đóng, phòng sẽ sử dụng mức âm lượng này,\nkhuyến nghị từ 15, tối đa là 20.";
     private readonly string file;
     public int Volume { get; private set; }=15;
     public OriginalDefaultVolumeSettings(string directory)

@@ -44,6 +44,9 @@ internal static class MobileRemoteVerification
         using var client=new HttpClient { BaseAddress=new Uri($"http://127.0.0.1:{server.Port}/"),Timeout=TimeSpan.FromSeconds(10) };
         void Require(bool value,string error) { if(!value)throw new InvalidDataException(error); }
         Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone read queue");
+        Require((await client.GetAsync("api/settings/default-volume")).StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone read default volume");
+        using(var unpaired=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=0 }))
+            Require(unpaired.StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone changed default volume");
         Require((await client.GetStringAsync("/")).Contains("sessionStorage.setItem"),"Mobile browser page missing");
         Checkpoint("Unauthorized request and mobile page checked");
         client.DefaultRequestHeaders.Authorization=new("Bearer",server.TestToken);
@@ -61,6 +64,8 @@ internal static class MobileRemoteVerification
         var results=await client.GetFromJsonAsync<YouTubeVideo[]>("api/search?q=fixture");
         Require(results is { Length:1 } && results[0].Id=="fixture0003","Remote search result lost");
         Checkpoint("Authenticated native search checked");
+        var originalDefault=await VerifyDefaultVolume(playback,client,panel,output);
+        Checkpoint("Phone default-volume HTTP, validation and shared desktop preference checked");
         if(Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1")
         {
             var start=new System.Diagnostics.ProcessStartInfo("python") { UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };
@@ -77,6 +82,10 @@ internal static class MobileRemoteVerification
             Require(browser.ExitCode==0,"Phone browser verification failed: "+(browserOutput+browserError).Replace(server.TestToken,"[redacted]",StringComparison.Ordinal));
             Checkpoint("Phone browser commands and responsive layout passed");
         }
+        using(var saved=JsonDocument.Parse(await client.GetStringAsync("api/settings/default-volume")))
+            Require(saved.RootElement.GetProperty("defaultVolume").GetInt32()==7,"Phone browser did not restore its verified default volume");
+        using(var restore=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=originalDefault }))
+            Require(restore.IsSuccessStatusCode,"Default-volume fixture could not restore its initial preference");
         await Send(new { action="add",id="fixture0003" });Require((await Queue()).Length==3,"Phone add did not reach actual panel queue");
         await Send(new { action="top",id="fixture0003" });Require((await Queue())[1]=="fixture0003","Phone priority failed");
         await Send(new { action="move",id="fixture0003",target=2 });Require((await Queue())[2]=="fixture0003","Phone reorder failed");
@@ -115,6 +124,8 @@ internal static class MobileRemoteVerification
         using(var invalid=await client.PostAsJsonAsync("api/action",new { action="command",id="shutdown" }))Require(invalid.StatusCode==HttpStatusCode.BadRequest,"Unknown phone command accepted");
         using(var unknown=await client.PostAsJsonAsync("api/action",new { action="add",id="unsearched1" }))Require(unknown.StatusCode==HttpStatusCode.BadRequest,"Unsearched arbitrary media accepted");
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
+        using(var revoked=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=0 }))
+            Require(revoked.StatusCode==HttpStatusCode.Unauthorized,"Revoked phone changed default volume");
         Checkpoint("Native commands and pairing revocation passed");
         // RePair uses live adapters only to make a local QR; remove it before other tests/captures.
         playback.Television.Overlay.Qr.Configure(new());
@@ -123,8 +134,44 @@ internal static class MobileRemoteVerification
             pauseResume=true,replay=true,nextRestoresIdle=true,blackout=true,muteAndVolumeUnmute=true,vocalActualPcmAndTvFeedback=true,
             originalQueueStableDuplicateIds=true,originalPriorityMoveDelete=true,originalClearAndShufflePreserveHead=true,
             localNextLeavesYouTubeQueueIntact=true,originalDownloadProgressAndCancel=true,
+            defaultVolumeReadWrite=true,defaultVolumeBoundsAndInvalidBodyRejection=true,defaultVolumePersistsAndSharesDesktop=true,
+            defaultVolumeLeavesLivePlaybackUnchanged=true,defaultVolumeAuthorizationOriginAndRevocation=true,
             phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
+    }
+    private static async Task<int> VerifyDefaultVolume(NativePlayback playback,HttpClient client,Canvas panel,string output)
+    {
+        void Require(bool value,string error) { if(!value)throw new InvalidDataException(error); }
+        var initial=playback.DefaultVolumeSettings.Volume;var live=playback.Decoder.OutputVolumeStep;var muted=playback.Decoder.Muted;
+        using(var state=JsonDocument.Parse(await client.GetStringAsync("api/settings/default-volume")))
+        {
+            Require(state.RootElement.GetProperty("defaultVolume").GetInt32()==initial&&state.RootElement.GetProperty("maxDefaultVolume").GetInt32()==20,
+                "Phone default-volume response differs from original fields");
+            Require(state.RootElement.GetProperty("defaultVolumeSettingTip").GetString()==OriginalDefaultVolumeSettings.SettingTip,"Original phone default-volume tip differs");
+        }
+        using(var cross=new HttpRequestMessage(HttpMethod.Post,"api/settings/default-volume"))
+        {
+            cross.Headers.Add("Origin","https://example.invalid");cross.Content=JsonContent.Create(new { defaultVolume=0 });
+            using var response=await client.SendAsync(cross);Require(response.StatusCode==HttpStatusCode.Forbidden,"Cross-origin default-volume update accepted");
+        }
+        foreach(var value in new[]{0,20,7})
+        {
+            using var response=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=value });
+            Require(response.IsSuccessStatusCode,"Phone could not save bounded default volume");
+            using var body=JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            Require(body.RootElement.GetProperty("defaultVolume").GetInt32()==value&&body.RootElement.GetProperty("maxDefaultVolume").GetInt32()==20,"Saved phone response differs");
+            Require(new OriginalDefaultVolumeSettings(output).Volume==value&&playback.DefaultVolumeSettings.Volume==value,"Phone default did not persist or reach shared desktop settings");
+            Require(playback.Decoder.OutputVolumeStep==live&&playback.Decoder.Muted==muted,"Saved phone default changed live output or mute");
+        }
+        foreach(var invalid in new object[]{new { defaultVolume=-1 },new { defaultVolume=21 },new { defaultVolume=1.5 },new { defaultVolume="7" },new { },new { volume=0 }})
+        { using var response=await client.PostAsJsonAsync("api/settings/default-volume",invalid);Require(response.StatusCode==HttpStatusCode.BadRequest,"Invalid phone default-volume body accepted"); }
+        using(var malformed=await client.PostAsync("api/settings/default-volume",new StringContent("{",System.Text.Encoding.UTF8,"application/json")))
+            Require(malformed.StatusCode==HttpStatusCode.BadRequest,"Malformed default-volume JSON accepted");
+        Require(playback.DefaultVolumeSettings.Volume==7&&new OriginalDefaultVolumeSettings(output).Volume==7,"Rejected default-volume requests changed saved value");
+        var dialog=new OriginalDefaultVolumeDialog(panel,playback.DefaultVolumeSettings);
+        try { Require(dialog.Pending==7,"Desktop default-volume dialog did not show phone's saved setting"); }
+        finally { dialog.Close(); }
+        return initial;
     }
     private static async Task VerifyOriginalQueue(NativePlayback playback,YouTubeMusicScreen music,MobileRemoteServer server,HttpClient client,string stereo,string directory,Canvas panel,BottomBar bottom)
     {
