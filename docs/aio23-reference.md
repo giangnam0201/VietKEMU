@@ -23,6 +23,14 @@ package, hardware-ID derivation, backend hosts, download protocol and original
 panel/TV behavior. Do not assume the Plus backend applies or transmit private
 identifiers to a newly discovered host without authorization for that host.
 
+A second supplied photograph shows a physical label reading "Đầu máy HD Plus
+4TB". The barcode is private. This does not establish that HD Plus is the same
+model as the supplied KTV-Plus firmware or that its printed serial is the login
+chip ID. The official VietKTV update page calls its HD Plus family VK082 and
+lists HP2.32; the directly linked `download/phanmem/HP2.32/2.32.rar` returned HTTP
+404 in a HEAD check. No serial from this second photograph has been submitted
+to a server.
+
 The first yt-dlp Windows build succeeded, but its public Blender video probe
 failed with YouTube's sign-in/bot-check response. This is not successful live
 music playback. Public search worked separately on the operator's PC. The app

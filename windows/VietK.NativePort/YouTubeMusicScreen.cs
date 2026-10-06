@@ -21,6 +21,10 @@ public sealed class YouTubeMusicScreen : IDisposable
     private readonly List<YouTubeVideo> queue=[];
     private CancellationTokenSource? searching,downloading;
     private WrapPanel? results;
+    private IReadOnlyList<YouTubeVideo> videos=[];
+    private readonly Dictionary<string,TextBlock> visibleTitles=[];
+    private TextBlock? pageLabel;
+    private int page;
     private StackPanel? queueView;
     private TextBlock? status;
     private TextBox? input;
@@ -47,10 +51,12 @@ public sealed class YouTubeMusicScreen : IDisposable
         Put(canvas,new Image { Width=43,Height=30,Source=new BitmapImage(new Uri(Path.Combine(root,"icon_youtube.png"))) },40,98);
         Put(canvas,Label("YouTube",28),95,88);
         var back=Button("‹ Trang chính",()=>HomeRequested?.Invoke());Put(canvas,back,1035,86);
-        results=new WrapPanel { Width=750 };
-        var scroll=new ScrollViewer { Width=775,Height=440,Content=results,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,
-            VerticalScrollBarVisibility=ScrollBarVisibility.Auto };
-        Put(canvas,scroll,25,148);
+        results=new WrapPanel { Width=740,Height=440,ClipToBounds=true };
+        Put(canvas,results,25,148);
+        var pages=new StackPanel { Orientation=Orientation.Horizontal };
+        pages.Children.Add(Button("‹",()=>ChangePage(-1)));
+        pageLabel=Label("1 / 1",20);pageLabel.Width=100;pageLabel.TextAlignment=TextAlignment.Center;pages.Children.Add(pageLabel);
+        pages.Children.Add(Button("›",()=>ChangePage(1)));Put(canvas,pages,280,550);
         var side=new StackPanel { Width=365 };Put(canvas,side,865,146);
         side.Children.Add(Label("Tên bài hát / liên kết YouTube",20));
         input=new TextBox { FontSize=22,Margin=new(0,12,0,8),Padding=new(10),Text=query??"",
@@ -77,26 +83,52 @@ public sealed class YouTubeMusicScreen : IDisposable
         var target=results;var query=input.Text.Trim();SetStatus("Đang tìm trên YouTube…");
         try
         {
-            var videos=await client.Search(query,cancellation.Token);
+            var found=await client.Search(query,cancellation.Token);
             if(!ReferenceEquals(searching,cancellation))return;
-            target.Children.Clear();
-            foreach(var video in videos)
-            {
-                var card=new StackPanel { Width=230,Height=195,Margin=new(7,6,7,6),Cursor=Cursors.Hand };
-                var image=new Image { Width=230,Height=140,Stretch=Stretch.UniformToFill };
-                if(Uri.TryCreate(video.Thumbnail,UriKind.Absolute,out var uri))image.Source=new BitmapImage(uri);
-                card.Children.Add(image);var title=Label(video.Title,18);title.TextAlignment=TextAlignment.Center;
-                title.TextWrapping=TextWrapping.Wrap;title.Height=45;card.Children.Add(title);
-                var frame=new Border { Child=card,CornerRadius=new(5),Background=new SolidColorBrush(Color.FromArgb(90,93,37,140)),Margin=new(2) };
-                frame.MouseLeftButtonUp+=(_,_)=>Add(video,false);
-                var menu=new ContextMenu();var now=new MenuItem { Header="Hát ngay" };now.Click+=(_,_)=>Add(video,true);menu.Items.Add(now);
-                frame.ContextMenu=menu;target.Children.Add(frame);
-            }
-            SetStatus(videos.Count==0?"Không tìm thấy video.":"Bấm bài để thêm vào hàng chờ. Bấm chuột phải để hát ngay.");
+            videos=found;page=0;RenderPage(target);
+            SetStatus(found.Count==0?"Không tìm thấy video.":"Bấm bài để thêm vào hàng chờ. Bấm chuột phải để hát ngay.");
         }
         catch(OperationCanceledException) { }
         catch(Exception ex) { if(!disposed)SetStatus(ex.Message); }
         finally { if(ReferenceEquals(searching,cancellation))searching=null;cancellation.Dispose(); }
+    }
+    private void ChangePage(int delta)
+    {
+        page=Math.Clamp(page+delta,0,Math.Max(0,(videos.Count-1)/6));
+        if(results is not null)RenderPage(results);
+    }
+    internal void SetVerificationResults(IReadOnlyList<YouTubeVideo> items)
+    { videos=items;page=0;if(results is not null)RenderPage(results); }
+    internal void VerifyPagination()
+    {
+        if(videos.Count!=8 || results?.Children.Count!=6)throw new InvalidDataException("YouTube first page must show six cards");
+        ChangePage(1);
+        if(results.Children.Count!=2 || pageLabel?.Text!="2 / 2")throw new InvalidDataException("YouTube last page lost results");
+        ChangePage(1);
+        if(page!=1)throw new InvalidDataException("YouTube advanced past last page");
+        ChangePage(-5);
+        if(page!=0 || results.Children.Count!=6)throw new InvalidDataException("YouTube first page boundary differs");
+    }
+    private void RenderPage(WrapPanel target)
+    {
+        target.Children.Clear();visibleTitles.Clear();
+        if(pageLabel is not null)pageLabel.Text=$"{page+1} / {Math.Max(1,(videos.Count+5)/6)}";
+        foreach(var video in videos.Skip(page*6).Take(6))
+        {
+            // fragment_youtube_recycler_item.xml and YouTubeAdapter.java:
+            // fitXY thumbnail, centered 220x45 title, no card background.
+            var card=new StackPanel { Width=230,Height=195,Margin=new(8,6,8,6),Cursor=Cursors.Hand };
+            var thumbnail=new Image { Width=230,Height=140,Stretch=Stretch.Fill };
+            if(Uri.TryCreate(video.Thumbnail,UriKind.Absolute,out var uri))thumbnail.Source=new BitmapImage(uri);
+            card.Children.Add(thumbnail);
+            var title=Label(video.Title,18);title.Width=220;title.Margin=new(0);title.VerticalAlignment=VerticalAlignment.Center;
+            title.TextWrapping=TextWrapping.Wrap;title.TextAlignment=TextAlignment.Center;
+            title.Foreground=queue.Any(item=>item.Id==video.Id)?new SolidColorBrush(Color.FromRgb(255,231,97)):Brushes.White;
+            card.Children.Add(new Border { Height=45,Child=title });visibleTitles[video.Id]=title;
+            card.MouseLeftButtonUp+=(_,_)=>Add(video,false);
+            var menu=new ContextMenu();var now=new MenuItem { Header="Hát ngay" };now.Click+=(_,_)=>Add(video,true);menu.Items.Add(now);
+            card.ContextMenu=menu;target.Children.Add(card);
+        }
     }
     private void Add(YouTubeVideo video,bool first)
     {
@@ -109,6 +141,8 @@ public sealed class YouTubeMusicScreen : IDisposable
     private void RefreshQueue()
     {
         bottom.SetConfirmedQueueCount(queue.Count);queueView?.Children.Clear();
+        foreach(var (id,title) in visibleTitles)
+            title.Foreground=queue.Any(item=>item.Id==id)?new SolidColorBrush(Color.FromRgb(255,231,97)):Brushes.White;
         for(var index=0;index<queue.Count;index++)
         {
             var video=queue[index];var row=new DockPanel { Margin=new(0,3,0,3) };
@@ -175,7 +209,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     private void SaveSettings()=>File.WriteAllText(settingsFile,JsonSerializer.Serialize(new YouTubeSettings(cookieFile)));
     private sealed record YouTubeSettings(string CookiesFile);
     private void SetStatus(string value) { message=value;if(status is not null)status.Text=value; }
-    private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,Foreground=Brushes.White,Margin=new(0,6,0,6) };
+    private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,FontFamily=OriginalFont.Family,Foreground=Brushes.White,Margin=new(0,6,0,6) };
     private static Button Button(string text,Action action)
     {
         var button=new Button { Content=text,FontSize=18,Padding=new(12,8,12,8),Margin=new(0,3,8,3),

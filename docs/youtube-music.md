@@ -11,7 +11,13 @@ tiles open the same panel. yt-dlp supplies public search results (no Data API ke
 and pasted video links work through the same queue. Cards use the original
 230-by-195 geometry, the firmware background, original YouTube icon, VietK header
 and existing bottom controls; touch keyboard, all menus and pixel parity remain
-unfinished. Queue IDs and displayed metadata persist in `youtube-queue.json`.
+unfinished. Results now use the original two rows of three cards per page,
+up to 48 results per search, stretched 230x140 thumbnails, centered 220x45
+titles, and queued-title color `#ffffe761`. The firmware's Roboto is used.
+The verification command checks six-card pagination, partial final pages and
+page bounds, and saves a separate clearly labeled layout-fixture screenshot.
+Those fixture cards never enter normal app results or the download queue.
+Queue IDs and displayed metadata persist in `youtube-queue.json`.
 
 yt-dlp fetches video plus audio at up to 1080p. FFmpeg merges/remuxes with no
 requested re-encode; ffprobe checks for both audio and video. Only a successful

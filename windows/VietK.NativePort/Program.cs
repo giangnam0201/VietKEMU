@@ -420,11 +420,19 @@ public static class Program
                     var youtubeImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);youtubeImage.Render(youtubeCanvas);
                     var youtubeEncoder=new PngBitmapEncoder();youtubeEncoder.Frames.Add(BitmapFrame.Create(youtubeImage));
                     using var captureFile=File.Create(Path.Combine(args[1],"native-youtube.png"));youtubeEncoder.Save(captureFile);
+                    youtubeCapture.SetVerificationResults(Enumerable.Range(0,8).Select(index=>
+                        new YouTubeVideo("fixture000"+index,"Verification fixture "+(index+1)+" — kiểm tra bố cục hai hàng", "", "")).ToArray());
+                    youtubeCapture.VerifyPagination();
+                    youtubeCanvas.UpdateLayout();
+                    var pageImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);pageImage.Render(youtubeCanvas);
+                    var pageEncoder=new PngBitmapEncoder();pageEncoder.Frames.Add(BitmapFrame.Create(pageImage));
+                    using var pageFile=File.Create(Path.Combine(args[1],"native-youtube-page-fixture.png"));pageEncoder.Save(pageFile);
                 }
                 File.WriteAllText(Path.Combine(args[1], "verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsRendering = true,
                     youtubeMainPanelNativeRendering = true,
+                    youtubeSixCardPaginationAndBoundsVerified = true,
                     androidRuntimeUsed = false,
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,

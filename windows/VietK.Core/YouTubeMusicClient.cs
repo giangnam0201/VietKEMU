@@ -45,7 +45,7 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
     {
         if(string.IsNullOrWhiteSpace(query))return [];
         if(VideoId(query.Trim()) is { } id)return [new(id,"YouTube "+id,"","")];
-        var json=await Run(Tool("yt-dlp"),Common().Concat(new[]{"--flat-playlist","--dump-single-json","--","ytsearch12:"+query}),null,cancellation,TimeSpan.FromMinutes(2));
+        var json=await Run(Tool("yt-dlp"),Common().Concat(new[]{"--flat-playlist","--dump-single-json","--","ytsearch48:"+query}),null,cancellation,TimeSpan.FromMinutes(2));
         return ParseSearch(json);
     }
     public static IReadOnlyList<YouTubeVideo> ParseSearch(string json)
