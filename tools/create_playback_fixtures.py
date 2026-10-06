@@ -5,6 +5,9 @@ import sys
 
 output = Path(sys.argv[1])
 output.mkdir(parents=True, exist_ok=True)
+subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i',
+    'sine=frequency=1600:sample_rate=48000:duration=1','-ac','2',
+    str(output/'expression.wav')],check=True)
 video = ['-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25:duration=20']
 subprocess.run(['ffmpeg', '-v', 'error', '-y', *video,
     '-f', 'lavfi', '-i', 'aevalsrc=0.2*sin(2*PI*440*t)|0.2*sin(2*PI*880*t):s=48000:d=20',

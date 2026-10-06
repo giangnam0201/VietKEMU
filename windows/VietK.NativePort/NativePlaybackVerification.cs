@@ -226,6 +226,36 @@ public static class NativePlaybackVerification
                 Require(playback.IdleVideoSource==Path.Combine(OriginalSupplement.Root,"player","60003950.mp4"),
                     "Imported factory idle lost precedence over the random background");
                 await Until(()=>played>idleStarts,"Imported idle clip did not decode");playback.Player.Stop();
+                // Synthetic PNG/WAV exercise the original six-second expression
+                // path without publishing the owner's recovered media.
+                var expressionRoot=Path.Combine(output,"expression-fixture");
+                var expressionDirectory=Path.Combine(expressionRoot,"ambience");Directory.CreateDirectory(expressionDirectory);
+                var picture=new PngBitmapEncoder();
+                var red=new byte[184*184*4];for(var pixel=0;pixel<red.Length;pixel+=4) { red[pixel+2]=255;red[pixel+3]=255; }
+                picture.Frames.Add(BitmapFrame.Create(BitmapSource.Create(184,184,96,96,PixelFormats.Bgra32,null,red,184*4)));
+                using(var file=File.Create(Path.Combine(expressionDirectory,"memeda.png")))picture.Save(file);
+                File.Copy(Path.Combine(root,"player","pause.png"),Path.Combine(expressionDirectory,"dc_overseas_popup_close.png"));
+                File.Copy(Path.Combine(fixtures,"expression.wav"),Path.Combine(expressionDirectory,"memeda.wav"));
+                using(var expressions=new AmbienceExpressions(playback.Television.Overlay))
+                using(var expressionTap=new PcmTap(expressions.Sound))
+                {
+                    var beforeChildren=panel.Children.Count;expressions.ShowDialog(host,expressionRoot);
+                    Require(panel.Children.Count==beforeChildren+1,"Vui nhon expression dialog did not attach to the panel");
+                    Require(playback.PlayMedia(sourceStereo,null,true),"Karaoke fixture rejected during expression verification");
+                    await Until(()=>playback.Decoder.Position>0,"Karaoke fixture did not start");
+                    var before=playback.Decoder.Position;
+                    Require(expressions.Show("memeda",expressionRoot),"Original expression file was not shown");
+                    Require(!expressions.Show("../untrusted",expressionRoot),"Expression selection escaped the original filename list");
+                    Require(playback.Television.Overlay.ExpressionVisible,"TV expression overlay is hidden");
+                    var combined=playback.Television.CompositePreview(playback.Decoder.VideoSurface);var center=new byte[4];
+                    combined.CopyPixels(new Int32Rect(320,110,1,1),center,4,0);
+                    Require(center[2]>240 && center[0]<10 && center[1]<10,"Panel preview omitted the TV expression pixels");
+                    await Task.Delay(1600);await Tone(expressionTap,1600,880,"Expression sound did not loop beyond its first second");
+                    Require(playback.Decoder.Position>before+1000 && playback.Decoder.PreserveStereo,"Expression replaced or interrupted karaoke playback");
+                    await Until(()=>!playback.Television.Overlay.ExpressionVisible,"Expression did not disappear at the original timeout");
+                    Require(expressions.ActiveExpression=="" && !expressions.Sound.IsPlaying,"Expression sound continued after its TV image expired");
+                    panel.Children.RemoveAt(panel.Children.Count-1);playback.Player.Stop();
+                }
                 var unsafeSupplement=Path.Combine(output,"unsafe-supplement-fixture.zip");
                 using(var bundle=ZipFile.Open(unsafeSupplement,ZipArchiveMode.Create))
                 { using var writer=new StreamWriter(bundle.CreateEntry("ambience/../../escape.png").Open());writer.Write("fixture"); }
@@ -243,6 +273,7 @@ public static class NativePlaybackVerification
                     continuousMarqueeMovementAndRefreshVerified=true,
                     configuredIdleDemoDecoderAndLoopVerified=true,
                     localSupplementImportIdlePrecedenceAndTraversalRejectionVerified=true,
+                    expressionDialogSharedPreviewLoopingSoundAndTimeoutVerified=true,
                     idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
                     playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,

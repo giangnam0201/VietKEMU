@@ -19,6 +19,9 @@ public sealed class TelevisionOverlay
     private readonly string root;
     private readonly TvOsdContract contract;
     private readonly Image control,pause;
+    private readonly Canvas expression=new() { Width=330,Height=330,Visibility=Visibility.Collapsed };
+    private readonly Image expressionImage=new() { Width=318,Height=318,Stretch=Stretch.Uniform };
+    public bool ExpressionVisible=>expression.Visibility==Visibility.Visible;
     private readonly TextBlock number;
     private readonly Canvas marqueeTrain=new();
     private readonly TranslateTransform marqueeShift=new();
@@ -53,6 +56,8 @@ public sealed class TelevisionOverlay
         number=Text("",contract.NumberSize);number.Width=300;number.TextAlignment=TextAlignment.Center;
         number.Visibility=Visibility.Collapsed;Put(number,490,contract.NumberY);
         timeout=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(contract.TimeoutMs) };
+        Put(expression,(1280-330)/2,65);
+        expression.Children.Add(expressionImage);System.Windows.Controls.Canvas.SetLeft(expressionImage,6);System.Windows.Controls.Canvas.SetTop(expressionImage,6);
         timeout.Tick+=(_,_)=> { timeout.Stop();control.Visibility=Visibility.Collapsed;number.Visibility=Visibility.Collapsed; };
         pauseRepeat=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(contract.TimeoutMs/6) };
         pauseRepeat.Tick+=(_,_)=>RepeatPause();
@@ -108,6 +113,19 @@ public sealed class TelevisionOverlay
         timeout.Stop();timeout.Start();
     }
     public void Stop() { timeout.Stop();pauseRepeat.Stop();marqueeShift.BeginAnimation(TranslateTransform.XProperty,null); }
+    public void ShowExpression(BitmapSource picture,string avatarPath)
+    {
+        expressionImage.Source=picture;
+        while(expression.Children.Count>1)expression.Children.RemoveAt(1);
+        if(File.Exists(avatarPath))
+        {
+            var avatar=new Image { Width=32,Height=32,Source=new BitmapImage(new Uri(avatarPath)),Stretch=Stretch.UniformToFill,
+                Clip=new EllipseGeometry(new Point(16,16),16,16) };
+            expression.Children.Add(avatar);System.Windows.Controls.Canvas.SetLeft(avatar,26);System.Windows.Controls.Canvas.SetTop(avatar,169);
+        }
+        expression.Visibility=Visibility.Visible;
+    }
+    public void HideExpression()=>expression.Visibility=Visibility.Collapsed;
     private BitmapImage Bitmap(string path)=>new(new Uri(Path.Combine(root,path)));
     private static TextBlock Text(string value,double size)=>new() { Text=value,FontSize=size,
         FontFamily=OriginalFont.Family,Foreground=Brushes.White,Effect=new System.Windows.Media.Effects.DropShadowEffect { BlurRadius=3,ShadowDepth=1 } };

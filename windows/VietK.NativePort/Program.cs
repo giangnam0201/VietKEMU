@@ -478,6 +478,7 @@ public static class Program
             app.MainWindow = window;
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             using var nativePlayback = new NativePlayback(bottom, stateDirectory);
+            using var ambienceExpressions=new AmbienceExpressions(nativePlayback.Television.Overlay);
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             playback = nativePlayback;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
@@ -508,6 +509,7 @@ public static class Program
             {
                 if (command == "home_imv")
                     window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
+                else if(command=="ambience_imv")ambienceExpressions.ShowDialog(window);
                 else nativePlayback.Command(command);
                 // Queue/ambience dialogs and complete service admission checks
                 // still need their original ports.
