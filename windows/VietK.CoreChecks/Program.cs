@@ -4,7 +4,7 @@ using VietK.Core;
 if(args.Length==4 && args[0]=="--verify-progressive-fixture")
 {
     var client=new YouTubeMusicClient(args[1],args[3]);
-    var video=new YouTubeVideo("VietKAVTest1","Interrupted audio HTTP fixture","","");
+    var video=new YouTubeVideo("fixture0001","Interrupted audio HTTP fixture","","");
     using var transfer=client.StartProgressive(video,_=>{},CancellationToken.None,args[2]);
     await transfer.WaitUntilReady(CancellationToken.None);var file=await transfer.Completion;
     if(client.CompletedVideo(video)!=file)throw new InvalidDataException("Recovered media did not receive validated cache marker");

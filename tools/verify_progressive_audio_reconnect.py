@@ -55,7 +55,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 server = http.server.ThreadingHTTPServer(('127.0.0.1', 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 base = f'http://127.0.0.1:{server.server_port}'
-info = {'id': 'VietKAVTest1', 'title': 'HTTP audio reconnect fixture', 'duration': 20,
+info = {'id': 'fixture0001', 'title': 'HTTP audio reconnect fixture', 'duration': 20,
         'extractor': 'generic', 'webpage_url': base,
         'formats': [{'format_id': '137', 'url': base+'/video.mp4', 'ext': 'mp4',
                      'vcodec': 'avc1.64001f', 'acodec': 'none', 'height': 180},
