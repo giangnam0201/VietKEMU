@@ -539,12 +539,15 @@ public static class Program
             };
             musicServer.ConnectionChanged+=singerNavigation.Refresh;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
+            IReadOnlyList<LocalSong> BroadcastSearch(string text,int page)=>songState.Search.ByBroadcastSpell(text,new SongPage(page,50),new SongQueryContext(true,musicServer.IsConnected))
+                .Select(song=>songState.GetSongById(song.Id)).OfType<LocalSong>().ToArray();
+            bool BroadcastIsLocal(int id)=>AvailableMedia(id).Any(media=>musicServer.LocalPath(media) is { } path&&File.Exists(path));
+            var broadcastControl=new OriginalBroadcastControl(nativePlayback.IdlePlaylist,id=>songState.GetSongById(id),BroadcastIsLocal,
+                id=>songOrder.Request(id,false),json=>nativePlayback.ImportIdlePlaylist(json,restartIdle:false),BroadcastSearch);
             youtubeMusic.OpenBroadcastPlaylist=()=>
             {
                 if(window.Content is Viewbox { Child:Canvas panel })new OriginalBroadcastPlaylistDialog(panel,nativePlayback,
-                    id=>songState.GetSongById(id),(text,page)=>songState.Search.ByBroadcastSpell(text,new SongPage(page,50),new SongQueryContext(true,musicServer.IsConnected))
-                        .Select(song=>songState.GetSongById(song.Id)).OfType<LocalSong>().ToArray(),
-                    id=>AvailableMedia(id).Any(media=>musicServer.LocalPath(media) is { } path&&File.Exists(path)),id=>songOrder.Request(id,false));
+                    id=>songState.GetSongById(id),BroadcastSearch,BroadcastIsLocal,id=>songOrder.Request(id,false),control:broadcastControl);
             };
             youtubeMusic.SearchOptions=searchOptions;
             youtubeMusic.OpenCollectionLogin=()=>collectionControls.Login();
@@ -556,7 +559,7 @@ public static class Program
             });
             youtubeMusic.OriginalQueue=originalRemote;
             nativePlayback.Player.Played+=originalRemote.Refresh;
-            using var mobileRemote=new MobileRemoteServer(app.Dispatcher,youtubeMusic,nativePlayback,ambience:ambienceExpressions);
+            using var mobileRemote=new MobileRemoteServer(app.Dispatcher,youtubeMusic,nativePlayback,ambience:ambienceExpressions,broadcasts:broadcastControl);
             youtubeMusic.MobileConnectionInfo=()=>mobileRemote.ConnectionInfo;
             youtubeMusic.RePairMobile=mobileRemote.RePair;
             youtubeMusic.OpenMobilePairing=()=>mobileRemote.ShowPairingPanel(window);

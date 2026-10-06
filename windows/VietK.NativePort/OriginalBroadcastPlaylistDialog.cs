@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -22,6 +21,7 @@ public sealed class OriginalBroadcastPlaylistDialog
     private readonly Func<string,int,IReadOnlyList<LocalSong>> search;
     private readonly Func<int,bool> isLocal;
     private readonly Action<int> order;
+    private readonly OriginalBroadcastControl control;
     private readonly List<LocalSong> songs=[];
     private readonly ScrollViewer list=new() { Width=620,Height=240,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
     private readonly StackPanel rows=new();
@@ -31,9 +31,10 @@ public sealed class OriginalBroadcastPlaylistDialog
     private readonly FrameworkElement add;
     private bool usbMode,closed;
     public OriginalBroadcastPlaylistDialog(Canvas host,NativePlayback playback,Func<int,LocalSong?> lookup,
-        Func<string,int,IReadOnlyList<LocalSong>> search,Func<int,bool> isLocal,Action<int> order,bool allowRemote=true)
+        Func<string,int,IReadOnlyList<LocalSong>> search,Func<int,bool> isLocal,Action<int> order,bool allowRemote=true,OriginalBroadcastControl? control=null)
     {
         this.host=host;this.playback=playback;this.lookup=lookup;this.search=search;this.isLocal=isLocal;this.order=order;
+        this.control=control??new OriginalBroadcastControl(playback.IdlePlaylist,lookup,isLocal,order,json=>playback.ImportIdlePlaylist(json,restartIdle:false),search);
         songs.AddRange(playback.IdlePlaylist.Entries.Select(e=>lookup(e.SongId)).OfType<LocalSong>().Where(s=>allowRemote||s.LocalFlag>0));
         BroadcastDialogUi.Body(Overlay,content,300,131);
         BroadcastDialogUi.Put(content,BroadcastDialogUi.Label("Video màn hình chờ",680,60,24,true),0,0);
@@ -103,9 +104,7 @@ public sealed class OriginalBroadcastPlaylistDialog
     {
         if(!usbMode)
         {
-            var json=JsonSerializer.Serialize(new { play_list=songs.Select(s=>new { song_id=s.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),type="1" }),is_need_reply="1" });
-            foreach(var song in songs)if(!isLocal(song.Id))order(song.Id);
-            playback.ImportIdlePlaylist(json,restartIdle:false);
+            control.Save(songs.Select(song=>song.Id).ToArray());
         }
         Close();
     }

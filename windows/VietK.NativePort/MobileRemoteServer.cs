@@ -25,6 +25,7 @@ public sealed class MobileRemoteServer : IDisposable
     private readonly YouTubeMusicScreen music;
     private readonly NativePlayback playback;
     private readonly AmbienceExpressions? ambience;
+    private readonly OriginalBroadcastControl? broadcasts;
     private readonly SemaphoreSlim searchGate=new(1);
     private readonly Dictionary<string,YouTubeVideo> found=[];
     private string token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
@@ -32,10 +33,11 @@ public sealed class MobileRemoteServer : IDisposable
     public int Port { get; private set; }
     internal string TestToken=>token;
     internal Func<string,CancellationToken,Task<IReadOnlyList<YouTubeVideo>>>? SearchFixture { get; set; }
-    public MobileRemoteServer(Dispatcher dispatcher,YouTubeMusicScreen music,NativePlayback playback,int port=9167,bool loopback=false,AmbienceExpressions? ambience=null)
+    public MobileRemoteServer(Dispatcher dispatcher,YouTubeMusicScreen music,NativePlayback playback,int port=9167,bool loopback=false,AmbienceExpressions? ambience=null,OriginalBroadcastControl? broadcasts=null)
     {
         this.dispatcher=dispatcher;this.music=music;this.playback=playback;
         this.ambience=ambience;
+        this.broadcasts=broadcasts;
         var builder=WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args=[] });
         builder.Logging.ClearProviders(); // Never log pairing tokens, URLs or cookies.
         builder.WebHost.ConfigureKestrel(options=>
@@ -75,6 +77,24 @@ public sealed class MobileRemoteServer : IDisposable
             await stream.CopyToAsync(context.Response.Body,context.RequestAborted);
         });
         web.MapGet("/api/state",async context=>await context.Response.WriteAsJsonAsync(await Ui(()=>music.RemoteState())));
+        OriginalBroadcastControl Broadcasts()=>this.broadcasts??throw new InvalidOperationException("Song database unavailable");
+        web.MapGet("/api/settings/broadcast-playlist",async context=>await context.Response.WriteAsJsonAsync(await Ui(()=>Broadcasts().State(playback.UsbIdleVideo is not null))));
+        web.MapGet("/api/settings/broadcast-playlist/list",async context=>await context.Response.WriteAsJsonAsync(await Ui(()=>Broadcasts().Saved())));
+        web.MapGet("/api/settings/broadcast-playlist/search",async context=>
+        {
+            var query=context.Request.Query["q"].ToString();
+            if(!int.TryParse(context.Request.Query["page"].ToString(),System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out var page))throw new ArgumentException();
+            await context.Response.WriteAsJsonAsync(await Ui(()=>Broadcasts().Search(query,page)));
+        });
+        web.MapPost("/api/settings/broadcast-playlist",async context=>
+        {
+            // Large original playlists need more than the generic 8KB action limit.
+            var limit=context.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpMaxRequestBodySizeFeature>();
+            if(limit is { IsReadOnly:false })limit.MaxRequestBodySize=1024*1024;
+            using var request=await JsonDocument.ParseAsync(context.Request.Body,cancellationToken:context.RequestAborted);
+            var ids=OriginalBroadcastControl.ParseRequest(request.RootElement);
+            await context.Response.WriteAsJsonAsync(await Ui(()=>Broadcasts().Save(ids)));
+        });
         // SettingAction.getDefaultVolume/setDefaultVolume, over the paired local
         // transport. Updating this preference never adjusts the current decoder.
         object DefaultVolume()=>new { defaultVolume=playback.DefaultVolumeSettings.Volume,maxDefaultVolume=20,

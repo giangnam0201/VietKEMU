@@ -27,6 +27,14 @@
 <label style="display:flex;align-items:center;gap:10px;padding:8px"><input type="checkbox" id="broadcastMute" style="width:24px;height:24px;padding:0;outline:0;accent-color:#00e5ef" disabled> Tắt tiếng</label>
 <div class="actions"><button type="button" id="broadcastMinus" disabled>−</button><input type="range" id="broadcastVolume" min="0" max="20" step="1" value="15" aria-label="Âm lượng màn hình chờ" disabled><button type="button" id="broadcastPlus" disabled>+</button></div>
 <p class="status">Đang chọn: <output id="broadcastDraft">15</output>/20 · Đóng để lưu</p><button type="button" id="broadcastClose" disabled>Đóng</button></details>
+<details id="playlistSettings"><summary>Video màn hình chờ</summary><p class="status" id="playlistMode"></p>
+<section id="playlistEditor"><div class="actions"><button type="button" id="playlistCreate" disabled>＋ Tạo mới</button></div>
+<p class="status" id="playlistEmpty">Vui lòng nhấn vào nút Tạo Mới để thêm bài hát vào màn hình chờ.</p><div id="playlistRows"></div>
+<div class="actions"><button type="button" id="playlistCancel" disabled>Hủy</button><button type="button" id="playlistConfirm" disabled>Xác nhận</button></div></section>
+<section id="playlistAdd" class="hidden"><label for="playlistQuery">Vui lòng nhập tên bài hát</label>
+<form id="playlistSearch" style="margin-top:8px"><input id="playlistQuery" maxlength="200" placeholder="Tên bài hát / ký tự đầu" autocomplete="off"><button type="button" id="playlistSearchClear" aria-label="Xóa tìm kiếm video chờ">×</button><button type="submit">Tìm</button></form>
+<p class="status" id="playlistSearchStatus" aria-live="polite"></p><div id="playlistSearchResults" class="hidden" style="max-height:320px;overflow:auto"><div id="playlistSearchRows"></div><button type="button" id="playlistMore" style="width:100%">Tải thêm</button></div>
+<div id="playlistAddedArea"><h3>Đã chọn</h3><div id="playlistAddedRows"></div><div class="actions"><button type="button" id="playlistBack">Quay lại</button><button type="button" id="playlistAddConfirm">Xác nhận tạo mới</button></div></div></section></details>
 <p class="status" id="vocalHint"></p><p class="status" id="volumeHint"></p><p class="status" id="state"></p><p class="status" id="offline"></p>
 </main>
 <footer><div class="controls"><button data-command="voldec">− Giảm âm</button><button data-command="play_imv" id="pause">Dừng / Tiếp tục</button><button data-command="volinc">+ Tăng âm</button><button data-command="replay_imv">Phát lại</button><button data-command="cut_song_imv">Qua bài</button><button data-command="mute" id="mute">Tắt tiếng</button><button data-command="ori_imv" id="vocal" disabled>Ngắt lời</button><span class="status" id="volume"></span></div></footer>
@@ -39,6 +47,47 @@ const token=sessionStorage.getItem('vietk-token')||'';let stateBusy=false,lastQu
 function notice(message){$('notice').textContent=message;$('notice').style.display='block';clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('notice').style.display='none',5000);}
 async function api(path,body,signal){const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store',signal});if(!response.ok){if(response.status===401)throw Error('Kết nối hết hạn. Quét lại QR trên TV.');if(response.status===429)throw Error('Đang tìm bài khác. Thử lại sau.');let error;try{error=(await response.json()).error;}catch{}throw Error(error||'Không kết nối được VietK.');}return response.json();}
 async function action(value){try{await api('action',value);await refresh();}catch(error){notice(error.message);}}
+let playlistSaved=null,playlistDraft=[],playlistAdded=[],playlistRequest=0,playlistChain=Promise.resolve(),playlistLocked=true;
+let playlistSearching,playlistSearchRequest=0,playlistPage=0,playlistHasMore=false,playlistSearchBusy=false;
+function playlistQueue(task){const result=playlistChain.then(task);playlistChain=result.catch(()=>{});return result;}
+function playlistBusy(busy){playlistLocked=busy;for(const id of ['playlistCreate','playlistCancel','playlistConfirm'])$(id).disabled=busy;for(const button of $('playlistRows').querySelectorAll('button'))button.disabled=busy;}
+function playlistRow(song){const row=document.createElement('div');row.className='row';const title=document.createElement('h3');title.textContent=song.songname;const singer=document.createElement('small');singer.textContent=song.singername;row.append(title,singer);return row;}
+function playlistRender(){
+ $('playlistRows').replaceChildren();$('playlistEmpty').classList.toggle('hidden',playlistDraft.length>0);
+ playlistDraft.forEach((song,index)=>{const row=playlistRow(song),controls=document.createElement('div');controls.className='actions';
+  controls.append(button('Tốp',()=>{if(playlistLocked)return;const item=playlistDraft.splice(index,1)[0];playlistDraft.unshift(item);playlistRender();}),button('Xóa',()=>{if(playlistLocked)return;playlistDraft.splice(index,1);playlistRender();}));row.append(controls);$('playlistRows').append(row);});playlistBusy(playlistLocked);
+}
+function playlistStopSearch(){++playlistSearchRequest;playlistSearching?.abort();playlistSearchBusy=false;playlistHasMore=false;}
+function playlistShowParent(){playlistStopSearch();$('playlistAdd').classList.add('hidden');$('playlistEditor').classList.remove('hidden');playlistRender();}
+async function playlistLoad(){const request=++playlistRequest;playlistBusy(true);playlistShowParent();try{const [state,list]=await playlistQueue(()=>Promise.all([api('settings/broadcast-playlist'),api('settings/broadcast-playlist/list')]));if(request!==playlistRequest)return;
+ playlistSaved=list.publishMusicOfLocal;playlistDraft=playlistSaved.slice();$('playlistMode').textContent=state.publishMusicMode==='1'?'Video USB đang được ưu tiên. Chỉnh sửa danh sách Đầu máy bên dưới.':'Danh sách Đầu máy · phát khi hàng chờ trống';playlistRender();
+ }catch(error){if(request===playlistRequest)notice(error.message);}finally{if(request===playlistRequest)playlistBusy(playlistSaved===null);}}
+$('playlistSettings').ontoggle=()=>{if($('playlistSettings').open)playlistLoad();else{++playlistRequest;playlistStopSearch();playlistDraft=playlistSaved?.slice()||[];playlistShowParent();playlistBusy(true);}};
+$('playlistCancel').onclick=()=>{$('playlistSettings').open=false;};
+$('playlistConfirm').onclick=async()=>{if(playlistLocked)return;const request=++playlistRequest;const publishMusicOfLocal=playlistDraft.slice();playlistBusy(true);try{const value=await playlistQueue(()=>api('settings/broadcast-playlist',{publishMusicOfLocal}));if(request===playlistRequest){playlistSaved=value.publishMusicOfLocal;playlistDraft=playlistSaved.slice();playlistRender();notice('Đã lưu video màn hình chờ.');$('playlistSettings').open=false;}}catch(error){if(request===playlistRequest)notice(error.message);}finally{if(request===playlistRequest)playlistBusy(false);}};
+function playlistAddedRender(){
+ $('playlistAddedRows').replaceChildren();playlistAdded.forEach((song,index)=>{const row=playlistRow(song);row.append(button('Xóa',()=>{playlistAdded.splice(index,1);playlistAddedRender();}));$('playlistAddedRows').append(row);});
+}
+function playlistShowAdded(){playlistStopSearch();$('playlistSearchResults').classList.add('hidden');$('playlistAddedArea').classList.remove('hidden');$('playlistSearchStatus').textContent='';playlistAddedRender();}
+$('playlistCreate').onclick=()=>{if(playlistLocked)return;playlistAdded=[];$('playlistQuery').value='';$('playlistEditor').classList.add('hidden');$('playlistAdd').classList.remove('hidden');playlistShowAdded();};
+$('playlistBack').onclick=()=>{playlistAdded=[];playlistShowParent();};
+$('playlistAddConfirm').onclick=()=>{playlistDraft.push(...playlistAdded);playlistAdded=[];playlistShowParent();};
+async function playlistFind(next=false){
+ const query=$('playlistQuery').value;if(!query){playlistShowAdded();return;}if(next&&(playlistSearchBusy||!playlistHasMore))return;
+ if(!next){playlistStopSearch();playlistPage=0;$('playlistSearchRows').replaceChildren();$('playlistSearchResults').scrollTop=0;}
+ const request=++playlistSearchRequest;playlistSearching=new AbortController();playlistSearchBusy=true;$('playlistMore').disabled=true;
+ $('playlistSearchResults').classList.remove('hidden');$('playlistAddedArea').classList.add('hidden');$('playlistSearchStatus').textContent='Đang tìm…';
+ try{const items=await api('settings/broadcast-playlist/search?q='+encodeURIComponent(query)+'&page='+playlistPage,null,playlistSearching.signal);if(request!==playlistSearchRequest)return;
+  for(const song of items){const result=button(song.songname+' — '+song.singername,()=>{playlistAdded.push(song);playlistShowAdded();});result.dataset.songid=String(song.songid);result.style.cssText='display:block;width:100%;text-align:left;white-space:normal;overflow-wrap:anywhere;margin:6px 0';$('playlistSearchRows').append(result);}
+  ++playlistPage;playlistHasMore=items.length===50;$('playlistMore').classList.toggle('hidden',!playlistHasMore);$('playlistSearchStatus').textContent=$('playlistSearchRows').children.length?'Chọn bài để thêm vào danh sách.':'Không tìm thấy bài hát có thể chọn.';
+ }catch(error){if(request===playlistSearchRequest&&error.name!=='AbortError'){$('playlistSearchStatus').textContent=error.message;playlistHasMore=false;$('playlistMore').classList.add('hidden');}}
+ finally{if(request===playlistSearchRequest){playlistSearchBusy=false;$('playlistMore').disabled=false;}}
+}
+$('playlistSearch').onsubmit=event=>{event.preventDefault();playlistFind();};
+$('playlistQuery').oninput=()=>playlistFind();$('playlistQuery').onfocus=()=>{if($('playlistQuery').value)playlistFind();};
+$('playlistSearchClear').onclick=()=>{$('playlistQuery').value='';playlistShowAdded();};
+$('playlistMore').onclick=()=>playlistFind(true);
+$('playlistSearchResults').onscroll=()=>{const list=$('playlistSearchResults');if(list.scrollTop+list.clientHeight>=list.scrollHeight-2)playlistFind(true);};
 let savedDefaultVolume=null,defaultVolumeRequest=0;
 let broadcastLoaded=false,broadcastRequest=0,broadcastChain=Promise.resolve();
 function broadcastBusy(busy){for(const id of ['broadcastMute','broadcastClose'])$(id).disabled=busy;for(const id of ['broadcastVolume','broadcastMinus','broadcastPlus'])$(id).disabled=busy||$('broadcastMute').checked;}

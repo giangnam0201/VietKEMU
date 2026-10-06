@@ -28,7 +28,8 @@ internal static class NativeBroadcastEditorVerification
             Require(playback.StartIdleDemo(),"Editor fixture idle rejected");var timer=Stopwatch.StartNew();
             while(playback.Player.State!=OriginalVideoState.Play||playback.Player.Position<=0) { if(timer.ElapsedMilliseconds>12000)throw new InvalidDataException("Editor fixture did not start real idle playback");await Task.Delay(30); }
             IReadOnlyList<LocalSong> Search(string text,int page)=>text=="Page"?Enumerable.Range(1000+page*50,page==0?50:10).Select(id=>Song(id,"Page song "+id)).ToArray():songs.Where(s=>s.Name.StartsWith(text,StringComparison.OrdinalIgnoreCase)).ToArray();
-            OriginalBroadcastPlaylistDialog Open()=>new(panel,playback,id=>songs.FirstOrDefault(s=>s.Id==id),Search,id=>id!=3,requests.Add);
+            var control=new OriginalBroadcastControl(playback.IdlePlaylist,id=>songs.FirstOrDefault(s=>s.Id==id),id=>id!=3,requests.Add,json=>playback.ImportIdlePlaylist(json,restartIdle:false),Search);
+            OriginalBroadcastPlaylistDialog Open()=>new(panel,playback,id=>songs.FirstOrDefault(s=>s.Id==id),Search,id=>id!=3,requests.Add,control:control);
             var dialog=Open();host.UpdateLayout();RequireFits(dialog.Overlay,"broadcast:add");Click(dialog.Overlay,"broadcast:top:2");host.UpdateLayout();
             Require(dialog.Draft.Select(s=>s.Id).SequenceEqual(new[]{3,1,2}),"Top operation did not move the selected row to index zero");
             Click(dialog.Overlay,"broadcast:delete:1");host.UpdateLayout();

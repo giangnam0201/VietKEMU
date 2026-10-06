@@ -16,8 +16,9 @@ public sealed class TelevisionQr
     public Canvas Canvas { get; }=new() { Width=1280-49*4d/3,Height=620,Visibility=Visibility.Collapsed };
     public OriginalTvQrState State { get; }=new();
     public MobileQrBinding Binding { get; private set; }=new();
-    private readonly Image image=new() { Width=91*4d/3,Height=91*4d/3,Stretch=Stretch.Fill };
-    private readonly TextBlock code=new() { Width=91*4d/3,Height=50,FontSize=36,FontWeight=FontWeights.Bold,
+    private const double OriginalQrSize=91*4d/3*.25;
+    private readonly Image image=new() { Width=OriginalQrSize,Height=OriginalQrSize,Stretch=Stretch.Fill };
+    private readonly TextBlock code=new() { Width=OriginalQrSize,Height=12.5,FontSize=9,FontWeight=FontWeights.Bold,
         TextAlignment=TextAlignment.Center,Foreground=Brushes.White,Background=new SolidColorBrush(Color.FromArgb(224,21,21,21)) };
     private readonly TranslateTransform slide=new();
     private readonly string modeFile;
@@ -43,7 +44,7 @@ public sealed class TelevisionQr
         Binding=binding;
         if(!binding.CanPresent) { Canvas.Visibility=Visibility.Collapsed;image.Source=null;return; }
         var pixels=OriginalMobileQr.Render(OriginalMobileQr.TelevisionPayload(binding),true);
-        image.Width=image.Height=91*4d/3;
+        image.Width=image.Height=OriginalQrSize;
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
         code.Text=binding.TvBindCode;

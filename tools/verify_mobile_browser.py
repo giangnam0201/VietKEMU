@@ -142,6 +142,8 @@ with sync_playwright() as p:
     page.wait_for_function("async()=> (await api('settings/broadcast-volume')).publishVolume === 8")
     expect(page.locator('#volume')).to_have_text(f'Âm lượng {volume}/20')
     expect(page.locator('#pause')).to_have_text('Tiếp tục')
+    from verify_mobile_playlist_browser import verify as verify_playlist
+    verify_playlist(page, output, volume)
     page.locator('#pause').click()
     expect(page.locator('#pause')).to_have_text('Dừng')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflows horizontally'
