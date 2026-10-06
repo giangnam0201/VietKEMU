@@ -172,11 +172,16 @@ public sealed class TelevisionWindow : Window
     public BitmapSource CompositePreview(BitmapSource? video)
     {
         Overlay.Canvas.Measure(new Size(1280,720));Overlay.Canvas.Arrange(new Rect(0,0,1280,720));
+        // Preserve the full transparent TV coordinate space. A default
+        // VisualBrush crops to occupied content and expands the logo to fill
+        // the preview when it is the only visible overlay.
+        var overlayImage=new RenderTargetBitmap(1280,720,96,96,PixelFormats.Pbgra32);
+        overlayImage.Render(Overlay.Canvas);
         var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())
         {
             var bounds=new Rect(0,0,640,360);context.DrawRectangle(Brushes.Black,null,bounds);
             if(!BlackVisible && video is not null)context.DrawImage(video,bounds);
-            context.DrawRectangle(new VisualBrush(Overlay.Canvas),null,bounds);
+            context.DrawImage(overlayImage,bounds);
         }
         var result=new RenderTargetBitmap(640,360,96,96,PixelFormats.Pbgra32);result.Render(drawing);result.Freeze();return result;
     }
@@ -246,6 +251,7 @@ public sealed class NativePlayback : IDisposable
         playingIdle=false;Player.Stop();CurrentMedia=null;ResetPreview();
         Television.Overlay.SetSong("");
         if(demo is null)return false;
+        demo=Path.GetFullPath(demo);
         Decoder.PreserveStereo=true;Player.SetTrackInfo(0,1);Player.SetVolume(1);
         playingIdle=Player.SetSource(demo)==0 && Player.Play()==0;
         return playingIdle;

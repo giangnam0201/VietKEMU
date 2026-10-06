@@ -106,7 +106,10 @@ public sealed class YouTubeMusicScreen : IDisposable
         input=new TextBox { Width=410,Height=42,FontSize=24,FontFamily=OriginalFont.Family,Text=text,
             Background=Brushes.Transparent,Foreground=Brushes.White,BorderThickness=new(0),Padding=new(0,5,0,0) };
         input.KeyDown+=async (_,e)=> { if(e.Key==System.Windows.Input.Key.Enter) { e.Handled=true;await Search(); } };
-        Put(canvas,input,805,353);Put(canvas,Button(contract.ClearText,()=>input.Clear()),1220,353);
+        var hint=Label(contract.Hint,24);hint.Foreground=new SolidColorBrush(Color.FromArgb(80,255,255,255));hint.IsHitTestVisible=false;
+        hint.Visibility=string.IsNullOrEmpty(text)?Visibility.Visible:Visibility.Collapsed;
+        input.TextChanged+=(_,_)=>hint.Visibility=input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
+        Put(canvas,input,805,353);Put(canvas,hint,805,353);Put(canvas,Button(contract.ClearText,()=>input.Clear()),1220,353);
         var keys=new Canvas { Width=480,Height=240 };Put(canvas,keys,800,400);var alphabetic=true;
         void Edit(string value,bool back=false)
         {

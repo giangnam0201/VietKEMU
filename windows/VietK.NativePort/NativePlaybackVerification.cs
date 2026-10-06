@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+using System.Windows.Media;
 using LibVLCSharp.Shared;
 using VietK.Core;
 
@@ -43,6 +44,13 @@ public static class NativePlaybackVerification
                 Require(playback.PlayMedia(clip), "Original APK grading video rejected");
                 await Until(() => played > 0 && playback.Decoder.Position > 0, "Original video did not decode/render");
                 Require(!playback.Television.BlackVisible, "Original black cover stayed above playing media");
+                var previewFixture=new byte[640*360*4];
+                for(var pixel=0;pixel<previewFixture.Length;pixel+=4)
+                { previewFixture[pixel]=31;previewFixture[pixel+1]=63;previewFixture[pixel+2]=127;previewFixture[pixel+3]=255; }
+                var composed=playback.Television.CompositePreview(BitmapSource.Create(640,360,96,96,
+                    PixelFormats.Bgra32,null,previewFixture,640*4));
+                var corner=new byte[4];composed.CopyPixels(new Int32Rect(500,300,1,1),corner,4,0);
+                Require(corner.SequenceEqual(new byte[] {31,63,127,255}),"TV logo overlay stretched across the panel video preview");
                 var snapshot = Path.GetFullPath(Path.Combine(output, "original-tv-video.png"));
                 Require(playback.Decoder.Native.TakeSnapshot(0, snapshot, 0, 0), "Native video snapshot request failed");
                 await Until(() => File.Exists(snapshot) && new FileInfo(snapshot).Length > 1024, "Decoded video snapshot missing");
