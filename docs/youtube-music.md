@@ -61,3 +61,16 @@ public Blender demonstration video used in yt-dlp's own README; its external
 service failure is recorded separately and does not block publishing the build.
 A green build alone must not be reported as successful YouTube fetching. Inspect
 `youtube-verification.json` and its native-frame snapshot for live evidence.
+
+On 2026-10-06 the operator explicitly authorized use of their Firefox session.
+Local yt-dlp tests then searched for `Mộng dưới hoa karaoke` and downloaded two
+real files: Blender's demonstration video `YE7VzlLtp-4` (21,781,692 bytes) and
+the public karaoke upload `BvXgbkHNJ6o` (9,469,509 bytes). Both downloads merged
+video and audio into MKV using stream copying. FFmpeg decoded each file's video
+and audio, and the existing bundled x64 libVLC decoded 41 and 45 video frames
+respectively through video callbacks. Reports and frame captures stay under
+ignored local artifacts. This proves local authenticated fetching and decoder
+compatibility for those two files, not universal availability, physical speaker
+output, complete WPF queue/TV integration or original VietK content parity.
+The Firefox-enabled Windows build is run 37435928828, commit cf9f13b; it passed
+the core, render and native playback checks and published the Windows test ZIP.
