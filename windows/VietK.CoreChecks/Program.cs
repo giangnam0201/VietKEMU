@@ -283,3 +283,51 @@ using(var queueDb=new SqliteConnection("Data Source=:memory:"))
         "Default manager initialization did not clear the persisted selected list");
 }
 Console.WriteLine("Original selected items/manager verified: reconstruction, score polarity, media preference, initialization, Top, drag indices, flow identity and notifications.");
+
+var dispatchPath=Path.Combine(Path.GetTempPath(),"vietk-dispatch-"+Guid.NewGuid()+".db");
+using(var observer=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=dispatchPath,Pooling=false }.ToString()))
+{
+    observer.Open();
+    using(var schema=observer.CreateCommand())
+    {
+        schema.CommandText="CREATE TABLE tblSelectedList(id INTEGER NOT NULL PRIMARY KEY,songid INT,canscore INT,sequence INT,customerId TEXT,tableid INT,stage INT)";
+        schema.ExecuteNonQuery();
+    }
+    var store=new SelectedListStore(observer);
+    SelectedPlaylistItem Item(int id)=>new(new LocalSong(id,"Song "+id,"",0,"",new int[4],new int[4],new int[4],
+        0,0,0,"","",0,"",1,0),0,null,null) { PlayId=id.ToString(),PlayName="Song "+id };
+    using var entered=new ManualResetEventSlim();using var release=new ManualResetEventSlim();
+    var workerThread=0;var mainThread=Environment.CurrentManagedThreadId;
+    using(var dispatcher=new SelectedQueueDispatcher(dispatchPath,item=>
+    {
+        workerThread=Environment.CurrentManagedThreadId;entered.Set();
+        if(!release.Wait(TimeSpan.FromSeconds(10)))throw new TimeoutException("Dispatcher fixture release timed out");
+        return false;
+    }))
+    {
+        await dispatcher.Ready.WaitAsync(TimeSpan.FromSeconds(10));
+        Require(dispatcher.Post(new(4,Item:Item(10))),"Worker rejected first append");
+        Require(entered.Wait(TimeSpan.FromSeconds(10)),"Worker never processed append");
+        var second=Item(20);dispatcher.Post(new(4,Item:second));second.PlayName="Mutated before dispatch";
+        dispatcher.Post(new(4,Item:Item(30)));dispatcher.Post(new(3,3));dispatcher.Post(new(1,2));
+        dispatcher.Post(new(31));release.Set();
+        await dispatcher.FlushAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        var rows=store.ReadStoredEntries();
+        Require(workerThread!=mainThread && rows.Select(row=>row.Song.SongId).SequenceEqual(new[]{10,20}) &&
+            rows[1].Song.Name=="Mutated before dispatch" && rows.All(row=>row.Song.CustomerId=="" && !row.Song.CanScore),
+            "Worker thread isolation, FIFO append/Top/delete, reference message or scoring normalization differs");
+        dispatcher.Post(new(5));await dispatcher.FlushAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        Require(store.Count==0,"Worker clear/barrier did not reach the observer connection");
+        dispatcher.Dispose();Require(!dispatcher.Post(new(4,Item:Item(40))),"Stopped worker accepted a message");
+    }
+    using(var failing=new SelectedQueueDispatcher(dispatchPath,_=>throw new InvalidDataException("fixture worker failure")))
+    {
+        await failing.Ready.WaitAsync(TimeSpan.FromSeconds(10));failing.Post(new(4,Item:Item(50)));
+        var failed=false;
+        try { await failing.FlushAsync().WaitAsync(TimeSpan.FromSeconds(10)); }
+        catch(InvalidDataException) { failed=true; }
+        Require(failed && !failing.Post(new(5)) && store.Count==0,"Faulted worker hid its failure or accepted further operations");
+    }
+}
+File.Delete(dispatchPath);
+Console.WriteLine("Original playlist worker verified: independent connection/thread, FIFO messages, barriers, live message objects, ignored 31, shutdown rejection and fault propagation.");

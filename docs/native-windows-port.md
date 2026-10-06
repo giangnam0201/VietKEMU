@@ -168,10 +168,26 @@ that flag is disabled, the bytecode's restore loop runs before IsInitialized,
 so its Add method does not repopulate the active list on first initialization.
 The store itself never clears data merely by opening the database.
 
-The host's ordered asynchronous message dispatcher, linked-service initialization,
-remaining manager methods, actual playback/list observers, download-list
-integration and panel queue handlers remain pending. The runtime translation
-is not yet connected to the interactive panel.
+`SelectedQueueDispatcher` now runs original DAO messages on one PlayListHandler
+worker with its own SQLite connection, separate from panel reads/search. Messages
+remain ordered and retain their runtime item references. Unknown messages,
+including the original unused constant 31, are ignored. Explicit barriers allow
+verification to wait for storage; quit rejects further posts and discards pending
+messages as Android Looper.quit does. Worker failure reaches pending barriers
+and prevents later posts instead of hiding lost operations.
+
+The native host now initializes the selected queue/worker and connects confirmed
+queue count and selected-song IDs to the bottom badge and grid colors. Start-play
+requests remain diagnostic events until the playback backend is translated.
+The Windows capture has an explicitly isolated backend fixture that adds/removes
+an actual catalogue entry directly, bypassing admission to check persistence and
+panel observers. It does not establish order-click admission or available music.
+
+Linked-service initialization, remaining manager methods, actual playback
+observers, download-list integration, report-table routing and panel order/Top
+handlers remain pending. Original clicks must pass those dependencies before
+remote entries are routed to the downloader; the host does not skip them by
+adding songs directly to its local queue.
 
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37397029606
 passed selected-item reconstruction, score polarity/ERC availability, preferred

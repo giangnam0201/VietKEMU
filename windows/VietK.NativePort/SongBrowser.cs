@@ -27,6 +27,10 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     public VietnameseSearchInput? Input { get; private set; }
     public IReadOnlyList<CatalogueSong> Results { get; private set; } = [];
     public bool Alphabetic { get; private set; } = true;
+    private IReadOnlySet<int> confirmedQueued=new HashSet<int>();
+    private Action? refreshSelection;
+    public void SetConfirmedQueuedSongs(IReadOnlySet<int> songIds)
+    { confirmedQueued=songIds;refreshSelection?.Invoke(); }
 
     public Canvas Create()=>CreateCore(null);
     internal Canvas CreateVerificationFixture(IReadOnlyList<CatalogueSong> songs)=>CreateCore(songs);
@@ -67,10 +71,11 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         {
             Results=songs;empty.Visibility=songs.Count==0?Visibility.Visible:Visibility.Collapsed;
             if(songGrid is not null)area.Children.Remove(songGrid);
-            songGrid=gridFactory.Create(songs);songGrid.HorizontalAlignment=HorizontalAlignment.Left;
+            songGrid=gridFactory.Create(songs,confirmedQueued);songGrid.HorizontalAlignment=HorizontalAlignment.Left;
             songGrid.VerticalAlignment=VerticalAlignment.Top;songGrid.Margin=new(0,50,6,0);
             songGrid.Visibility=songs.Count==0?Visibility.Collapsed:Visibility.Visible;area.Children.Add(songGrid);
         }
+        refreshSelection=()=>ShowResults(Results);
         var back=new Border { Width=more.BackWidth,Height=more.BackHeight,CornerRadius=new(more.BackCorner),
             Background=Gradient(more.BackStartColor,more.BackEndColor),Child=Icon("icon_back.png",27,20) };
         Click(back,()=>HomeRequested?.Invoke()); Put(canvas,back,contract.BackX,contract.BackY);

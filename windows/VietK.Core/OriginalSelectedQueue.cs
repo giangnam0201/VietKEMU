@@ -14,7 +14,8 @@ public sealed record SelectedQueueCommand(int What,int Arg1=0,int Arg2=0,Selecte
             case 4:if(Item is not null) { var entry=Item.ToStoredSong(scoreAvailable(Item));store.AddSong(entry);Item.CustomerId=entry.CustomerId; }break;
             case 5:store.Clear();break;
             case 6:store.SortLocalSong(Arg1,Arg2);break;
-            default:throw new ArgumentOutOfRangeException(nameof(What));
+            // Original Handler ignores unknown messages, including constant 31.
+            default:break;
         }
     }
 }

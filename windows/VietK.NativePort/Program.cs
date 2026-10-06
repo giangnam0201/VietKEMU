@@ -38,9 +38,25 @@ public static class Program
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
                 Path.Combine(stateDirectory,"song-browser-state.db"));
+            using var queueDispatcher=new SelectedQueueDispatcher(Path.Combine(stateDirectory,"song-browser-state.db"),
+                // No discovered storage/ERC resolver yet: metadata cannot prove
+                // a usable local subtitle. Replace with original storage port.
+                item=>item.IsSongCanScore(_=>null,File.Exists));
+            queueDispatcher.Ready.GetAwaiter().GetResult();
+            SongBrowser? queueBrowser=null;
+            OriginalSelectedQueue? selectedQueue=null;
+            selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
+                command=> { if(!queueDispatcher.Post(command))throw new InvalidOperationException("Playlist database worker stopped"); },
+                ()=> { bottom.SetConfirmedQueueCount(selectedQueue!.Count);
+                    queueBrowser?.SetConfirmedQueuedSongs(selectedQueue.Snapshot().Select(item=>item.SongMetadata.Id).ToHashSet()); },
+                ()=>System.Diagnostics.Trace.WriteLine("Original queue requests start-play; playback port pending"));
+            selectedQueue.Initialize(songState.SelectedList,()=>SelectedPlaylistItem.Restore(
+                songState.SelectedList.ReadStoredEntries(),id=>songState.GetSongById(id),songState.GetMedia,_=>null));
+            bottom.SetConfirmedQueueCount(selectedQueue.Count);
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
             var browser = new SongBrowser(root, songContract, moreContract, songState,gridContract);
+            queueBrowser=browser;
             Canvas Panel(int screen = 0)
             {
                 var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
@@ -172,6 +188,33 @@ public static class Program
                     var gridImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);gridImage.Render(gridFixture);
                     var gridEncoder=new PngBitmapEncoder();gridEncoder.Frames.Add(BitmapFrame.Create(gridImage));
                     using(var file=File.Create(Path.Combine(args[1],"native-song-grid-fixture.png")))gridEncoder.Save(file);
+                    // Explicit backend integration fixture, bypassing order
+                    // admission. It verifies notifications/storage/rendering,
+                    // not network admission, downloaded media or playback.
+                    using(var fixtureDispatcher=new SelectedQueueDispatcher(importPath,item=>item.IsSongCanScore(_=>null,File.Exists)))
+                    {
+                        fixtureDispatcher.Ready.GetAwaiter().GetResult();
+                        var playRequests=0;OriginalSelectedQueue? fixtureQueue=null;
+                        fixtureQueue=new OriginalSelectedQueue(id=>imported.GetSongById(id),
+                            command=> { if(!fixtureDispatcher.Post(command))throw new InvalidOperationException("Fixture dispatcher stopped"); },
+                            ()=> { bottom.SetConfirmedQueueCount(fixtureQueue!.Count);
+                                browser.SetConfirmedQueuedSongs(fixtureQueue.Snapshot().Select(item=>item.SongMetadata.Id).ToHashSet()); },
+                            ()=>playRequests++);
+                        fixtureQueue.Initialize(selected,()=>SelectedPlaylistItem.Restore(selected.ReadStoredEntries(),
+                            id=>imported.GetSongById(id),imported.GetMedia,_=>null));
+                        fixtureQueue.Add(restoredItem);fixtureDispatcher.FlushAsync().GetAwaiter().GetResult();
+                        if(bottom.QueueCount!=1 || fixtureQueue.Count!=1 || playRequests!=1 ||
+                            selected.ReadStoredEntries().Single().Song.SongId!=101000 ||
+                            selected.ReadStoredEntries().Single().Song.CanScore || fixtureQueue.Snapshot()[0].LocalFlag!=0)
+                            throw new InvalidDataException("Native queue/worker/observer integration differs or fabricated media/scoring");
+                        gridFixture.UpdateLayout();
+                        var queueImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);queueImage.Render(gridFixture);
+                        var queueEncoder=new PngBitmapEncoder();queueEncoder.Frames.Add(BitmapFrame.Create(queueImage));
+                        using(var file=File.Create(Path.Combine(args[1],"native-queue-observer-fixture.png")))queueEncoder.Save(file);
+                        fixtureQueue.DeleteByIndex(0);fixtureDispatcher.FlushAsync().GetAwaiter().GetResult();
+                        if(bottom.QueueCount!=0 || selected.Count!=0 || playRequests!=2)
+                            throw new InvalidDataException("Native queue deletion did not propagate to observer/store/play request");
+                    }
                 }
                 if(!SHA256.HashData(File.ReadAllBytes(wholePath)).SequenceEqual(catalogueHash))
                     throw new InvalidDataException("Local import modified the original whole catalogue");
@@ -211,6 +254,7 @@ public static class Program
                     originalLocalSongLookupVerified = true,
                     originalSelectedListStorageVerified = true,
                     originalSelectedItemReconstructionVerified = true,
+                    nativeQueueWorkerObserverIntegrationVerified = true,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,

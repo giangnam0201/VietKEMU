@@ -20,6 +20,8 @@ public sealed class BottomBar(string root, BottomContract contract)
     public bool Paused { get; private set; }
     public bool OriginalVocal { get; private set; }
     private readonly Dictionary<string, FrameworkElement> buttons = [];
+    private TextBlock? queueBadge;
+    public int QueueCount { get; private set; }
 
     public Canvas Create()
     {
@@ -63,11 +65,12 @@ public sealed class BottomBar(string root, BottomContract contract)
         // 30x20px, white bold count, original icon_playlist_num background.
         var count = new TextBlock
         {
-            Width = 30, Height = 20, Text = "0", FontSize = 14,
+            Width = 30, Height = 20, Text = QueueCount.ToString(), FontSize = 14,
             FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center,
             Background = new ImageBrush(new BitmapImage(new Uri(Path.Combine(root, "icon_playlist_num.png"))))
         };
         Canvas.SetLeft(count, 1220); Canvas.SetTop(count, 0); bar.Children.Add(count);
+        queueBadge=count;
         SetConfirmedPlaybackState(Paused, OriginalVocal);
         return bar;
     }
@@ -77,6 +80,11 @@ public sealed class BottomBar(string root, BottomContract contract)
         Paused = paused; OriginalVocal = originalVocal;
         Set("play_imv", paused); Set("pause_imv", !paused);
         Set("ori_imv", !originalVocal); Set("accp_imv", originalVocal);
+    }
+
+    public void SetConfirmedQueueCount(int count)
+    {
+        QueueCount=count;if(queueBadge is not null)queueBadge.Text=count.ToString();
     }
 
     public bool IsVisible(string href) => buttons.TryGetValue(href, out var button) && button.Visibility == Visibility.Visible;
