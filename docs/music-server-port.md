@@ -10,6 +10,19 @@ prove music-library access: the approved request for song 101000 returned HTTP
 matched the APK's field order and produced the same result without a redirect.
 No production song was downloaded. Encrypted karaoke playback remains unverified.
 
+The subsequent explicitly approved read-only `os_unlock_cloud_information`
+request returned application error 404, `sn not in devices_table`, with no
+`is_unlock` status. The server does not recognize the PC serial as a registered
+device. The login token therefore must not be described as proof of library
+authorization. `DataCenterConfigure` confirms the tested login URL is the
+original default outside-server route. The inspected account path
+`DCUnlockCloudLibraryCommu` uses `user_unlock_device_login` for a phone/password
+or verification-code login; it does not insert a new hardware serial into the
+server registry. No unlock, account binding or device registration was sent.
+Restoring production downloads needs an identity and music entitlement the
+service legitimately accepts, or a supported registration path from its operator.
+Changing Windows retries alone cannot supply that server-side registration.
+
 ## Original protocol evidence
 
 - `KmDataCenterService` resources specify `http://viet.duochang.cc/login`, signing

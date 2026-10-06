@@ -30,6 +30,7 @@ def main():
     parser.add_argument('identity', type=Path)
     parser.add_argument('output', type=Path)
     parser.add_argument('--song-id', type=int)
+    parser.add_argument('--cloud-status', action='store_true', help='Read original cloud-library lock status; never unlock or bind')
     args = parser.parse_args()
     config = json.loads(args.identity.read_text(encoding='utf-8-sig'))
     chip, mac = config['ChipId'], config['Mac']
@@ -55,7 +56,7 @@ def main():
               'scope': 'One original login request; no fabricated identity or token. No music download claim.'}
     (args.output / 'login-result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result, ensure_ascii=False))
-    if args.song_id is None or not accepted:
+    if (args.song_id is None and not args.cloud_status) or not accepted:
         return
     # Same approved host and original media command; the normal server token
     # returned by login supplies the signature salt.
@@ -64,6 +65,26 @@ def main():
         raise ValueError('Returned service is a different host; inspect before forwarding identity')
     headers['validcode'] = str(reply['validatecode'])
     headers['sign'] = signature(chip, str(reply['token']))
+    if args.cloud_status:
+        body = json.dumps({'cmdid': 'os_unlock_cloud_information'}, separators=(',', ':'))
+        request = urllib.request.Request(service, urllib.parse.urlencode({'body': body}).encode(), headers)
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status = json.loads(response.read())
+        (args.output / 'cloud-status.private.json').write_text(json.dumps(status), encoding='utf-8')
+        message = str(status.get('errormessage', ''))
+        for secret in (chip, mac, str(reply['token']), str(reply['validatecode'])):
+            if secret:
+                message = message.replace(secret, '[redacted]')
+        status_result = {'command': 'os_unlock_cloud_information',
+                         'errorcode': status.get('errorcode', ''),
+                         'errormessage': message,
+                         'hasLockStatus': 'is_unlock' in status,
+                         'isUnlock': status.get('is_unlock'),
+                         'scope': 'Read-only original status request. No unlock, account binding or registration performed.'}
+        (args.output / 'cloud-status-result.json').write_text(json.dumps(status_result, indent=2), encoding='utf-8')
+        print(json.dumps(status_result))
+    if args.song_id is None:
+        return
     body = json.dumps({'cmdid': 'sn_song_media_list', 'songid': args.song_id, 'mac': mac, 'token': ''}, separators=(',', ':'))
     request = urllib.request.Request(service, urllib.parse.urlencode({'body': body}).encode(), headers)
     with urllib.request.urlopen(request, timeout=10) as response:
