@@ -22,10 +22,12 @@ public sealed class SelectedQueueDialog
     private readonly Border selectedTab,historyTab;
     private readonly Dictionary<string,Canvas> transfers=[];
     private string? playingId;
+    private readonly SelectedQueueDrag? drag;
+    internal SelectedQueueDrag Drag=>drag??throw new InvalidOperationException("Queue reorder callback is missing");
     public bool ShowingHistory { get; private set; }
     public Canvas Overlay { get; }=new() { Width=1280,Height=800,Background=new SolidColorBrush(Color.FromArgb(128,0,0,0)) };
     public StackPanel Rows { get; }=new();
-    public SelectedQueueDialog(Canvas panel,Action<YouTubeVideo> remove,Action<YouTubeVideo> top,Action clear,Action shuffle,Action retry,string? resources=null)
+    public SelectedQueueDialog(Canvas panel,Action<YouTubeVideo> remove,Action<YouTubeVideo> top,Action clear,Action shuffle,Action retry,string? resources=null,Action<YouTubeVideo,int>? move=null)
     {
         this.panel=panel;this.remove=remove;this.top=top;this.clear=clear;this.shuffle=shuffle;this.retry=retry;
         this.resources=resources??Path.Combine(OriginalSupplement.Root,"ambience","playlist");
@@ -41,7 +43,8 @@ public sealed class SelectedQueueDialog
         var divider=new Border { Width=1,Height=20,Background=new SolidColorBrush(Color.FromArgb(51,255,255,255)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false };
         toolbar.Children.Add(divider);
         list=new ScrollViewer { Width=585,Height=449,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=Rows };
+            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=Rows,PanningMode=PanningMode.VerticalOnly };
+        if(move is not null)drag=new SelectedQueueDrag(Overlay,list,Rows,move,this.resources);
         Put(content,list,0,130);SwitchTab(false);
         panel.Children.Add(Overlay);
     }
@@ -52,6 +55,7 @@ public sealed class SelectedQueueDialog
     }
     internal void SwitchTab(bool history)
     {
+        drag?.Cancel();
         ShowingHistory=history;
         void Style(Border tab,string icon,bool selected)
         {
@@ -68,7 +72,7 @@ public sealed class SelectedQueueDialog
     }
     public void Refresh(IReadOnlyList<YouTubeVideo> queue,bool playing,IReadOnlyDictionary<string,QueueTransferDisplay>? downloadStates=null)
     {
-        Rows.Children.Clear();transfers.Clear();playingId=playing?queue.FirstOrDefault()?.Id:null;
+        drag?.Cancel();Rows.Children.Clear();transfers.Clear();playingId=playing?queue.FirstOrDefault()?.Id:null;
         for(var index=0;index<queue.Count;index++)
         {
             var position=index;var video=queue[index];var row=new Canvas { Width=585,Height=65,Background=Brushes.Transparent };
@@ -90,6 +94,7 @@ public sealed class SelectedQueueDialog
             Put(row,ClickIcon("ic_delete",()=>remove(video)),499,0);
             var retryHit=new Border { Width=440,Height=65,Background=Brushes.Transparent };
             retryHit.MouseLeftButtonUp+=(_,e)=> { if(position==0 && !playing)retry();e.Handled=true; };Put(row,retryHit,0,0);
+            drag?.Attach(retryHit,row,video,index);
             Rows.Children.Add(row);
         }
     }
@@ -140,7 +145,7 @@ public sealed class SelectedQueueDialog
         var button=new Border { Width=140,Height=46,CornerRadius=new CornerRadius(26),Background=gradient,Child=text };
         button.MouseLeftButtonUp+=(_,e)=> { action();e.Handled=true; };return button;
     }
-    public void Close()=>panel.Children.Remove(Overlay);
+    public void Close() { drag?.Cancel();panel.Children.Remove(Overlay); }
     private FrameworkElement ActionIcon(string icon,string label,Action action)
     {
         var area=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Background=Brushes.Transparent };

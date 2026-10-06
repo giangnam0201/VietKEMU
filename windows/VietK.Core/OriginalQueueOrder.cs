@@ -25,4 +25,9 @@ public static class OriginalQueueOrder
         if(idle)items.Clear();
         else while(items.Count>1)items.RemoveAt(items.Count-1);
     }
+    public static bool Move<T>(IList<T> items,int source,int target)
+    {
+        if(source<1 || source>=items.Count || target<1 || target>=items.Count || source==target)return false;
+        var item=items[source];items.RemoveAt(source);items.Insert(target,item);return true;
+    }
 }

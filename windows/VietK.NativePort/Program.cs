@@ -437,6 +437,7 @@ public static class Program
                     youtubeSixCardPaginationAndBoundsVerified = true,
                     selectedQueueTopDeleteShuffleAndPreservePlayingVerified = true,
                     selectedQueueTabsAndRealByteProgressStatesVerified = true,
+                    selectedQueueDragMoveCancelAndEdgeScrollVerified = true,
                     androidRuntimeUsed = false,
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,

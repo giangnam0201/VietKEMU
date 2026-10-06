@@ -71,7 +71,7 @@ the owner's local original-resource supplement, not published in the release.
 The selected/history header switches reproduce `PlayListDialog`, including the
 transparent selected tab and dark unselected tab. `SungListManager.addItem`
 excludes YouTube, so that tab remains empty for the native YouTube queue. Native
-catalogue recording/history integration and drag ordering remain pending.
+catalogue recording/history integration remains pending.
 
 Download labels now follow waiting/progress/error states with the original 40x3
 bitmap bar. The native YouTube adaptation uses real byte counters; streaming
@@ -80,3 +80,18 @@ keep the same row and scrolling position while the TV continues playing. Failure
 keeps the song available for retry; validated completion removes its decoration.
 Toolbar buttons use the APK's 25ms scale animation from 1 to .8 and back.
 Windows capture checks both tabs and unknown/known/error/completed transfer views.
+
+Queue reordering translates `SelectedLocalListManager.sortItemBySerial`, the
+65px insertion calculation and retained target from `SelectedPullListView`, and
+the 643x66, .8-opacity drag preview from `DragViewManager`. Index zero is protected.
+The one-past-last marker remains allowed by the drawing calculation but rejected
+by the sort manager, matching the source. Cancellation, tab changes and lost
+capture discard the drag. Edge scrolling advances 20px per 100ms native timer
+tick; equivalence to Android's smooth-scroll interpolation is not yet verified.
+
+The native panel enables this path with a 500ms mouse hold. The decompiled APK
+contains its long-click handler but does not establish where it is registered;
+gesture activation equivalence remains unproven. Windows checks use controlled
+drag coordinates, actual release/tab callbacks and a synthetic bitmap to verify
+the marker renders above the preview, both move directions, head protection,
+cancellation and edge scrolling. Original PNGs remain in the local supplement.

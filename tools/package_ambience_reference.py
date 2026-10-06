@@ -38,7 +38,7 @@ for name in ['dc_overseas_popup_close','dc_overseas_set_on','dc_overseas_set_off
 for name in ['ic_cut_song','ic_cut_song_press','ic_delete','ic_delete_press','ic_top_song','ic_top_song_press',
              'icon_youtube','play_list_select','play_list_select_light','selected_list_clear_all',
              'selected_list_shuffle','selected_song_playing','play_list_sung','play_list_sung_light',
-             'selected_item_download_bg','selected_item_download_progress']:
+             'selected_item_download_bg','selected_item_download_progress','selected_order_into']:
     add(panel, f'res/drawable-mdpi-v4/{name}.png', f'ambience/playlist/{name}.png', 'dualkmbox.apk')
 for name in ['barrage_ellipse','barrage_rocket']:
     add(tv, f'res/drawable-tvdpi-v4/{name}.png', f'ambience/{name}.png', 'daulkmboxosdtv.apk')
