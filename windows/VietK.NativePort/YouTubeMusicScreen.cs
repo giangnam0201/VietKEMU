@@ -230,7 +230,10 @@ public sealed class YouTubeMusicScreen : IDisposable
             panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));panel.UpdateLayout();
             var dragImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);dragImage.Render(panel);
             var markerPixel=new byte[4];dragImage.CopyPixels(new Int32Rect(1242,403,1,1),markerPixel,4,0);
-            Require(markerPixel.All(value=>value==255),"Insertion bitmap did not render above the drag preview: BGRA="+string.Join(",",markerPixel));
+            var backgroundPixel=new byte[4];image.CopyPixels(new Int32Rect(1242,403,1,1),backgroundPixel,4,0);
+            Require(markerPixel.Take(3).All(value=>value>=254) && markerPixel[3]==255 &&
+                markerPixel.Take(3).Sum(value=>(int)value)-backgroundPixel.Take(3).Sum(value=>(int)value)>300,
+                "Insertion bitmap did not render above the drag preview: BGRA="+string.Join(",",markerPixel));
             var dragEncoder=new PngBitmapEncoder();dragEncoder.Frames.Add(BitmapFrame.Create(dragImage));
             using(var dragFile=File.Create(Path.Combine(captureDirectory,"native-queue-drag-fixture.png")))dragEncoder.Save(dragFile);
             Click(queueDialog.Overlay);Require(queue.Select(v=>v.Id).SequenceEqual(new[]{"queue-fixture-0","queue-fixture-2","queue-fixture-3","queue-fixture-1"}) && !queueDialog.Drag.IsDragging,"Drag release failed to reorder or remove its ghost");
@@ -242,10 +245,11 @@ public sealed class YouTubeMusicScreen : IDisposable
             Click(content.Children.OfType<Border>().Single(b=>Equals(b.Tag,"Lịch sử")));
             Require(!queueDialog.Drag.IsDragging && queue[2].Id=="queue-fixture-2","Tab switch committed a cancelled drag");
             Click(content.Children.OfType<Border>().Single(b=>Equals(b.Tag,"Đã đặt bài")));
-            queue.AddRange(Enumerable.Range(4,16).Select(i=>new YouTubeVideo("queue-fixture-"+i,"Scroll fixture "+i,"","")));RefreshQueue();panel.UpdateLayout();
+            queue.AddRange(Enumerable.Range(4,16).Select(i=>new YouTubeVideo("queue-fixture-"+i,"Scroll fixture "+i,"","")));RefreshQueue();
+            panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));panel.UpdateLayout();
             Require(queueDialog.Drag.BeginForVerification(1),"Scrollable drag could not start");queueDialog.Drag.Update(450);queueDialog.Drag.ScrollForVerification();
             Require(queueDialog.Drag.ScrollOffset==20,"Original edge scrolling did not advance 20px");queueDialog.Drag.Cancel();
-            queue.RemoveRange(4,16);Save();RefreshQueue();panel.UpdateLayout();
+            queue.RemoveRange(4,16);Save();RefreshQueue();panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));panel.UpdateLayout();
             Require(active && generation==stamp,"Reordering restarted current playback");
             Click(IconAt(3,"ic_top_song"));Require(queue.Select(v=>v.Id).SequenceEqual(new[]{"queue-fixture-0","queue-fixture-3","queue-fixture-1","queue-fixture-2"}),"Queue top callback differs");
             Click(IconAt(2,"ic_delete"));Require(queue.Count==3 && queue.All(v=>v.Id!="queue-fixture-1"),"Pending-song delete callback failed");
