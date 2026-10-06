@@ -511,6 +511,13 @@ public static class Program
             app.MainWindow = window;
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             using var nativePlayback = new NativePlayback(bottom, stateDirectory);
+            nativePlayback.IdleSongExists=id=>songState.GetSongById(id) is not null;
+            nativePlayback.ResolveIdleSong=id=>
+            {
+                foreach(var media in AvailableMedia(id))
+                    if(musicServer.LocalPath(media) is { } path&&File.Exists(path))return new NativeIdleSong(path,media);
+                return null;
+            };
             using var ambienceExpressions=new AmbienceExpressions(nativePlayback.Television.Overlay,nativePlayback.Television,nativePlayback);
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             singerDirectory.Playback=nativePlayback;

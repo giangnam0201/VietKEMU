@@ -1,0 +1,9 @@
+# Original idle playlist rotation
+
+The decoded `BroadcastListManager` reads `localbroadcastlist.init`, whose `play_list` entries contain string `song_id` and `type` fields. It generates a list of unique positive IDs that exist in the song database, keeps its cursor when the configuration changes, wraps in order, and tries at most list size plus one entries while skipping unavailable local songs. Restart begins with a fresh cursor.
+
+The Windows port now loads that format from its state directory and resolves real local media through the existing song database and music cache. Idle playback completion advances the list; replay restarts the same idle song. Karaoke interrupts idle playback without consuming another idle entry. Idle songs retain idle volume settings and do not enter the selected-song queue. Custom or legacy `Demo.mp4` takes priority; the factory reset clears the configured list.
+
+The Firefox/options menu can import an original `.init` or equivalent JSON playlist. This file picker is a Windows import entry, not the original playlist editor. The full original editor, cloud list requests, linked-device behavior and random cached-song fallback remain pending. If the imported list has no playable local media, the port uses its existing factory idle-video fallback. It does not invent successful downloads for unavailable songs.
+
+Verification is pending the GitHub Windows build. Core checks cover parsing, persistence, duplicate and missing database filtering, cursor retention, wrap, invalid-import preservation and bounded unavailable retries. The native test decodes real synthetic media, seeks to its end to exercise completion-driven rotation, and checks replay, interruption, custom/legacy video priority and factory reset. These tests do not establish physical-device or cloud parity.

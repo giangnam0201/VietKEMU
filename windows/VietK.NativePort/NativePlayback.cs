@@ -232,6 +232,7 @@ public sealed class TelevisionWindow : Window
 }
 
 public enum PlaybackSource { Idle,LocalKaraoke,YouTube }
+public sealed record NativeIdleSong(string Path,SongMedia Metadata);
 
 public sealed class NativePlayback : IDisposable
 {
@@ -274,6 +275,10 @@ public sealed class NativePlayback : IDisposable
     public string? IdleVideoSource { get; private set; }
     public OriginalDefaultVolumeSettings DefaultVolumeSettings { get; }
     public OriginalBroadcastVolumeSettings BroadcastVolumeSettings { get; }
+    public OriginalBroadcastPlaylist IdlePlaylist { get; }
+    public Func<int,NativeIdleSong?>? ResolveIdleSong { get; set; }
+    public Func<int,bool>? IdleSongExists { get; set; }
+    public int? IdleSongId { get; private set; }
     public OriginalMarqueeSettings MarqueeSettings { get; }
     public void SetLocalMarquee(string text) { MarqueeSettings.SaveLocal(text);Television.Overlay.RefreshAdvertisement(); }
     public NativePlayback(BottomBar bottom, string stateDirectory)
@@ -282,6 +287,7 @@ public sealed class NativePlayback : IDisposable
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
         DefaultVolumeSettings=new OriginalDefaultVolumeSettings(stateDirectory);
         BroadcastVolumeSettings=new OriginalBroadcastVolumeSettings(stateDirectory);
+        IdlePlaylist=new OriginalBroadcastPlaylist(stateDirectory);
         songVolumeStep=DefaultVolumeSettings.Volume;broadcastVolumeStep=BroadcastVolumeSettings.Volume;broadcastMuted=BroadcastVolumeSettings.Muted;
         MarqueeSettings=new OriginalMarqueeSettings(stateDirectory);
         Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
@@ -323,7 +329,7 @@ public sealed class NativePlayback : IDisposable
             Width=1280,Height=720,Fill=new VisualBrush(Television.VideoLayers) {
                 ViewboxUnits=BrushMappingMode.Absolute,Viewbox=new Rect(0,0,1280,720),Stretch=Stretch.Fill } } };
     }
-    public bool StartIdleDemo()
+    public bool StartIdleDemo(bool advance=true)
     {
         // BroadcastListManager / USBSetBroadcastDialog: Demo.mp4 is a separate
         // idle broadcast, not the APK's grade_video.mp4 scoring animation.
@@ -334,15 +340,22 @@ public sealed class NativePlayback : IDisposable
             Path.Combine(AppContext.BaseDirectory,"60003950.mp4"),
             Path.Combine(OriginalSupplement.Root,"player","60003950.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Original","player","random_bg_default.mp4") };
-        var demo=paths.FirstOrDefault(File.Exists);
+        NativeIdleSong? idleSong=null;
+        if(!advance&&Source==PlaybackSource.Idle&&IdleVideoSource is { } replay&&File.Exists(replay))
+            idleSong=CurrentMedia is { } current?new(replay,current):null;
+        else if(!paths.Take(4).Any(File.Exists)&&ResolveIdleSong is not null)
+            idleSong=IdlePlaylist.Next(id=> { var candidate=ResolveIdleSong(id);return candidate is not null&&File.Exists(candidate.Path)?candidate:null; },IdleSongExists);
+        var demo=!advance&&Source==PlaybackSource.Idle&&IdleVideoSource is { } existing&&File.Exists(existing)?existing:idleSong?.Path??paths.FirstOrDefault(File.Exists);
         if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
-        playingIdle=false;Player.Stop();CurrentMedia=null;IdleVideoSource=demo;ResetPreview();
+        playingIdle=false;Player.Stop();CurrentMedia=idleSong?.Metadata;IdleSongId=idleSong?.Metadata.SongId;IdleVideoSource=demo;ResetPreview();
         Decoder.SetOutputVolumeStep(broadcastMuted?0:broadcastVolumeStep);
         Source=PlaybackSource.Idle;CurrentFlowId="";SourceChanged?.Invoke(Source);
         Television.Overlay.SetSong("");
         if(demo is null)return false;
         demo=Path.GetFullPath(demo);
-        Decoder.PreserveStereo=true;Player.SetTrackInfo(0,1);Player.SetVolume(1);
+        Decoder.PreserveStereo=idleSong is null||CurrentMedia is { OriginalTrack:0,AccompanyTrack:5 } or { OriginalTrack:5,AccompanyTrack:0 };
+        Player.SetTrackInfo(CurrentMedia?.OriginalTrack??0,CurrentMedia?.AccompanyTrack??1);
+        var idleGain=(CurrentMedia?.DefaultVolume??100)/100f;Player.SetVolume(idleGain<=0?.8f:idleGain);
         playingIdle=Player.SetSource(demo)==0 && Player.Play()==0;
         return playingIdle;
     }
@@ -359,7 +372,13 @@ public sealed class NativePlayback : IDisposable
     }
     public void UseFactoryIdleVideo()
     {
+        IdlePlaylist.Import("{\"play_list\":[]}");
         idleVideoPath="";SavePreferences();
+        if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
+    }
+    public void ImportIdlePlaylist(string json)
+    {
+        IdlePlaylist.Import(json);idleVideoPath="";SavePreferences();
         if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
     }
     private void SavePreferences()
@@ -373,7 +392,7 @@ public sealed class NativePlayback : IDisposable
         if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
         Decoder.SetOutputVolumeStep(songVolumeStep);
         Source=source;CurrentFlowId=flowId;SourceChanged?.Invoke(source);
-        playingIdle=false;Player.Stop(); CurrentMedia = metadata;ResetPreview();
+        playingIdle=false;Player.Stop(); CurrentMedia = metadata;IdleSongId=null;ResetPreview();
         Decoder.PreserveStereo=preserveStereo || metadata is { OriginalTrack:0,AccompanyTrack:5 } or { OriginalTrack:5,AccompanyTrack:0 };
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
         // KmPlayerCtrlImpl.getMediaVolume; configured HDD scale defaults to 1.
@@ -399,7 +418,7 @@ public sealed class NativePlayback : IDisposable
                 Player.SetSingMode(mode);
                 break;
             case "replay_imv":
-                if(playingIdle)StartIdleDemo();
+                if(playingIdle)StartIdleDemo(advance:false);
                 else if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path)
                     PlayMedia(path, CurrentMedia,Decoder.PreserveStereo,Source,CurrentFlowId);
                 Television.Overlay.ShowControl("replay");

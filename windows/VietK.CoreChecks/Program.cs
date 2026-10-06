@@ -712,6 +712,7 @@ SingerDirectoryChecks.Run();
 SearchSettingsChecks.Run();
 DefaultVolumeChecks.Run();
 BroadcastVolumeChecks.Run();
+BroadcastPlaylistChecks.Run();
 MarqueeSettingsChecks.Run();
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();

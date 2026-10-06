@@ -215,6 +215,13 @@ public sealed class YouTubeMusicScreen : IDisposable
             if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new TvQrModeDialog(panel,playback.Television.Overlay.Qr);
         });
         Add("Chọn video chờ (Demo.mp4)…",ChooseIdleVideo);
+        Add("Nhập danh sách video chờ VietK…",()=>
+        {
+            var dialog=new Microsoft.Win32.OpenFileDialog { Title="Danh sách video chờ VietK",Filter="VietK playlist|*.init;*.json|All files|*.*",CheckFileExists=true };
+            if(dialog.ShowDialog()!=true)return;
+            try { playback.ImportIdlePlaylist(File.ReadAllText(dialog.FileName));SetStatus("Đã lưu danh sách video chờ. Chỉ bài có video trên máy mới phát được."); }
+            catch(Exception error) { SetStatus(error.Message); }
+        });
         Add("Dùng video chờ gốc",()=> { playback.UseFactoryIdleVideo();SetStatus("Đã khôi phục video chờ mặc định."); });menu.IsOpen=true;
     }
     private void ChooseIdleVideo()
