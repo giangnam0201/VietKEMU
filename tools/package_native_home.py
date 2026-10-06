@@ -114,6 +114,21 @@ def package_song_browser(app, destination, entries, strings, values):
         return int(re.search(r'\b' + field + r'\s*=\s*(\d+)\s*;', source)[1])
     phantom_width = constant('NNTPReply', 'POSTING_NOT_ALLOWED')
     phantom_height = constant('TelnetCommand', 'GA')
+    panel_utils = (java / 'com/evideo/spellpanel/retrieve/PanelUtils.java').read_text()
+    replacements = {'sysSettingAboutView.VERSION_RE': 'V', 'DCCheckCodeCommu.TYPE_EMAIL_UNBIND': '8',
+                    'Marker.ANY_MARKER': '*', 'Marker.ANY_NON_NULL_MARKER': '+'}
+    # Resolve the constants from their original decoded classes before using
+    # the replacement text in PanelUtils' original arrays.
+    for reference, expected in replacements.items():
+        class_name, field = reference.split('.')
+        imported = re.search(r'import ([\w.]+\.' + class_name + r');', panel_utils)[1]
+        source = (java / (imported.replace('.', '/') + '.java')).read_text()
+        if re.search(r'\b' + field + r'\s*=\s*"([^"]*)"\s*;', source)[1] != expected:
+            raise RuntimeError('Original keyboard character constant changed: ' + reference)
+    def letters(field):
+        body = re.search(r'\b' + field + r'\s*=\s*\{([^}]+)\}', panel_utils)[1]
+        for reference, value in replacements.items(): body = body.replace(reference, json.dumps(value))
+        return json.loads('[' + body + ']')
     icons = ['search_keyboard_back.png', 'icon_pen.png', 'keyboard_earth.png']
     provenance = []
     for name in icons:
@@ -137,6 +152,7 @@ def package_song_browser(app, destination, entries, strings, values):
         'keyboardHeight': dim('search_input_panel_view_height'),
         'keyRowHeight': dim('spell_keyboard_item_height'), 'keyGap': dim('spell_keyboard_item_spacing'),
         'keyTextSize': dim('spell_letter_text_size'),
+        'alphabetLetters': letters('computerLetters'), 'symbolLetters': letters('numberAndSympols'),
         'provenance': 'SongNameFragment; BaseSongForGridViewFragment; CategoryHomeView; activity_main.xml; '
                       'view_song_name_vertical_scroll.xml; SearchInputKeyboardView; YueNanFirstSpellPanel; '
                       'AllKeyboardWithSoftPanel; PanelUtils'

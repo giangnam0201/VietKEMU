@@ -12,7 +12,8 @@ public sealed record SongBrowserContract(string Title, string EmptyMessage, stri
     string Hint, string ClearText, double ContainerX, double ContainerY, double ContainerWidth,
     double ContainerHeight, double CategoryHeight, double BackX, double BackY,
     double KeyboardWidth, double KeyboardY, double PhantomWidth, double PhantomHeight,
-    double KeyboardHeight, double KeyRowHeight, double KeyGap, double KeyTextSize, string Provenance);
+    double KeyboardHeight, double KeyRowHeight, double KeyGap, double KeyTextSize,
+    string[] AlphabetLetters, string[] SymbolLetters, string Provenance);
 
 // First local SongNameFragment path. Song tiles/actions, alternate input modes,
 // Phantom video and YouTube service navigation are separate unfinished ports.
@@ -60,8 +61,14 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         Click(back,()=>HomeRequested?.Invoke()); Put(canvas,back,contract.BackX,contract.BackY);
 
         var shell=new Grid { Width=contract.KeyboardWidth };
+        // Android 6 GradientDrawable: omitted endColor defaults to transparent,
+        // and an explicit centerColor inserts a stop at 0.5.
+        // aosp-mirror/platform_frameworks_base android-6.0.1_r1, updateGradientDrawableGradient.
+        var shellGradient=new LinearGradientBrush(new GradientStopCollection {
+            new(Color("#335a2e9d"),0), new(Color("#337339b1"),.5), new(Colors.Transparent,1) },
+            new Point(0,.5),new Point(1,.5));
         shell.Children.Add(new Border { CornerRadius=new(5),BorderThickness=new(1),IsHitTestVisible=false,
-            BorderBrush=Brush("#195375be"),Background=Gradient("#335a2e9d","#337339b1") });
+            BorderBrush=Brush("#195375be"),Background=shellGradient });
         var column=new StackPanel(); shell.Children.Add(column);
         column.Children.Add(new Border { Width=contract.PhantomWidth,Height=contract.PhantomHeight,
             Margin=new(20,5,20,5),Padding=new(2),CornerRadius=new(5),Background=Brushes.Black });
@@ -92,8 +99,8 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         void BuildKeys()
         {
             keys.Children.Clear();
-            var letters=Alphabetic?"QWERTYUIOPASDFGHJKLZXCVBNM".Select(c=>c.ToString()).ToArray():
-                new[]{"1","2","3","4","5","6","7","8","9","0","=","!","@","#","$","%","^","&","*",",",".","+","-","/","'","_"};
+            var letters=Alphabetic?contract.AlphabetLetters:contract.SymbolLetters;
+            if(letters.Length!=26)throw new InvalidDataException("Original Vietnamese key count differs");
             Border Key(string text,double width,double x,int row,Action action,string? icon=null)
             {
                 var key=new Border { Width=width,Height=contract.KeyRowHeight-contract.KeyGap,

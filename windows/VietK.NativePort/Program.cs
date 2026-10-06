@@ -71,6 +71,19 @@ public static class Program
                 using(var file=File.Create(Path.Combine(args[1],"native-song-browser.png")))songEncoder.Save(file);
                 if(browser.Results.Count!=0 || browser.Input?.Text!="" || !browser.Alphabetic)
                     throw new InvalidDataException("Original initial song browser state differs");
+                var spellCallbacks=0;
+                browser.Input!.SpellRequested+=_=>spellCallbacks++;
+                browser.Input.Letter("M");browser.Input.Letter("D");browser.Input.Letter("H");
+                var inputFrame=new System.Windows.Threading.DispatcherFrame();
+                var inputWait=new System.Windows.Threading.DispatcherTimer { Interval=TimeSpan.FromMilliseconds(250) };
+                inputWait.Tick+=(_,_)=> { inputWait.Stop();inputFrame.Continue=false; };
+                inputWait.Start();System.Windows.Threading.Dispatcher.PushFrame(inputFrame);
+                if(spellCallbacks!=1 || browser.Input.Text!="MDH" || browser.Results.Count!=0)
+                    throw new InvalidDataException("Native keyboard/query integration differs or fabricated local songs");
+                songCanvas.UpdateLayout();
+                var typedImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);typedImage.Render(songCanvas);
+                var typedEncoder=new PngBitmapEncoder();typedEncoder.Frames.Add(BitmapFrame.Create(typedImage));
+                using(var file=File.Create(Path.Combine(args[1],"native-song-search.png")))typedEncoder.Save(file);
                 // The contract was extracted from HomeNewFragment, not guessed.
                 var expected = new[] { "singer", "app", "mixcloud", "youtube", "soudcloud", "more" };
                 if (!contract.Tiles.Select(t => t.Tag).SequenceEqual(expected))
@@ -134,6 +147,7 @@ public static class Program
                     originalClickGuardVerified = true,
                     moreScreenNativeRendering = true,
                     songBrowserEmptyStateNativeRendering = true,
+                    nativeVietnameseInputQueryIntegrationVerified = true,
                     vietnameseKeyboard = "default layout/input translated; Thai and handwriting pending",
                     songGrid = "nonempty tiles/actions and media-index import pending",
                     homeResourcePort = "implemented; visual fidelity requires comparison",
