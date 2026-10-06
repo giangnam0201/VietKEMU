@@ -74,7 +74,8 @@ internal sealed class OriginalDefaultVolumeSeekBar : FrameworkElement
     private bool dragging;
     private readonly ImageSource? thumb=OriginalDefaultVolumeDialog.Artwork("volume_seekbar_thumb")?.Source;
     internal event Action<int>? Released;
-    internal int Progress { get=>progress;set { progress=Math.Clamp(value,0,20);InvalidateVisual(); } }
+    internal event Action<int>? ProgressChanged;
+    internal int Progress { get=>progress;set { progress=Math.Clamp(value,0,20);InvalidateVisual();ProgressChanged?.Invoke(progress); } }
     internal OriginalDefaultVolumeSeekBar(int value)
     {
         Width=256;Height=59;Focusable=true;Progress=value;

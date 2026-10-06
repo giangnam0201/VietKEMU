@@ -89,6 +89,18 @@ public sealed class MobileRemoteServer : IDisposable
             await context.Response.WriteAsJsonAsync(result);
         });
         object Marquee()=>new { mode="1",localText=playback.MarqueeSettings.LocalText,maxLength=OriginalMarqueeSettings.MaximumLength,cloudAvailable=false };
+        object BroadcastVolume()=>new { publishVolume=playback.BroadcastVolumeSettings.Volume,
+            isMuteOfPublishVolume=playback.BroadcastVolumeSettings.Muted?"1":"0",maxPublishMusic=20,restartTip=OriginalBroadcastVolumeSettings.RestartTip };
+        web.MapGet("/api/settings/broadcast-volume",async context=>await context.Response.WriteAsJsonAsync(await Ui(BroadcastVolume)));
+        web.MapPost("/api/settings/broadcast-volume",async context=>
+        {
+            using var request=await JsonDocument.ParseAsync(context.Request.Body,cancellationToken:context.RequestAborted);
+            if(request.RootElement.ValueKind!=JsonValueKind.Object||!request.RootElement.TryGetProperty("publishVolume",out var value)||
+                value.ValueKind!=JsonValueKind.Number||!value.TryGetInt32(out var volume)||volume is <0 or >20||
+                !request.RootElement.TryGetProperty("isMuteOfPublishVolume",out var mute)||mute.ValueKind!=JsonValueKind.String||mute.GetString() is not ("0" or "1"))throw new ArgumentException();
+            var result=await Ui(()=> { playback.BroadcastVolumeSettings.Save(volume,mute.GetString()=="1");return BroadcastVolume(); });
+            await context.Response.WriteAsJsonAsync(result);
+        });
         web.MapGet("/api/settings/marquee",async context=>await context.Response.WriteAsJsonAsync(await Ui(Marquee)));
         web.MapPost("/api/settings/marquee",async context=>
         {

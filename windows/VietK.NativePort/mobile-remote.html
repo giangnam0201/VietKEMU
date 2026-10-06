@@ -23,6 +23,10 @@
 <form id="marqueeForm" style="display:block"><textarea id="marqueeText" maxlength="240" rows="3" aria-label="Chữ chạy trên TV" style="width:100%;font:inherit;color:white;background:#180c31;border:2px solid #5c3589;border-radius:12px;padding:12px;resize:vertical" disabled></textarea>
 <p class="status" id="marqueeCount">240/240</p><p class="status" id="marqueeSaved" aria-live="polite" style="overflow-wrap:anywhere;white-space:pre-wrap"></p>
 <div class="actions"><button type="button" id="marqueeClear" disabled>Xóa</button><button type="button" id="marqueeCancel" disabled>Hủy</button><button type="submit" id="marqueeConfirm" disabled>Xác nhận</button></div></form></details>
+<details id="broadcastVolumeSettings"><summary>Âm lượng màn hình chờ</summary><p class="status" id="broadcastVolumeTip"></p>
+<label><input type="checkbox" id="broadcastMute" disabled> Tắt tiếng</label>
+<div class="actions"><button type="button" id="broadcastMinus" disabled>−</button><input type="range" id="broadcastVolume" min="0" max="20" step="1" value="15" aria-label="Âm lượng màn hình chờ" disabled><button type="button" id="broadcastPlus" disabled>+</button></div>
+<p class="status">Đang chọn: <output id="broadcastDraft">15</output>/20 · Đóng để lưu</p><button type="button" id="broadcastClose" disabled>Đóng</button></details>
 <p class="status" id="vocalHint"></p><p class="status" id="state"></p><p class="status" id="offline"></p>
 </main>
 <footer><div class="controls"><button data-command="voldec">− Giảm âm</button><button data-command="play_imv" id="pause">Dừng / Tiếp tục</button><button data-command="volinc">+ Tăng âm</button><button data-command="replay_imv">Phát lại</button><button data-command="cut_song_imv">Qua bài</button><button data-command="mute" id="mute">Tắt tiếng</button><button data-command="ori_imv" id="vocal" disabled>Ngắt lời</button><span class="status" id="volume"></span></div></footer>
@@ -36,6 +40,16 @@ function notice(message){$('notice').textContent=message;$('notice').style.displ
 async function api(path,body,signal){const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store',signal});if(!response.ok){if(response.status===401)throw Error('Kết nối hết hạn. Quét lại QR trên TV.');if(response.status===429)throw Error('Đang tìm bài khác. Thử lại sau.');let error;try{error=(await response.json()).error;}catch{}throw Error(error||'Không kết nối được VietK.');}return response.json();}
 async function action(value){try{await api('action',value);await refresh();}catch(error){notice(error.message);}}
 let savedDefaultVolume=null,defaultVolumeRequest=0;
+let broadcastLoaded=false,broadcastRequest=0,broadcastChain=Promise.resolve();
+function broadcastBusy(busy){for(const id of ['broadcastMute','broadcastClose'])$(id).disabled=busy;for(const id of ['broadcastVolume','broadcastMinus','broadcastPlus'])$(id).disabled=busy||$('broadcastMute').checked;}
+function broadcastDraft(value){$('broadcastVolume').value=String(Math.max(0,Math.min(20,value)));$('broadcastDraft').textContent=$('broadcastVolume').value;}
+function broadcastQueue(task){const result=broadcastChain.then(task);broadcastChain=result.catch(()=>{});return result;}
+$('broadcastVolumeSettings').ontoggle=async()=>{const request=++broadcastRequest;const opened=$('broadcastVolumeSettings').open;if(!opened&&!broadcastLoaded)return;const body=opened?null:{publishVolume:Number($('broadcastVolume').value),isMuteOfPublishVolume:$('broadcastMute').checked?'1':'0'};broadcastLoaded=false;broadcastBusy(true);try{const value=await broadcastQueue(()=>api('settings/broadcast-volume',body));if(request===broadcastRequest){$('broadcastMute').checked=value.isMuteOfPublishVolume==='1';broadcastDraft($('broadcastMute').checked?0:value.publishVolume);$('broadcastVolumeTip').textContent=value.restartTip;broadcastLoaded=$('broadcastVolumeSettings').open;}if(!opened)notice('Đã lưu âm lượng màn hình chờ. Hiệu quả sau khi khởi động lại.');}catch(error){notice(error.message);}finally{if(request===broadcastRequest)broadcastBusy(!broadcastLoaded);}};
+$('broadcastMute').onchange=()=>{if($('broadcastMute').checked)broadcastDraft(0);broadcastBusy(false);};
+$('broadcastVolume').oninput=()=>broadcastDraft(Number($('broadcastVolume').value));
+$('broadcastMinus').onclick=()=>broadcastDraft(Number($('broadcastVolume').value)-1);
+$('broadcastPlus').onclick=()=>broadcastDraft(Number($('broadcastVolume').value)+1);
+$('broadcastClose').onclick=()=>{$('broadcastVolumeSettings').open=false;};
 function defaultVolumeBusy(busy){for(const id of ['defaultVolume','defaultVolumeMinus','defaultVolumePlus','defaultVolumeCancel','defaultVolumeConfirm'])$(id).disabled=busy;}
 function defaultVolumeDraft(value){$('defaultVolume').value=String(Math.max(0,Math.min(20,value)));$('defaultVolumeDraft').textContent=$('defaultVolume').value;}
 function defaultVolumeSaved(value){savedDefaultVolume=value.defaultVolume;$('defaultVolumeTip').textContent=value.defaultVolumeSettingTip;$('defaultVolumeSaved').textContent='Đã lưu: '+savedDefaultVolume+'/20';defaultVolumeDraft(savedDefaultVolume);}

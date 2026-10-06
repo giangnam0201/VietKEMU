@@ -70,6 +70,7 @@ internal static class MobileRemoteVerification
         var originalDefault=await VerifyDefaultVolume(playback,client,panel,output);
         Checkpoint("Phone default-volume HTTP, validation and shared desktop preference checked");
         var originalMarquee=await VerifyMarquee(playback,client,output);
+        var originalBroadcast=await MobileBroadcastVolumeVerification.Run(playback,client,output);
         Checkpoint("Phone local marquee HTTP, validation and preserved TV song/idle text checked");
         if(Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1")
         {
@@ -95,6 +96,9 @@ internal static class MobileRemoteVerification
         using(var restore=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText=originalMarquee.Text }))
             Require(restore.IsSuccessStatusCode,"Marquee fixture could not restore its initial preference");
         playback.Television.Overlay.SetSong(originalMarquee.Current,originalMarquee.Next);
+        Require(playback.BroadcastVolumeSettings.Volume==8&&!playback.BroadcastVolumeSettings.Muted,"Browser did not restore idle-volume fixture");
+        using(var restore=await client.PostAsJsonAsync("api/settings/broadcast-volume",new { publishVolume=originalBroadcast.Volume,isMuteOfPublishVolume=originalBroadcast.Muted?"1":"0" }))
+            Require(restore.IsSuccessStatusCode,"Idle-volume fixture restoration failed");
         await Send(new { action="add",id="fixture0003" });Require((await Queue()).Length==3,"Phone add did not reach actual panel queue");
         await Send(new { action="top",id="fixture0003" });Require((await Queue())[1]=="fixture0003","Phone priority failed");
         await Send(new { action="move",id="fixture0003",target=2 });Require((await Queue())[2]=="fixture0003","Phone reorder failed");
@@ -133,6 +137,9 @@ internal static class MobileRemoteVerification
         using(var invalid=await client.PostAsJsonAsync("api/action",new { action="command",id="shutdown" }))Require(invalid.StatusCode==HttpStatusCode.BadRequest,"Unknown phone command accepted");
         using(var unknown=await client.PostAsJsonAsync("api/action",new { action="add",id="unsearched1" }))Require(unknown.StatusCode==HttpStatusCode.BadRequest,"Unsearched arbitrary media accepted");
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
+        Require((await client.GetAsync("api/settings/broadcast-volume")).StatusCode==HttpStatusCode.Unauthorized,"Revoked phone read idle volume");
+        using(var revoked=await client.PostAsJsonAsync("api/settings/broadcast-volume",new { publishVolume=0,isMuteOfPublishVolume="1" }))
+            Require(revoked.StatusCode==HttpStatusCode.Unauthorized,"Revoked phone changed idle volume");
         using(var revoked=await client.PostAsJsonAsync("api/settings/default-volume",new { defaultVolume=0 }))
             Require(revoked.StatusCode==HttpStatusCode.Unauthorized,"Revoked phone changed default volume");
         using(var revoked=await client.PostAsJsonAsync("api/settings/marquee",new { mode="1",localText="Revoked" }))
@@ -149,6 +156,7 @@ internal static class MobileRemoteVerification
             defaultVolumeLeavesLivePlaybackUnchanged=true,defaultVolumeAuthorizationOriginAndRevocation=true,
             marqueeReadWriteAndPersistence=true,marqueeAuthorizationOriginAndRevocation=true,marqueeValidationAndCloudRejection=true,
             marqueeSongIdleAndLocalQueueTitlesPreserved=true,marqueeSharedTvTextUpdated=true,
+            broadcastVolumeOriginalFieldsAndValidation=true,broadcastVolumeLeavesSessionAndSongsUnchanged=true,broadcastVolumeAuthorizationOriginAndRevocation=true,
             phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
     }

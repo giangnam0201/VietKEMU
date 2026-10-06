@@ -202,6 +202,10 @@ public sealed class YouTubeMusicScreen : IDisposable
         {
             if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new OriginalDefaultVolumeDialog(panel,playback.DefaultVolumeSettings);
         });
+        Add("Âm lượng màn hình chờ…",()=>
+        {
+            if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new OriginalBroadcastVolumeDialog(panel,playback.BroadcastVolumeSettings);
+        });
         Add("Chữ chạy trên TV…",EditMarquee);
         Add("Kết nối điều khiển bằng điện thoại",()=> { SetStatus(MobileConnectionInfo?.Invoke()??"Điều khiển điện thoại chưa khởi động.");OpenMobilePairing?.Invoke(); });
         Add("Ngắt điện thoại cũ / tạo QR mới",()=> { RePairMobile?.Invoke();SetStatus("Đã đổi mã kết nối. Quét lại QR trên TV."); });
@@ -480,6 +484,8 @@ public sealed class YouTubeMusicScreen : IDisposable
                 "Video YouTube không có thông tin kênh nguyên xướng / nhạc đệm của VietK.":playback.VocalUnavailableReason);
             return true;
         }
+        if((command is "volinc" or "voldec")&&playback.Source==PlaybackSource.Idle&&playback.BroadcastSessionMuted)
+        { SetStatus("Chế độ hiện tại không cho phép điều chỉnh âm lượng DEMO");return true; }
         if(command is "order_bg" or "orderlist_imv")
         { if(OriginalQueue?.ShouldPresent==true)OriginalQueue.ShowDialog();else ShowQueue();return true; }
         return false;

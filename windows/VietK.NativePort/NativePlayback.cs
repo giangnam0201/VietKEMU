@@ -247,6 +247,10 @@ public sealed class NativePlayback : IDisposable
     public Func<string,bool>? CommandOverride { get; set; }
     public SongMedia? CurrentMedia { get; private set; }
     private string idleVideoPath="";
+    private int songVolumeStep,broadcastVolumeStep;
+    private readonly bool broadcastMuted;
+    public int BroadcastSessionVolume=>broadcastVolumeStep;
+    public bool BroadcastSessionMuted=>broadcastMuted;
     private OriginalSingMode? pendingTrackFeedback;
     public bool IsPlayingIdle=>playingIdle;
     public bool ConfirmedOriginalVocal=>bottom.OriginalVocal;
@@ -263,6 +267,7 @@ public sealed class NativePlayback : IDisposable
     public bool CanSwitchVocal=>VocalUnavailableReason.Length==0;
     public string? IdleVideoSource { get; private set; }
     public OriginalDefaultVolumeSettings DefaultVolumeSettings { get; }
+    public OriginalBroadcastVolumeSettings BroadcastVolumeSettings { get; }
     public OriginalMarqueeSettings MarqueeSettings { get; }
     public void SetLocalMarquee(string text) { MarqueeSettings.SaveLocal(text);Television.Overlay.RefreshAdvertisement(); }
     public NativePlayback(BottomBar bottom, string stateDirectory)
@@ -270,6 +275,8 @@ public sealed class NativePlayback : IDisposable
         this.bottom = bottom;
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
         DefaultVolumeSettings=new OriginalDefaultVolumeSettings(stateDirectory);
+        BroadcastVolumeSettings=new OriginalBroadcastVolumeSettings(stateDirectory);
+        songVolumeStep=DefaultVolumeSettings.Volume;broadcastVolumeStep=BroadcastVolumeSettings.Volume;broadcastMuted=BroadcastVolumeSettings.Muted;
         MarqueeSettings=new OriginalMarqueeSettings(stateDirectory);
         Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
         Television = new TelevisionWindow(Decoder.VideoSurface,MarqueeSettings);
@@ -322,7 +329,9 @@ public sealed class NativePlayback : IDisposable
             Path.Combine(OriginalSupplement.Root,"player","60003950.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Original","player","random_bg_default.mp4") };
         var demo=paths.FirstOrDefault(File.Exists);
+        if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
         playingIdle=false;Player.Stop();CurrentMedia=null;IdleVideoSource=demo;ResetPreview();
+        Decoder.SetOutputVolumeStep(broadcastMuted?0:broadcastVolumeStep);
         Source=PlaybackSource.Idle;CurrentFlowId="";SourceChanged?.Invoke(Source);
         Television.Overlay.SetSong("");
         if(demo is null)return false;
@@ -355,6 +364,8 @@ public sealed class NativePlayback : IDisposable
     public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false,PlaybackSource source=PlaybackSource.LocalKaraoke,string flowId="")
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
+        if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
+        Decoder.SetOutputVolumeStep(songVolumeStep);
         Source=source;CurrentFlowId=flowId;SourceChanged?.Invoke(source);
         playingIdle=false;Player.Stop(); CurrentMedia = metadata;ResetPreview();
         Decoder.PreserveStereo=preserveStereo || metadata is { OriginalTrack:0,AccompanyTrack:5 } or { OriginalTrack:5,AccompanyTrack:0 };
@@ -389,6 +400,13 @@ public sealed class NativePlayback : IDisposable
                 break;
             case "cut_song_imv": Player.Stop(); NextRequested?.Invoke(); break;
             case "volinc": case "voldec":
+                if(Source==PlaybackSource.Idle)
+                {
+                    if(broadcastMuted)break;
+                    broadcastVolumeStep=Math.Clamp(broadcastVolumeStep+(command=="volinc"?1:-1),0,20);
+                    SetMuted(false,showFeedback:false);Decoder.SetOutputVolumeStep(broadcastVolumeStep);
+                    Television.Overlay.ShowControl("play_ctrl_audio_bg",broadcastVolumeStep);break;
+                }
                 // BottomMenuBarView -> KmPlayCtrlUtil.updateVolume clears mute.
                 SetMuted(false,showFeedback:false);
                 Decoder.SetOutputVolumeStep(Decoder.OutputVolumeStep + (command == "volinc" ? 1 : -1));
