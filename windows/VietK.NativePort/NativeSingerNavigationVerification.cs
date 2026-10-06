@@ -59,8 +59,11 @@ internal static class NativeSingerNavigationVerification
             ClickSinger(originalPanel,"song-singers:70000001","Fixture one");
             var active=navigation.Active!;Require(active.Singer?.Id==9&&active.Results.Count==60,"Singer initial fetch did not retain the original 60-record page");
             var panel=((Viewbox)host.Content).Child as Canvas??throw new InvalidDataException("Singer panel missing");host.UpdateLayout();
-            var scrolling=Descendants<ScrollViewer>(panel).Single();scrolling.ScrollToVerticalOffset(600);
-            await Until(()=>active.Results.Count==72,"Singer scrolling did not append the next original page");
+            var scrolling=Descendants<ScrollViewer>(panel).Single();
+            await Until(()=>panel.IsLoaded&&scrolling.IsLoaded&&scrolling.ViewportHeight>0,"Singer screen did not finish loading before the scroll gesture");
+            scrolling.ScrollToVerticalOffset(600);
+            try { await Until(()=>active.Results.Count==72,"Singer scrolling did not append the next original page"); }
+            catch(InvalidDataException error) { throw new InvalidDataException($"{error.Message}; count={active.Results.Count}, offset={scrolling.VerticalOffset}, viewport={scrolling.ViewportHeight}, loaded={panel.IsLoaded}",error); }
             Require(active.Results.Select(song=>song.Id).Distinct().Count()==72&&active.Results.All(song=>song.Id<70000073),"Singer pagination leaked another singer or duplicated songs");
             active.Input!.Letter("F");active.Input.Letter("A");await Until(()=>active.Results.Count==1,"Singer search did not stay restricted to the active ID");
             Require(active.Results.Single().Id==70000001,"Singer spell search returned another title");
