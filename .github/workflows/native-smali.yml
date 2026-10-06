@@ -50,6 +50,37 @@ jobs:
           if missing: raise RuntimeError('Missing original bytecode: ' + ','.join(sorted(missing)))
           (output/'provenance.json').write_text(json.dumps(files, indent=2))
           PY
+      - name: Retain original data-center service transport and login bytecode
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil
+          app = Path('decoded/KmDataCenterService')
+          output = Path('bytecode-review/KmDataCenterService')
+          classes = {'DataCenterService', 'BaseDataCenterCommu', 'DataCenterCommu', 'CommonDataCenterCommu',
+                     'KtvDataCenterCommu', 'DataCenterConfigure', 'DataCenterMessage', 'DataCenterToken',
+                     'DataCenterSign', 'UriManager', 'DataCenterHttp', 'DataCenterHttps', 'DataCenterHttpFactory',
+                     'OkHttpClientFactory', 'SignHeaderAttach', 'BaseSignHeaderAttach', 'SignHeaderAttachFactory'}
+          entries = {entry['path']: entry for entry in json.loads((app/'original-entries.json').read_text())}
+          files = []
+          found = set()
+          for root in (app/'apktool').glob('smali*'):
+              if not root.is_dir(): continue
+              dex = 'classes.dex' if root.name == 'smali' else root.name.removeprefix('smali_') + '.dex'
+              for source in (root/'com/evideo').rglob('*.smali'):
+                  name = source.stem.split('$')[0]
+                  if name not in classes: continue
+                  relative = source.relative_to(app/'apktool')
+                  destination = output / relative
+                  destination.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(source, destination)
+                  files.append({'path': relative.as_posix(), 'decodedSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+                                'originalDex': dex, 'originalDexSha256': entries[dex]['sha256']})
+                  found.add(name)
+          missing = {'DataCenterService', 'BaseDataCenterCommu', 'DataCenterCommu', 'DataCenterHttp'} - found
+          if missing: raise RuntimeError('Missing original server transport bytecode: ' + ','.join(sorted(missing)))
+          (output/'provenance.json').write_text(json.dumps(files, indent=2))
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: original-song-playlist-bytecode

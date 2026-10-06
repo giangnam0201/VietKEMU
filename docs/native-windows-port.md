@@ -324,3 +324,25 @@ actual firmware song 101000, verifies state 202, unchanged remote flag 0,
 independent worker persistence and combined identity, then verifies clear/reset.
 It explicitly bypasses storage/server admission and does not claim a media file
 or live request succeeded. Servers, television and playback remain pending.
+
+`OriginalMediaUrlResolver` ports `DCDomain.requestMediaList` from its original
+classes26.dex: `sn_song_media_list`, song ID, Ethernet MAC and empty token;
+required medialist schema and metadata, HTTP-file probe ordering, score updates,
+volume UUID selection and the returned Media constructor defaults. Computed type,
+extension and file-size values never reach that constructor in the bytecode.
+`OriginalDownloadUrlStage` ports `DCThread.run`: first media entry, literal
+`%2F`/`?attname=` replacement, media update before transfer, offline stop/error
+1015, empty-URL error 1012 and exception error 1013. These classes have explicit
+transport/storage dependencies; production server wiring remains pending.
+Android JSON numeric conversion is checked against the
+[AOSP JSON helper](https://android.googlesource.com/platform/libcore/+/refs/heads/main/json/src/main/java/org/json/JSON.java).
+The broader Android JSON implementation has not been fully ported.
+
+Cloud run https://github.com/giangnam0201/VietKEMU/actions/runs/37414832410,
+commit `4d07635`, passed the resolver request/response fixtures, score/volume
+callback order, malformed response and URL-stage error cases, then Windows
+compilation/capture and test ZIP packaging. These are synthetic protocol fixtures,
+not a successful live server login or music download. Supporting original helper
+bytecode was collected in run 37414835354 and retained locally as
+`artifacts/original-bytecode-v5`. The next production dependency is the separate
+`KmDataCenterService` APK's login, permissions, tokens, signing and HTTP transport.
