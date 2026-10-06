@@ -301,6 +301,7 @@ public static class NativePlaybackVerification
                     combined.CopyPixels(new Int32Rect(320,110,1,1),center,4,0);
                     Require(center[2]>240 && center[0]<10 && center[1]<10,"Panel preview omitted the TV expression pixels");
                     await Task.Delay(1600);await Tone(expressionTap,1600,880,"Expression sound did not loop beyond its first second");
+                    Require(expressions.Show("memeda",expressionRoot),"Expression could not restart for mute verification");
                     var expressionPower=await MeasurePower(expressionTap,1600);
                     playback.SetMuted(true);
                     await UntilPower(expressionTap,1600,power=>power<expressionPower*.001,"Mute left expression WAV audible");
@@ -461,6 +462,11 @@ public static class NativePlaybackVerification
     {
         tap.Reset();await Task.Delay(400);
         var samples=tap.Read();
+        // Repeating one-second expression media can be between decoder inputs.
+        // Require real PCM, but give the next loop time to supply enough frames.
+        var deadline=DateTime.UtcNow.AddSeconds(2);
+        while(samples.Length<4800&&DateTime.UtcNow<deadline)
+        { await Task.Delay(100);samples=tap.Read(); }
         if(samples.Length<4800)throw new InvalidDataException("No decoded PCM available for gain verification");
         return Math.Min(PcmTap.Power(samples,frequency,0),PcmTap.Power(samples,frequency,1));
     }
