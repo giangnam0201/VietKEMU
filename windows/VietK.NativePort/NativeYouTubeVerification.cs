@@ -30,7 +30,7 @@ static class NativeYouTubeVerification
                 decoded=playback.Decoder.Position>=500 && playback.Decoder.Native.Size(0,ref width,ref height) && width>0 && height>0;
                 if(!decoded)throw new IOException("YouTube video did not produce native decoded video frames");
                 var snapshot=Path.GetFullPath(Path.Combine(output,"youtube-native-tv.png"));
-                if(!playback.Decoder.Native.TakeSnapshot(0,snapshot,0,0))throw new IOException("YouTube TV snapshot failed");
+                playback.SaveVideoFrame(snapshot);
                 deadline=DateTime.UtcNow.AddSeconds(10);
                 while(!File.Exists(snapshot) && DateTime.UtcNow<deadline)await Task.Delay(100);
                 if(!File.Exists(snapshot))throw new IOException("YouTube decoded-frame snapshot missing");

@@ -43,6 +43,7 @@ public static class NativePlaybackVerification
                 Require(playback.StartIdleDemo(),"Bundled original idle background unavailable");
                 await Until(()=>played>0 && playback.DecodedPreviewFrames>idlePreviewBefore,
                     "Bundled original idle background did not decode into the panel preview");
+                Require(!string.IsNullOrWhiteSpace(playback.Television.Overlay.MarqueeText),"Idle marquee missing");
                 var idleEncoder=new PngBitmapEncoder();idleEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
                 using(var idleFile=File.Create(Path.Combine(output,"bundled-idle-preview.png")))idleEncoder.Save(idleFile);
                 played=0;
@@ -59,7 +60,7 @@ public static class NativePlaybackVerification
                 var corner=new byte[4];composed.CopyPixels(new Int32Rect(500,300,1,1),corner,4,0);
                 Require(corner.SequenceEqual(new byte[] {31,63,127,255}),"TV logo overlay stretched across the panel video preview");
                 var snapshot = Path.GetFullPath(Path.Combine(output, "original-tv-video.png"));
-                Require(playback.Decoder.Native.TakeSnapshot(0, snapshot, 0, 0), "Native video snapshot request failed");
+                playback.SaveVideoFrame(snapshot);
                 await Until(() => File.Exists(snapshot) && new FileInfo(snapshot).Length > 1024, "Decoded video snapshot missing");
                 await Until(() => playback.DecodedPreviewFrames>previewFramesBefore && playback.PreviewFrame is not null,
                     "Panel preview did not receive real decoder pixels");
@@ -135,6 +136,27 @@ public static class NativePlaybackVerification
                 Require(playback.Decoder.PreserveStereo,"Replay lost stereo playback mode");
 
                 var multi = Path.GetFullPath(Path.Combine(fixtures, "multiple.ts"));
+                using(var growing=new ProgressiveVideo(Path.Combine(output,"growing-video.ts"),async (target,cancel)=>
+                {
+                    await using var source=File.OpenRead(multi);var chunk=new byte[8192];
+                    while(true)
+                    {
+                        var count=await source.ReadAsync(chunk,cancel);if(count==0)break;
+                        await target.WriteAsync(chunk.AsMemory(0,count),cancel);await target.FlushAsync(cancel);
+                        await Task.Delay(100,cancel);
+                    }
+                    await Task.Delay(3000,cancel);
+                },CancellationToken.None))
+                {
+                    await growing.WaitUntilReady(CancellationToken.None);
+                    var before=playback.DecodedPreviewFrames;
+                    Require(playback.PlayMedia(growing.Url,preserveStereo:true),"Growing video stream rejected");
+                    await Until(()=>playback.DecodedPreviewFrames>before+10,"Growing stream did not produce live decoded frames");
+                    Require(!growing.Completion.IsCompleted,"Video only started after download completed");
+                    var frameStart=playback.DecodedPreviewFrames;await Task.Delay(1000);
+                    Require(playback.DecodedPreviewFrames-frameStart>=10,"Shared TV/preview source still updates like snapshot polling");
+                    playback.Player.Stop();
+                }
                 // Vocal mode persists between songs in the original player.
                 // Select original explicitly before testing stream index 1.
                 playback.Player.SetSingMode(OriginalSingMode.Original);
@@ -171,6 +193,7 @@ public static class NativePlaybackVerification
                     decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,
                     configuredIdleDemoDecoderAndLoopVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
+                    playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,
                     stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,
                     youtubeStereoPcmAndReplayVerified = true,
                     pauseResumeClockVerified = true, nativeSeekReplayVerified = true,

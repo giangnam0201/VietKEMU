@@ -21,6 +21,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     private readonly YouTubeMusicClient client;
     private readonly List<YouTubeVideo> queue=[];
     private CancellationTokenSource? searching,downloading;
+    private ProgressiveVideo? liveTransfer;
     private WrapPanel? results;
     private IReadOnlyList<YouTubeVideo> videos=[];
     private readonly Dictionary<string,TextBlock> visibleTitles=[];
@@ -72,8 +73,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         pages.Children.Add(Button("‹",()=>ChangePage(-1)));
         pageLabel=Label("1 / 1",20);pageLabel.Width=100;pageLabel.TextAlignment=TextAlignment.Center;pages.Children.Add(pageLabel);
         pages.Children.Add(Button("›",()=>ChangePage(1)));Put(canvas,pages,280,550);
-        preview=new Image { Width=440,Height=249,Stretch=Stretch.Uniform,Source=playback.PreviewFrame };
-        Put(canvas,new Border { Width=440,Height=249,Background=Brushes.Black,Child=preview },820,95);
+        Put(canvas,new Border { Width=440,Height=249,Background=Brushes.Black,Child=playback.CreatePanelPreview() },820,95);
         CreateKeyboard(canvas,query??"");
         status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=750;status.Height=52;Put(canvas,status,38,603);
         RefreshQueue();
@@ -144,7 +144,18 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Chọn file cookies…",ChooseCookies);
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
         Add("Thử lại bài đang tải",()=>_=PlayFirst());menu.IsOpen=true;
+        Add("Chữ chạy trên TV…",EditMarquee);
     }
+    private void EditMarquee()
+    {
+        var path=Path.Combine(Path.GetDirectoryName(queueFile)!,"tv-marquee.txt");
+        var text=new TextBox { Text=File.Exists(path)?File.ReadAllText(path):"",AcceptsReturn=true,TextWrapping=TextWrapping.Wrap,Height=150 };
+        var area=new StackPanel { Margin=new(15) };area.Children.Add(text);
+        var window=new Window { Title="VietK — Chữ chạy trên TV",Width=500,Height=270,Content=area,Owner=Application.Current.MainWindow };
+        area.Children.Add(Button("Lưu",()=> { File.WriteAllText(path,text.Text);UpdateMarquee();window.Close(); }));window.ShowDialog();
+    }
+    private void UpdateMarquee()=>playback.Television.Overlay.SetSong(active?queue.FirstOrDefault()?.Title??"":"",
+        active?queue.Skip(1).FirstOrDefault()?.Title??"":"");
     private void ShowQueue()
     {
         queueView=new StackPanel();var content=new StackPanel { Margin=new(20) };content.Children.Add(Label("Đã chọn",26));
@@ -203,6 +214,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     private void RefreshQueue()
     {
         bottom.SetConfirmedQueueCount(queue.Count);queueView?.Children.Clear();
+        UpdateMarquee();
         foreach(var (id,title) in visibleTitles)
             title.Foreground=queue.Any(item=>item.Id==id)?new SolidColorBrush(Color.FromRgb(255,231,97)):Brushes.White;
         for(var index=0;index<queue.Count;index++)
@@ -221,21 +233,31 @@ public sealed class YouTubeMusicScreen : IDisposable
     private async Task PlayFirst()
     {
         downloading?.Cancel();var stamp=++generation;
-        playback.Player.Stop();active=false;
+        playback.Player.Stop();active=false;liveTransfer?.Dispose();liveTransfer=null;
         if(queue.Count==0) { playback.StartIdleDemo();return; }
         var video=queue[0];var cancellation=new CancellationTokenSource();downloading=cancellation;
         SetStatus("Đang tải: "+video.Title);
         try
         {
-            var file=await client.Download(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
+            var file=client.CompletedVideo(video);
+            if(file is null)
+            {
+            liveTransfer=client.StartProgressive(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
             {
                 if(stamp==generation)SetStatus("Đang tải: "+video.Title+" — "+(progress.Total>0?
                     (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
             }),cancellation.Token);
+            await liveTransfer.WaitUntilReady(cancellation.Token);file=liveTransfer.Url;
+            }
             if(stamp!=generation || disposed)return;
             if(!playback.PlayMedia(file,preserveStereo:true))throw new IOException("Không phát được video đã tải.");
             active=true;SetStatus("Đang phát: "+video.Title);RefreshQueue();
             playback.Television.Overlay.SetSong(video.Title,queue.Skip(1).FirstOrDefault()?.Title??"");
+            if(liveTransfer is not null)
+            {
+                await liveTransfer.Completion;
+                if(stamp==generation && !disposed)SetStatus("Đang phát: "+video.Title+" — đã tải xong");
+            }
         }
         catch(OperationCanceledException) { }
         catch(Exception ex) { if(stamp==generation && !disposed)SetStatus(ex.Message+" — bấm Thử lại hoặc chọn bài khác."); }
@@ -257,9 +279,9 @@ public sealed class YouTubeMusicScreen : IDisposable
         return false;
     }
     private void Next()
-    { downloading?.Cancel();++generation;active=false;playback.Player.Stop();if(queue.Count>0)queue.RemoveAt(0);Save();RefreshQueue();_=PlayFirst(); }
+    { downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;++generation;active=false;playback.Player.Stop();if(queue.Count>0)queue.RemoveAt(0);Save();RefreshQueue();_=PlayFirst(); }
     private void Clear()
-    { downloading?.Cancel();++generation;active=false;queue.Clear();Save();RefreshQueue();playback.StartIdleDemo();SetStatus("Hàng chờ trống."); }
+    { downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;++generation;active=false;queue.Clear();Save();RefreshQueue();playback.StartIdleDemo();SetStatus("Hàng chờ trống."); }
     private void Save()
     { File.WriteAllText(queueFile+".tmp",JsonSerializer.Serialize(queue));File.Move(queueFile+".tmp",queueFile,true); }
     private void ChooseCookies()
@@ -283,5 +305,5 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private static void Put(Canvas canvas,UIElement element,double x,double y)
     { Canvas.SetLeft(element,x);Canvas.SetTop(element,y);canvas.Children.Add(element); }
-    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();playback.CommandOverride=null;playback.PreviewFrameChanged-=PreviewChanged; }
+    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();liveTransfer?.Dispose();playback.CommandOverride=null;playback.PreviewFrameChanged-=PreviewChanged; }
 }

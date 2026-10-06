@@ -21,12 +21,17 @@ public sealed class TelevisionOverlay
     private readonly Image control,pause;
     private readonly TextBlock number,marquee;
     private readonly DispatcherTimer timeout;
+    private readonly Dictionary<string,string> messages;
+    private readonly string advertisementFile;
+    public string MarqueeText=>marquee.Text;
     public string LastControl { get; private set; }="";
     public bool Paused => pause.Visibility==Visibility.Visible;
     public bool ControlVisible => control.Visibility==Visibility.Visible;
     public TelevisionOverlay(string root)
     {
         this.root=root;
+        messages=JsonSerializer.Deserialize<Dictionary<string,string>>(File.ReadAllText(Path.Combine(root,"player","marquee.json")))!;
+        advertisementFile=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VietKNativePort","tv-marquee.txt");
         contract=JsonSerializer.Deserialize<TvOsdContract>(File.ReadAllText(Path.Combine(root,"player","osd.json")),
             new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original TV OSD contract");
         var logo=new Image { Source=Bitmap("top-logo.png"),Width=135,Height=64,Stretch=Stretch.Uniform };
@@ -44,11 +49,13 @@ public sealed class TelevisionOverlay
     }
     public void SetSong(string current,string next="",string advertisement="")
     {
-        marquee.Text=(string.IsNullOrWhiteSpace(current)?"": "Đang phát: "+current)+
-            (string.IsNullOrWhiteSpace(next)?"":"     Tiếp theo: "+next)+
+        if(string.IsNullOrWhiteSpace(advertisement) && File.Exists(advertisementFile))advertisement=File.ReadAllText(advertisementFile);
+        var key=string.IsNullOrWhiteSpace(current)?"marquee_not_demand_tip":
+            string.IsNullOrWhiteSpace(next)?"marquee_current_playing_tip":"marquee_current_playing_and_next_play_tip";
+        marquee.Text=messages[key].Replace("%1$s",current).Replace("%2$s",next)+
             (string.IsNullOrWhiteSpace(advertisement)?"":"     "+advertisement);
         marquee.Measure(new Size(double.PositiveInfinity,54));
-        marquee.BeginAnimation(System.Windows.Controls.Canvas.LeftProperty,new DoubleAnimation(1060,-marquee.DesiredSize.Width,
+        marquee.BeginAnimation(System.Windows.Controls.Canvas.LeftProperty,new DoubleAnimation(0,-marquee.DesiredSize.Width,
             TimeSpan.FromSeconds(Math.Max(15,(1060+marquee.DesiredSize.Width)/70))) { RepeatBehavior=RepeatBehavior.Forever });
     }
     public void SetPaused(bool value)

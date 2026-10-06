@@ -412,6 +412,21 @@ def package_player_reference(decoded, destination, firmware):
         raise RuntimeError('Original TV reference video differs')
     output = destination / 'player'
     output.mkdir(exist_ok=True)
+    video_inventory=[]
+    inspection=destination/'video-inspection';inspection.mkdir(exist_ok=True)
+    for original_apk in sorted(firmware.rglob('*.apk')):
+        with zipfile.ZipFile(original_apk) as bundle:
+            for entry in bundle.infolist():
+                if not entry.filename.lower().endswith('.mp4'):
+                    continue
+                clip=inspection/(original_apk.stem+'-'+Path(entry.filename).name)
+                clip.write_bytes(bundle.read(entry))
+                thumbnail=clip.with_suffix('.png')
+                subprocess.run(['ffmpeg','-v','error','-ss','2','-i',str(clip),'-frames:v','1','-vf','scale=640:-1','-y',str(thumbnail)],check=True)
+                video_inventory.append({'apk':str(original_apk.relative_to(firmware)), 'asset':entry.filename,
+                    'bytes':entry.file_size, 'thumbnail':thumbnail.name,'sha256':hashlib.sha256(clip.read_bytes()).hexdigest()})
+                clip.unlink()
+    (inspection/'inventory.json').write_text(json.dumps(sorted(video_inventory,key=lambda item:-item['bytes']),indent=2))
     (output / original.name).write_bytes(payload)
     background_asset = 'assets/random_bg_default.mp4'
     background_file = app / 'apktool' / background_asset
@@ -439,6 +454,11 @@ def package_player_reference(decoded, destination, firmware):
     shutil.copy2(decoded / 'daulkmboxosdtv/apktool/res/layout/activity_osd.xml', output / 'activity_osd.xml')
     tv = decoded / 'daulkmboxosdtv'
     tv_entries = json.loads((tv / 'original-entries.json').read_text())
+    strings={item.get('name'):item.text or '' for item in ET.parse(tv/'apktool/res/values/strings.xml').getroot()}
+    for localized in sorted((tv/'apktool/res').glob('values-vi*/strings.xml')):
+        strings.update({item.get('name'):item.text or '' for item in ET.parse(localized).getroot()})
+    (output/'marquee.json').write_text(json.dumps({key:strings[key] for key in (
+        'marquee_not_demand_tip','marquee_current_playing_tip','marquee_current_playing_and_next_play_tip')},ensure_ascii=False,indent=2))
     records = []
     for name in ('play', 'pause', 'replay', 'original', 'accompany', 'play_ctrl_audio_bg'):
         candidates = sorted((tv / 'apktool/res').glob('drawable*/' + name + '.png'))

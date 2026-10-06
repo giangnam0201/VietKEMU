@@ -127,4 +127,60 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         if(process.ExitCode!=0)throw new IOException("YouTube fetch failed: "+string.Join("\n",errors));
         return text.ToString();
     }
+    public ProgressiveVideo StartProgressive(YouTubeVideo video,Action<YouTubeTransferProgress> progress,
+        CancellationToken cancellation,string? verificationInfoFile=null)
+    {
+        if(VideoId(video.Id)!=video.Id)throw new ArgumentException("Invalid YouTube video ID");
+        var directory=Path.GetFullPath(Path.Combine(cacheDirectory,video.Id));Directory.CreateDirectory(directory);
+        var file=Path.Combine(directory,video.Id+".stream.ts");
+        if(File.Exists(file+".complete"))File.Delete(file+".complete");
+        return new ProgressiveVideo(file,async (output,token)=>
+        {
+            var arguments=Common().Concat(new[]{"--no-playlist","--no-simulate","--quiet","--no-progress",
+                "--ffmpeg-location",Path.GetFullPath(toolDirectory),"--downloader","ffmpeg",
+                "--downloader-args","ffmpeg_o:-f mpegts -flush_packets 1 -mpegts_flags +resend_headers",
+                "--format","bv[vcodec^=avc1][height<=1080]+ba[acodec^=mp4a]/b[ext=mp4][height<=1080]",
+                "--output","-"}).ToList();
+            if(verificationInfoFile is not null)arguments.AddRange(["--load-info-json",Path.GetFullPath(verificationInfoFile)]);
+            else arguments.AddRange(["--","https://www.youtube.com/watch?v="+video.Id]);
+            var start=new ProcessStartInfo(Tool("yt-dlp")) { UseShellExecute=false,CreateNoWindow=true,
+                RedirectStandardOutput=true,RedirectStandardError=true,StandardErrorEncoding=Encoding.UTF8 };
+            foreach(var argument in arguments)start.ArgumentList.Add(argument);
+            using var process=Process.Start(start)??throw new IOException("Could not start progressive YouTube transfer");
+            var errors=process.StandardError.ReadToEndAsync(token);
+            using var timeout=CancellationTokenSource.CreateLinkedTokenSource(token);timeout.CancelAfter(TimeSpan.FromMinutes(30));
+            using var registration=timeout.Token.Register(()=> { try { if(!process.HasExited)process.Kill(true); } catch(InvalidOperationException) { } });
+            try
+            {
+                var buffer=new byte[65536];long received=0;
+                while(true)
+                {
+                    var count=await process.StandardOutput.BaseStream.ReadAsync(buffer,timeout.Token);if(count==0)break;
+                    await output.WriteAsync(buffer.AsMemory(0,count),timeout.Token);await output.FlushAsync(timeout.Token);
+                    received+=count;progress(new(received,0,"downloading"));
+                }
+                await process.WaitForExitAsync(timeout.Token);
+                var error=await errors;
+                if(process.ExitCode!=0)throw new IOException("YouTube progressive fetch failed: "+string.Join('\n',error.Split('\n').TakeLast(8)));
+                var probe=await Run(Tool("ffprobe"),["-v","error","-show_entries","stream=codec_type","-of","json",file],null,token,TimeSpan.FromSeconds(30));
+                using var inspection=JsonDocument.Parse(probe);
+                var types=inspection.RootElement.GetProperty("streams").EnumerateArray().Select(item=>item.GetProperty("codec_type").GetString()).ToArray();
+                if(!types.Contains("audio") || !types.Contains("video"))throw new IOException("Progressive transfer is missing video or audio");
+                await File.WriteAllTextAsync(file+".complete",received.ToString(),token);
+                progress(new(received,received,"finished"));
+            }
+            catch { if(!process.HasExited)process.Kill(true);throw; }
+        },cancellation);
+    }
+    public string? CompletedVideo(YouTubeVideo video)
+    {
+        if(VideoId(video.Id)!=video.Id)return null;
+        foreach(var extension in new[]{".stream.ts",".mkv"})
+        {
+            var path=Path.GetFullPath(Path.Combine(cacheDirectory,video.Id,video.Id+extension));
+            if(File.Exists(path+".complete") && File.Exists(path) && long.TryParse(File.ReadAllText(path+".complete"),out var size)
+                && size>0 && new FileInfo(path).Length==size)return path;
+        }
+        return null;
+    }
 }

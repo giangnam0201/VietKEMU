@@ -20,6 +20,9 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
 {
     private readonly LibVLC library;
     private readonly Dispatcher dispatcher;
+    private readonly SharedVideoFrames frames;
+    public BitmapSource VideoSurface => frames.Surface;
+    public event Action? VideoFrameChanged;
     private Media? media;
     private string? source;
     private int generation;
@@ -47,6 +50,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
         LibVLCSharp.Shared.Core.Initialize(directory);
         library = new LibVLC("--no-video-title-show", "--no-osd");
         Native = new MediaPlayer(library) { EnableKeyInput = false, EnableMouseInput = false };
+        frames=new SharedVideoFrames(Native,dispatcher);frames.Updated+=()=>VideoFrameChanged?.Invoke();
         Native.Playing += (_, _) => Post(() => { if(firstFrame)ConfirmedPause?.Invoke(false); });
         Native.Paused += (_, _) => Post(() => ConfirmedPause?.Invoke(true));
         Native.EndReached += (_, _) => Post(() => Original?.OnComplete());
@@ -140,7 +144,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; generation++; Native.Stop(); Native.Dispose(); media?.Dispose(); library.Dispose();
+        disposed = true; generation++; Native.Stop(); Native.Dispose();frames.Dispose(); media?.Dispose(); library.Dispose();
     }
 }
 
@@ -148,18 +152,20 @@ public sealed class TelevisionWindow : Window
 {
     private bool allowClose;
     private readonly Border black;
+    public Grid VideoLayers { get; }
     public TelevisionOverlay Overlay { get; }
     public bool BlackVisible => black.Visibility == Visibility.Visible;
-    public TelevisionWindow(MediaPlayer player)
+    public TelevisionWindow(BitmapSource surface)
     {
         Title = "VietK — TV output"; Width = 960; Height = 540; Background = Brushes.Black;
         // activity_osd: full video surface, black cover above it, then loading,
         // playback hint and grading containers. Missing OSD layers stay absent.
         black = new Border { Background = Brushes.Black };
         Overlay=new TelevisionOverlay(Path.Combine(AppContext.BaseDirectory,"Original"));
-        var layers=new Grid();layers.Children.Add(black);
-        layers.Children.Add(new Viewbox { Child=Overlay.Canvas,Stretch=Stretch.Uniform });
-        Content = new VideoView { MediaPlayer = player, Content = layers };
+        VideoLayers=new Grid { Width=1280,Height=720,Background=Brushes.Black };
+        VideoLayers.Children.Add(new Image { Source=surface,Stretch=Stretch.Uniform });
+        VideoLayers.Children.Add(black);VideoLayers.Children.Add(Overlay.Canvas);
+        Content = new Viewbox { Child=VideoLayers,Stretch=Stretch.Uniform };
     }
     public void SetBlack(bool visible) => black.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
     protected override void OnClosing(CancelEventArgs e)
@@ -168,7 +174,7 @@ public sealed class TelevisionWindow : Window
         base.OnClosing(e);
     }
     public void ClosePermanently() { allowClose = true; Close(); }
-    public void Detach() => ((VideoView)Content).MediaPlayer = null;
+    public void Detach() { }
     public BitmapSource CompositePreview(BitmapSource? video)
     {
         Overlay.Canvas.Measure(new Size(1280,720));Overlay.Canvas.Arrange(new Rect(0,0,1280,720));
@@ -191,14 +197,8 @@ public sealed class NativePlayback : IDisposable
 {
     private readonly BottomBar bottom;
     private readonly string stateFile;
-    private readonly string previewDirectory;
-    private readonly DispatcherTimer previewTimer;
-    private string? pendingPreview;
-    private DateTime pendingPreviewAt;
     private bool playingIdle;
-    private int previewSequence;
-    private BitmapSource? previewVideo;
-    public BitmapSource? PreviewFrame { get; private set; }
+    public BitmapSource? PreviewFrame => Television.CompositePreview(Decoder.VideoSurface);
     public int DecodedPreviewFrames { get; private set; }
     public event Action<BitmapSource>? PreviewFrameChanged;
     public WindowsVideoDecoder Decoder { get; }
@@ -213,10 +213,8 @@ public sealed class NativePlayback : IDisposable
         this.bottom = bottom;
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
         Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
-        Television = new TelevisionWindow(Decoder.Native);
-        previewDirectory=Path.Combine(stateDirectory,"preview");Directory.CreateDirectory(previewDirectory);
-        previewTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(500) };
-        previewTimer.Tick+=(_,_)=>RefreshPreview();previewTimer.Start();
+        Television = new TelevisionWindow(Decoder.VideoSurface);
+        Decoder.VideoFrameChanged+=()=> { DecodedPreviewFrames++;PreviewFrameChanged?.Invoke(Decoder.VideoSurface); };
         Player = new OriginalVideoPlayer(Decoder, Television.SetBlack);
         Decoder.Original = Player;
         Decoder.ConfirmedPause = paused => { bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
@@ -232,13 +230,11 @@ public sealed class NativePlayback : IDisposable
     }
     public void ShowTelevision(Window panel)
     { Television.Show(); }
-    public Image CreatePanelPreview()
+    public FrameworkElement CreatePanelPreview()
     {
-        var image=new Image { Stretch=Stretch.Uniform,Source=PreviewFrame };
-        void Update(BitmapSource frame)=>image.Source=frame;
-        image.Loaded+=(_,_)=> { image.Source=PreviewFrame;PreviewFrameChanged+=Update; };
-        image.Unloaded+=(_,_)=>PreviewFrameChanged-=Update;
-        return image;
+        return new Viewbox { Stretch=Stretch.Uniform,Child=new System.Windows.Shapes.Rectangle {
+            Width=1280,Height=720,Fill=new VisualBrush(Television.VideoLayers) {
+                ViewboxUnits=BrushMappingMode.Absolute,Viewbox=new Rect(0,0,1280,720),Stretch=Stretch.Fill } } };
     }
     public bool StartIdleDemo()
     {
@@ -261,7 +257,6 @@ public sealed class NativePlayback : IDisposable
     }
     private void ResetPreview()
     {
-        pendingPreview=null;previewVideo=null;
         Television.Overlay.SetPaused(false);
     }
     public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false)
@@ -305,30 +300,11 @@ public sealed class NativePlayback : IDisposable
                 break;
         }
     }
-    private void RefreshPreview()
+    public void SaveVideoFrame(string path)
     {
-        if(PreviewFrameChanged is null)return;
-        try
-        {
-            if(pendingPreview is not null && DateTime.UtcNow-pendingPreviewAt>TimeSpan.FromSeconds(3))pendingPreview=null;
-            if(pendingPreview is not null && File.Exists(pendingPreview) && new FileInfo(pendingPreview).Length>0)
-            {
-                using var stream=File.OpenRead(pendingPreview);var image=new BitmapImage();image.BeginInit();
-                image.CacheOption=BitmapCacheOption.OnLoad;image.StreamSource=stream;image.EndInit();image.Freeze();
-                previewVideo=image;pendingPreview=null;DecodedPreviewFrames++;
-            }
-            PreviewFrame=Television.CompositePreview(previewVideo);PreviewFrameChanged?.Invoke(PreviewFrame);
-            if(pendingPreview is null && !Television.BlackVisible)
-            {
-                var path=Path.GetFullPath(Path.Combine(previewDirectory,"frame-"+(previewSequence++%2)+".png"));
-                if(File.Exists(path))File.Delete(path);
-                if(Decoder.Native.TakeSnapshot(0,path,640,360)) { pendingPreview=path;pendingPreviewAt=DateTime.UtcNow; }
-            }
-        }
-        catch(IOException) { }
-        catch(System.IO.FileFormatException) { }
-        catch(System.NotSupportedException) { }
+        var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(Decoder.VideoSurface));
+        using var file=File.Create(path);encoder.Save(file);
     }
-    public void Dispose() { previewTimer.Stop();Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
+    public void Dispose() { Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
     private sealed record PlaybackPreferences(int Volume);
 }
