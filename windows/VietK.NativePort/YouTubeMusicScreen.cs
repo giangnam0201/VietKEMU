@@ -48,7 +48,8 @@ public sealed class YouTubeMusicScreen : IDisposable
         Put(canvas,Label("YouTube",28),95,88);
         var back=Button("‹ Trang chính",()=>HomeRequested?.Invoke());Put(canvas,back,1035,86);
         results=new WrapPanel { Width=750 };
-        var scroll=new ScrollViewer { Width=775,Height=440,Content=results,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
+        var scroll=new ScrollViewer { Width=775,Height=440,Content=results,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,
+            VerticalScrollBarVisibility=ScrollBarVisibility.Auto };
         Put(canvas,scroll,25,148);
         var side=new StackPanel { Width=365 };Put(canvas,side,865,146);
         side.Children.Add(Label("Tên bài hát / liên kết YouTube",20));
@@ -57,13 +58,14 @@ public sealed class YouTubeMusicScreen : IDisposable
         input.KeyDown+=async (_,e)=> { if(e.Key==Key.Enter) { e.Handled=true;await Search(); } };side.Children.Add(input);
         var search=Button("Tìm kiếm",()=>_=Search());search.Width=180;side.Children.Add(search);
         side.Children.Add(Label("Hàng chờ",22));
-        queueView=new StackPanel();side.Children.Add(new ScrollViewer { Content=queueView,Height=220,Margin=new(0,8,0,5) });
+        queueView=new StackPanel();side.Children.Add(new ScrollViewer { Content=queueView,Height=160,Margin=new(0,8,0,5),
+            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,VerticalScrollBarVisibility=ScrollBarVisibility.Auto });
         var actions=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(actions);
         actions.Children.Add(Button("Thử lại",()=>_=PlayFirst()));actions.Children.Add(Button("Xóa hàng chờ",Clear));
         var login=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(login);
         login.Children.Add(Button("Cookies YouTube…",ChooseCookies));
         login.Children.Add(Button("Bỏ cookies",()=> { cookieFile="";SaveSettings();SetStatus("Chế độ công khai; không dùng phiên đăng nhập."); }));
-        status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=1180;Put(canvas,status,38,603);
+        status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=750;status.Height=52;Put(canvas,status,38,603);
         RefreshQueue();
         if(!string.IsNullOrWhiteSpace(query))_=Search();
         return canvas;
