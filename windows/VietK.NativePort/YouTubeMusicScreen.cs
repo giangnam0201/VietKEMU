@@ -105,7 +105,7 @@ public sealed class YouTubeMusicScreen : IDisposable
             new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original keyboard");
         input=new TextBox { Width=410,Height=42,FontSize=24,FontFamily=OriginalFont.Family,Text=text,
             Background=Brushes.Transparent,Foreground=Brushes.White,BorderThickness=new(0),Padding=new(0,5,0,0) };
-        input.KeyDown+=async (_,e)=> { if(e.Key==Key.Enter) { e.Handled=true;await Search(); } };
+        input.KeyDown+=async (_,e)=> { if(e.Key==System.Windows.Input.Key.Enter) { e.Handled=true;await Search(); } };
         Put(canvas,input,805,353);Put(canvas,Button(contract.ClearText,()=>input.Clear()),1220,353);
         var keys=new Canvas { Width=480,Height=240 };Put(canvas,keys,800,400);var alphabetic=true;
         void Edit(string value,bool back=false)
