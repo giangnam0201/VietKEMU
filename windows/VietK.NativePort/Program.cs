@@ -117,6 +117,7 @@ public static class Program
                     downloadQueue.DeleteByIndex(index);
                 }
                 downloadSelection.Reset();downloadSelection.DownloadFirst();QueueChanged();
+                queueBrowser?.Refresh();
             };
             musicServer.Failed+=async (id,code,detail)=>
             {

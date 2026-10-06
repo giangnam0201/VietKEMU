@@ -34,6 +34,8 @@ public static class NativePlaybackVerification
                     new WindowInteropHelper(playback.Television).Handle != IntPtr.Zero &&
                     playback.Television.Owner is null, "Independent panel/TV window handles missing");
                 var played = 0; playback.Player.Played += () => played++;
+                await NativeMusicPipelineVerification.Run(playback,root,fixtures,output);
+                played=0;
                 var clip = Path.GetFullPath(Path.Combine(root, "player", "grade_video.mp4"));
                 Require(playback.PlayMedia(clip), "Original APK grading video rejected");
                 await Until(() => played > 0 && playback.Decoder.Position > 0, "Original video did not decode/render");
@@ -119,6 +121,7 @@ public static class NativePlaybackVerification
                     panelPlaybackObserverVerified = true, volumeStepVerified = true,
                     nextAndDecoderCompletionVerified = true,
                     httpDownloadedVideoHashAndDecoderVerified = true,
+                    signedHttpLoginMediaRequestCacheQueueAndDecoderVerified = true,
                     scope = "Real video pixels and decoded PCM, with original player/control rules. Audio-device playback, full TV OSD, encrypted karaoke, storage, scoring and live downloads remain unverified."
                 }, new JsonSerializerOptions { WriteIndented = true }));
                 result = 0;

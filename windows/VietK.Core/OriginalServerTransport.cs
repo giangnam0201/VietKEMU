@@ -59,6 +59,7 @@ public sealed class OriginalMusicTransfer : IDisposable
         if(songId<=0)throw new ArgumentOutOfRangeException(nameof(songId));
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri) || uri.Scheme is not ("http" or "https"))
             throw new OriginalTransferException(1001,"Invalid music URL");
+        directory=Path.GetFullPath(directory);
         Directory.CreateDirectory(directory);
         var filename=songId+(url.Contains(".mp3",StringComparison.Ordinal)?".mp3":".ts");
         var temporary=Path.Combine(directory,filename+".tmp");
