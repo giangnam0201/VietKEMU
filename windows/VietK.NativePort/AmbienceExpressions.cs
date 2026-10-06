@@ -30,12 +30,13 @@ public sealed class AmbienceExpressions : IDisposable
     {
         this.playback=playback;muted=playback?.Decoder.Muted??false;
         this.television=television;
-        this.overlay=overlay;library=new LibVLC("--no-video","--no-video-title-show");
-        Sound=new LibVLCSharp.Shared.MediaPlayer(library) { Volume=50 };
-        Sound.Playing+=(_,_)=>Sound.Volume=muted?0:50;
-        // As with the main decoder, Playing can precede creation of the audio
-        // output. Reapply gain when real audio timing confirms readiness.
-        Sound.TimeChanged+=(_,args)=> { if(args.Time>0)Sound.Volume=muted?0:50; };
+        // Android's effect volume is a linear .5 multiplier. VLC's output
+        // volume uses a cubic curve and may not exist yet at Playing. Apply
+        // the fixed gain in the decoder filter, retaining unity output gain.
+        this.overlay=overlay;library=new LibVLC("--no-video","--no-video-title-show","--audio-filter=gain","--gain-value=0.5");
+        Sound=new LibVLCSharp.Shared.MediaPlayer(library) { Volume=100 };
+        Sound.Playing+=(_,_)=>Sound.Volume=muted?0:100;
+        Sound.TimeChanged+=(_,args)=> { if(args.Time>0)Sound.Volume=muted?0:100; };
         if(playback is not null)playback.MuteChanged+=SetMuted;
         expiry.Tick+=(_,_)=>Hide();
     }
@@ -51,7 +52,7 @@ public sealed class AmbienceExpressions : IDisposable
         if(File.Exists(wave))
         {
             media=new Media(library,new Uri(Path.GetFullPath(wave)));media.AddOption(":input-repeat=65535");
-            Sound.Volume=muted?0:50;Sound.Play(media);
+            Sound.Volume=muted?0:100;Sound.Play(media);
         }
         expiry.Start();return true;
     }
@@ -168,6 +169,6 @@ public sealed class AmbienceExpressions : IDisposable
     private static BitmapImage LoadImage(string path)=>new(new Uri(Path.GetFullPath(path)));
     private static void Put(Canvas canvas,UIElement child,double x,double y)
     { Canvas.SetLeft(child,x);Canvas.SetTop(child,y);canvas.Children.Add(child); }
-    private void SetMuted(bool value) { muted=value;Sound.Volume=value?0:50; }
+    private void SetMuted(bool value) { muted=value;Sound.Volume=value?0:100; }
     public void Dispose() { if(playback is not null)playback.MuteChanged-=SetMuted;Hide();Sound.Dispose();library.Dispose(); }
 }
