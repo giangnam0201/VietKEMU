@@ -49,6 +49,12 @@ The original empty-message and YouTube button are present; YouTube navigation,
 Thai/handwriting mode actions, nonempty song tiles/actions and media-index
 import remain pending. Phantom remains an empty original-sized video region.
 This is still a development component, not a working karaoke release.
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37392895683
+renders both initial and typed-search states and checks that three rapid key
+inputs emit one delayed query against the original empty local seed. Character
+arrays and their referenced constants are resolved from the decoded APK source.
+Fonts, inherited Android button metrics and TileButton depth animation still
+need fidelity work; a rendered capture alone does not prove pixel equivalence.
 
 `WholeCatalogue` translates read-only `WholeSongDAO` count, existence, ID lookup
 and remote-metadata checks. It reads the unchanged original database. An online
