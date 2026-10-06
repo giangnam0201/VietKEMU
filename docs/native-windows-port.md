@@ -146,11 +146,29 @@ downloaded verification report confirms `originalSelectedListStorageVerified`
 and `androidRuntimeUsed: false`. These checks establish storage behavior only;
 they do not establish working panel queue actions or playback.
 
-This is the storage layer. Runtime item reconstruction, manager initialization,
-notification/playback dispatch, download-list integration and panel queue
-handlers remain pending. The manager's default clear-on-start policy must be
-translated separately; the store never clears the user's data merely by opening
-the database.
+`SelectedPlaylistItem.Restore` now reconstructs runtime item metadata from these
+rows: catalogue-backed normal/mdream/kmtrain/photomv types skip absent songs;
+other types use the original synthetic Song defaults. Saved display metadata
+remains distinct from catalogue metadata, and null getters normalize as in
+KmPlayListItem. Scoring is enabled when Song's raw CanScore is zero, while the
+selected table writes booleans as 1/0. Media selection prefers the first path
+resolved by storage discovery, otherwise the first metadata entry. A filename
+or a download URL alone never establishes a local file.
+
+`OriginalSelectedQueue` translates append, existing/new/repeat Top, drag sort,
+delete, identity and clear behavior, with explicit original DAO messages and
+separate list/playback notification callbacks. Top and sorting protect current
+index zero in memory. Original drag sort forwards zero-based indices to the
+one-based DAO; this mismatch is preserved rather than silently repaired. The
+manager defaults to clearing persisted entries on initialization. Even when
+that flag is disabled, the bytecode's restore loop runs before IsInitialized,
+so its Add method does not repopulate the active list on first initialization.
+The store itself never clears data merely by opening the database.
+
+The host's ordered asynchronous message dispatcher, linked-service initialization,
+remaining manager methods, actual playback/list observers, download-list
+integration and panel queue handlers remain pending. The runtime translation
+is not yet connected to the interactive panel.
 
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,

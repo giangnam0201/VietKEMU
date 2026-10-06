@@ -151,13 +151,20 @@ public static class Program
                     // Separate capture database: these are persistence fixtures,
                     // not interactive selections or claims of playback success.
                     selected.Clear();
-                    var storedInput=new SelectedSong(localSong.Id,localSong.CanScore==1,null,localSong.ReportTableNumber,
+                    var storedInput=new SelectedSong(localSong.Id,localSong.ScoringEnabled,null,localSong.ReportTableNumber,
                         localSong.Stage,"normal",localSong.Name,"",localSong.Singer,localSong.Id.ToString(),"fixture-flow","");
                     var selectedId=selected.AddSong(storedInput);
                     var storedOutput=selected.ReadStoredEntries().Single();
                     if(selectedId<=0 || storedOutput.Sequence!=1 || storedOutput.LegacyPlayType is not null ||
                         storedOutput.Song!=storedInput || !selected.IsExist(selectedId))
                         throw new InvalidDataException("Original seed selected-list schema/storage round-trip differs");
+                    var restoredItem=SelectedPlaylistItem.Restore(selected.ReadStoredEntries(),
+                        id=>imported.GetSongById(id),imported.GetMedia,_=>null).Single();
+                    if(restoredItem.SongMetadata.Id!=101000 || restoredItem.CanScore ||
+                        restoredItem.VideoMedia?.FileName!="101000.MPG" || restoredItem.LocalFlag!=0 ||
+                        restoredItem.InfoId!="normal||101000||Mộng dưới hoa (sc)" ||
+                        restoredItem.FlowId!="fixture-flow" || restoredItem.DownloadState!=200 || restoredItem.DownloadFinished)
+                        throw new InvalidDataException("Original selected item reconstruction differs");
                     selected.Clear();
                     var gridFixture=browser.CreateVerificationFixture(fixtureSongs);
                     var gridBottom=bottom.Create();Canvas.SetTop(gridBottom,bottomContract.Y);gridFixture.Children.Add(gridBottom);
@@ -203,6 +210,7 @@ public static class Program
                     originalMediaMetadataLookupVerified = true,
                     originalLocalSongLookupVerified = true,
                     originalSelectedListStorageVerified = true,
+                    originalSelectedItemReconstructionVerified = true,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,

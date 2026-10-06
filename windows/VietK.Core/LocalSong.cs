@@ -7,6 +7,8 @@ public sealed record LocalSong(int Id,string Name,string Spell,int Words,string 
     int[] SingerIds,int[] Types,int[] Languages,int PlayRate,int CanScore,int CanMShow,
     string? Album,string? ErcVersion,int HasRemote,string? LastUpdateTime,int LocalFlag,int IsPsl)
 {
+    // Song.canScore uses zero as enabled, unlike tblSelectedList's bool encoding.
+    public bool ScoringEnabled => CanScore==0;
     public int ReportTableNumber { get; set; }=-1;
     public int Stage { get; set; }
     public int SongSpecies { get; set; }=-999;

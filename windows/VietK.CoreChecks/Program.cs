@@ -194,3 +194,81 @@ using(var reopened=new SqliteConnection(new SqliteConnectionStringBuilder { Data
 }
 File.Delete(selectedPath);
 Console.WriteLine("Original selected store verified: migration, round-trip, Top/sort/delete, repeats, persistence and failed insert.");
+
+using(var queueDb=new SqliteConnection("Data Source=:memory:"))
+{
+    queueDb.Open();
+    using(var schema=queueDb.CreateCommand())
+    {
+        schema.CommandText="CREATE TABLE tblSelectedList(id INTEGER NOT NULL PRIMARY KEY,songid INT,canscore INT,sequence INT,customerId TEXT,tableid INT,stage INT)";
+        schema.ExecuteNonQuery();
+    }
+    var store=new SelectedListStore(queueDb);
+    LocalSong? Lookup(int id)=>id==999?null:new(id,"Database name "+id,"DB",2,"Database singer",
+        new[]{1,2,-1,-1},new[]{8,-1,-1,-1},new[]{8,-1,-1,-1},1,0,0,"","",1,"",2,0);
+    SongMedia Media(int id)=>new(id,10,"media"+id,100,1,0,"audio","",0,"","","","",0,null,null,"");
+    SelectedSong Stored(int id,string? type)=>new(id,false,null,5,3,type,"Saved name "+id,null,null,"id-"+id,null,null);
+    store.AddSong(Stored(10,null));store.AddSong(Stored(999,"normal"));
+    foreach(var type in new[]{"normal","mdream","kmtrain","photomv","movie","youtube"})store.AddSong(Stored(10,type));
+    IReadOnlyList<SelectedPlaylistItem> Restore()=>SelectedPlaylistItem.Restore(store.ReadStoredEntries(),Lookup,
+        _=>new[]{Media(1),Media(2)},media=>media.Id==2?"verified-local-file":null);
+    var restored=Restore();
+    Require(restored.Count==6 && restored[0].Sequence==3 && restored[0].CanScore && restored[0].IsDisco &&
+        restored[0].SongMetadata.Name=="Database name 10" && restored[0].PlayName=="Saved name 10" &&
+        restored[0].TableId==5 && restored[0].Stage==3 && restored[0].VideoMedia?.Id==2 &&
+        restored[0].SingerName=="" && restored[0].PlayUrl=="" && restored[0].FlowId=="" &&
+        restored[0].InfoId=="normal||id-10||Saved name 10" && restored[0].DownloadState==200 && !restored[0].DownloadFinished,
+        "Selected restore filtering, source-versus-saved metadata, null getters, score polarity or local media preference differs");
+    Require(restored.Take(4).All(item=>item.CanScore && item.LocalFlag==2) &&
+        restored.Skip(4).All(item=>!item.CanScore && item.LocalFlag==1 && item.SongMetadata.Spell=="" &&
+            item.SongMetadata.SingerIds.SequenceEqual(new int[4])),
+        "Original catalogue-backed versus synthetic playback type reconstruction differs");
+    var noLocal=SelectedPlaylistItem.Restore(store.ReadStoredEntries(),Lookup,_=>new[]{Media(1),Media(2)},_=>null);
+    Require(noLocal[0].VideoMedia?.Id==1,"Remote metadata fallback changed or inferred a local file");
+
+    var commands=new List<SelectedQueueCommand>();var effects=new List<string>();
+    void Post(SelectedQueueCommand command) { commands.Add(command);effects.Add("post"+command.What); }
+    var queue=new OriginalSelectedQueue(Lookup,Post,()=>effects.Add("changed"),()=>effects.Add("start"));
+    queue.ClearOnInitialize=false;queue.Initialize(store,Restore);
+    Require(queue.IsInitialized && queue.Count==0 && store.Count==8 && commands.Count==0,
+        "Initialization invented saved queue restoration or persistence before initialized");
+    SelectedPlaylistItem Item(int id,string type="normal")=>new(Lookup(id)!,0,null,null)
+        { PlayType=type,PlayId="id-"+id,PlayName="Song "+id,InfoId=type+"||id-"+id+"||Song "+id };
+    queue.Add(Item(10));queue.Add(Item(20));queue.Add(Item(30));queue.Add(Item(40));
+    Require(effects.Take(3).SequenceEqual(new[]{"start","post4","changed"}) && commands.Count==4 &&
+        queue.Snapshot().All(item=>Guid.TryParse(item.FlowId,out _) && item.LocalFlag==2),
+        "Append flow IDs or first-song notification/DAO dispatch order differs");
+    Require(!queue.TopByIndex(0) && !queue.TopByIndex(1) && !queue.TopByIndex(4) && queue.TopByIndex(3) &&
+        queue.Snapshot().Select(item=>item.SongMetadata.Id).SequenceEqual(new[]{10,40,20,30}) && commands.Last()==new SelectedQueueCommand(3,4),
+        "Queue Top guards, current-song preservation or one-based DAO argument differs");
+    Require(!queue.SortByIndex(0,2) && !queue.SortByIndex(2,0) && queue.SortByIndex(1,3) &&
+        queue.Snapshot().Select(item=>item.SongMetadata.Id).SequenceEqual(new[]{10,20,30,40}) &&
+        commands.Last()==new SelectedQueueCommand(6,1,3),"Drag sort converted original DAO indices or moved current song");
+    Require(queue.Exists(Item(20)) && !queue.Exists(Item(50)) && queue.Top(Item(30),true,false) &&
+        queue.Snapshot()[1].SongMetadata.Id==30 && queue.Top(Item(50),false,false) && queue.Snapshot()[1].SongMetadata.Id==50,
+        "Existing versus new Top routing differs");
+    var oldCount=queue.Count;Require(queue.Top(Item(30),true,true) && queue.Count==oldCount+1 &&
+        queue.Snapshot()[1].SongMetadata.Id==30,"Normal repeat Top did not add a separate item");
+    var youtube=Item(60,"youtube");youtube.PlayUrl="https://www.youtube.com/watch?v=ABC";queue.Add(youtube);
+    var ytCopy=queue.Snapshot().Last();
+    var ytDuplicate=Item(70,"youtube");ytDuplicate.PlayUrl=ytCopy.PlayUrl;
+    Require(youtube.PlayUrl=="ABC" && ytCopy.FlowId=="ABC" && ytCopy.PlayUrl=="https://www.youtube.com/watch?v=ABC" &&
+        queue.Exists(ytDuplicate),"YouTube normalization/clone flow or URL duplicate identity differs");
+    var cloud=Item(80,"soundcloud");cloud.CloudKey="cloud-key";queue.Add(cloud);
+    var cloudDuplicate=Item(90,"mixcloud");cloudDuplicate.CloudKey="cloud-key";
+    Require(queue.Snapshot().Last().FlowId=="cloud-key" && queue.Exists(cloudDuplicate),"Cloud key identity differs");
+    effects.Clear();Require(queue.DeleteByIndex(0) && effects.SequenceEqual(new[]{"post1","start","changed"}) &&
+        commands.Last()==new SelectedQueueCommand(1,1),"Playing-song deletion notifications/one-based DAO dispatch differs");
+    effects.Clear();Require(!queue.DeleteByIndex(-1) && effects.SequenceEqual(new[]{"changed"}),
+        "Invalid deletion changed original notification semantics");
+    store.Clear();foreach(var command in commands.Take(6))command.Apply(store);
+    Require(store.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{40,20,10,30}),
+        "DAO dispatch repaired the original drag-sort index mismatch instead of forwarding it");
+    queue.ClearWithoutNext();Require(queue.Count==0 && commands.Last()==new SelectedQueueCommand(5),"Clear dispatch differs");
+    effects.Clear();Require(!queue.DeleteByIndex(0) && effects.SequenceEqual(new[]{"start","changed"}),
+        "Original empty current-slot deletion did not request playback/list notification");
+    var fresh=new OriginalSelectedQueue(Lookup,Post,()=>{},()=>{});
+    fresh.Initialize(store,Restore);Require(fresh.ClearOnInitialize && store.Count==0 && fresh.Count==0,
+        "Default manager initialization did not clear the persisted selected list");
+}
+Console.WriteLine("Original selected items/manager verified: reconstruction, score polarity, media preference, initialization, Top, drag indices, flow identity and notifications.");
