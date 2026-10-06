@@ -5,6 +5,7 @@ namespace VietK.Core;
 public sealed class SelectedPlaylistItem
 {
     public LocalSong SongMetadata { get; }
+    public string SongName { get; set; }
     public SongMedia? VideoMedia { get; }
     public int Sequence { get; }
     public string? CustomerId { get; set; }
@@ -14,10 +15,11 @@ public sealed class SelectedPlaylistItem
     public bool CanScoreInDatabase { get; }
     public bool IsDisco { get; }
     public int SongSpecies { get; }
-    public bool Broadcast => false;
+    public bool Broadcast { get; }
     public int Score { get; set; }
     public int DownloadState { get; set; }=200;
-    public int DownloadProgress { get; set; }
+    private int downloadProgress;
+    public int DownloadProgress { get=>downloadProgress;set=>downloadProgress=Math.Clamp(value,0,100); }
     public bool DownloadFinished { get; set; }
     public string PlayType { get; set; }="normal";
     public string PlayName { get; set; }="";
@@ -31,9 +33,9 @@ public sealed class SelectedPlaylistItem
     public string InfoId { get; set; }="";
     public string? CloudKey { get; set; }
 
-    public SelectedPlaylistItem(LocalSong song,int sequence,string? customerId,SongMedia? media)
+    public SelectedPlaylistItem(LocalSong song,int sequence,string? customerId,SongMedia? media,bool broadcast=false)
     {
-        SongMetadata=song;Sequence=sequence;CustomerId=customerId;VideoMedia=media;
+        SongMetadata=song;SongName=song.Name;Sequence=sequence;CustomerId=customerId;VideoMedia=media;Broadcast=broadcast;
         TableId=song.ReportTableNumber;Stage=song.Stage;LocalFlag=song.LocalFlag;
         CanScoreInDatabase=song.ScoringEnabled;IsDisco=song.Types[0]==8;SongSpecies=song.SongSpecies;
         SingerName=song.Singer;
@@ -57,7 +59,7 @@ public sealed class SelectedPlaylistItem
 
     public static IReadOnlyList<SelectedPlaylistItem> Restore(IEnumerable<StoredSelectedSong> rows,
         Func<int,LocalSong?> lookup,Func<int,IReadOnlyList<SongMedia>> mediaLookup,
-        Func<SongMedia,string?> localPath)
+        Func<SongMedia,string?> localPath,int syntheticLocalFlag=1)
     {
         var items=new List<SelectedPlaylistItem>();
         foreach(var row in rows)
@@ -66,7 +68,7 @@ public sealed class SelectedPlaylistItem
             var song=type is "normal" or "mdream" or "kmtrain" or "photomv"
                 ?lookup(entry.SongId)
                 :new LocalSong(entry.SongId,entry.Name??"","",0,"",new int[4],new int[4],new int[4],
-                    0,1,0,"","",0,"",1,0);
+                    0,1,0,"","",0,"",syntheticLocalFlag,0);
             if(song is null)continue;
             song.ReportTableNumber=entry.TableId;song.Stage=entry.Stage;
             // Original Media.isVideo returns true for every media object. Prefer

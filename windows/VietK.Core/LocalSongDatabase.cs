@@ -9,6 +9,7 @@ public sealed class LocalSongDatabase : IDisposable
     private readonly SqliteConnection connection;
     public SongSearch Search { get; }
     public SelectedListStore SelectedList { get; }
+    public DownloadListStore DownloadList { get; }
 
     public LocalSongDatabase(string seedPath, string statePath)
     {
@@ -25,6 +26,7 @@ public sealed class LocalSongDatabase : IDisposable
             UpgradeSongColumns(connection);
             Search = new SongSearch(connection);
             SelectedList = new SelectedListStore(connection);
+            DownloadList = new DownloadListStore(connection);DownloadList.UpgradeSchema();
         }
         catch { connection.Dispose(); throw; }
     }

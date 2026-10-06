@@ -220,6 +220,28 @@ the original NoStorage rejection without adding to either queue. Report:
 `artifacts/native-verification-v17/verification.json`. This verifies admission;
 it does not establish functional downloading, system-toast fidelity or playback.
 
+`OriginalDownloadQueue` translates SongDownListManager state and effects:
+restoration (filtering mobile entries), append/Top flow IDs, next-slot guards,
+identity, progress/errors, first-match metadata changes, public-play insertion,
+registry removals and clear/cancel ordering. Progress setters retain the original
+0–100 clamp and byte-count truncation; unknown totals still set state 202 while
+preserving progress and returning false. Progress/error setters do not invent
+list notifications. Download-first requests remain explicit dependencies.
+
+`DownloadListStore` translates SongDownListDAO metadata, Top/delete transactions,
+count-based append, single-shift repeated-song deletion and reconstruction.
+DAOHelper's exact base table creation is included because the shipped local seed
+does not contain tblSongDownList. Numeric playType remains separate from text
+type. Unlike selected persistence, this table has no customerId/canscore columns;
+restored customer IDs are empty and synthetic download songs retain local flag 0.
+Authoritative bytecode collection including SongDownListDAO/DownListDAOManager:
+https://github.com/giangnam0201/VietKEMU/actions/runs/37399776719.
+
+The download DAO worker, host queue wiring, progress/update registries, transfer
+engine and server protocol remain pending. The native capture exercises actual
+seed table creation and catalogue metadata round-trip only; it does not start a
+download or claim any music file exists.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37398160720
 passed the worker/FIFO/failure checks and native Windows build/capture. Its
 isolated queue fixture verifies append/delete persistence, start-play request

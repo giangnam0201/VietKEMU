@@ -391,3 +391,88 @@ Require(!reportRoute.Check(executionSong,true,true,0,LaunchReport) && !reportRou
     reportRoute.Check(executionSong,true,true,1,LaunchReport) && reportRoute.SelectedSong==executionSong && reportRoute.Top &&
     launches.SequenceEqual(new[]{"com.evideo.kmbox.plugin.REPORTTABLE:2"}),"Report-table availability, saved selection or launch mode differs");
 Console.WriteLine("Original order execution verified: item construction, NAS, gate effects, local/download routing, handled-versus-success, rate exclusions and report plugin routing.");
+
+var downMessages=new List<DownloadQueueCommand>();var downEffects=new List<string>();
+SelectedPlaylistItem DownItem(int id,string type="normal",bool broadcast=false)=>new(new LocalSong(id,"Song "+id,"",0,"Singer",
+    new int[4],new int[4],new int[4],0,1,0,"","",1,"",0,0) { ReportTableNumber=8,Stage=2 },0,"guest",null,broadcast)
+    { PlayType=type,PlayId=id.ToString(),PlayName="Mộng 'dưới hoa' "+id,InfoId=type+"||"+id+"||Song "+id,FlowId="saved-"+id };
+var down=new OriginalDownloadQueue(command=> { downMessages.Add(command);downEffects.Add("post"+command.What); },
+    ()=>downEffects.Add("changed"),()=>downEffects.Add("download"),()=>downEffects.Add("cancel"),
+    id=>downEffects.Add("progress-remove:"+id),id=>downEffects.Add("update-remove:"+id));
+down.ClearOnInitialize=false;
+down.Initialize(()=>downEffects.Add("clear-store"),()=>new[]{DownItem(10),DownItem(99,"mobile"),DownItem(20)},true);
+Require(down.Count==2 && downMessages.Count==0 && down.Snapshot()[0].FlowId=="saved-10" &&
+    downEffects.SequenceEqual(new[]{"download"}),"Download restoration skipped saved entries, persisted prematurely or kept mobile entries");
+downEffects.Clear();down.Add(DownItem(30));
+Require(downEffects.SequenceEqual(new[]{"post4","changed","download"}) && Guid.TryParse(down.At(2)!.FlowId,out _) &&
+    down.At(-1) is null && down.At(3) is null,"Download append/UUID/effect ordering differs");
+downEffects.Clear();Require(down.Top(DownItem(40),false,false) &&
+    down.Snapshot().Select(item=>item.SongMetadata.Id).SequenceEqual(new[]{10,40,20,30}) &&
+    downEffects.SequenceEqual(new[]{"post4","changed","download","post3","changed","changed","download"}) &&
+    downMessages.Last()==new DownloadQueueCommand(3,4),"New download Top changed current item or notification/download request ordering");
+downEffects.Clear();Require(!down.TopByIndex(0) && !down.TopByIndex(1) && !down.TopByIndex(4) &&
+    down.Top(DownItem(30),true,false) && down.Snapshot()[1].SongMetadata.Id==30 &&
+    downEffects.SequenceEqual(new[]{"post3","changed","download"}),"Existing download Top does not preserve next/current slots");
+Require(down.Exists(DownItem(20)) && !down.Exists(DownItem(20,"youtube")) && down.ContainsSong(20) && !down.ContainsSong(0),
+    "Download identity was replaced with global stream URL identity");
+down.Add(DownItem(20));downEffects.Clear();
+Require(down.SetProgressBySong(20,3,2) && down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==66 && item.DownloadState==202),
+    "Repeated downloads did not receive truncated byte progress");
+Require(!down.SetProgressBySong(20,0,99) && down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==66 && item.DownloadState==202),
+    "Unknown maximum changed progress/result instead of only the downloading state");
+down.SetProgressBySong(20,1,2);Require(down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==100),"Download progress did not clamp above 100");
+down.SetProgressBySong(20,1,-1);Require(down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==0),"Download progress did not clamp below zero");
+var flow=down.At(1)!.FlowId;
+Require(down.SetProgressByFlow(flow,45) && down.At(1)!.DownloadProgress==45 && !down.SetProgressByFlow("",45) &&
+    down.FindFlowIndex(flow)==1 && down.FindFlowIndex("missing")==0 && down.SetError(20,408) &&
+    down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadState==408) && downEffects.Count==0,
+    "Flow progress/error updates changed matching or invented list notifications");
+down.SetSongInfo(20,"Updated name","Updated singer");
+Require(down.Snapshot().First(item=>item.SongMetadata.Id==20).InfoId=="normal||20||Updated name" &&
+    down.Snapshot().Last(item=>item.SongMetadata.Id==20).PlayName!="Updated name","Download metadata update must affect only the first matching song");
+downEffects.Clear();Require(down.DeleteByIndex(0) && downEffects.SequenceEqual(new[]{"post1","progress-remove:10","update-remove:10","changed"}),
+    "Download delete changed registry/DAO/notification order");
+downEffects.Clear();var beforePublic=downMessages.Count;
+Require(down.AddPublic(DownItem(50,"mobile",true)) && down.MobileFirst && !down.AddPublic(DownItem(60,"normal",true)) &&
+    downMessages.Count==beforePublic && downEffects.Count==0,"Public playback insertion persisted/notified or replaced an existing broadcast");
+down.Clear();Require(down.Count==0 && downEffects.SequenceEqual(new[]{"post5","cancel"}),"Clear missed cancellation or invented a list change");
+var offlineEffects=new List<string>();var offlineDown=new OriginalDownloadQueue(_=>{},()=>{},()=>offlineEffects.Add("download"),()=>{},_=>{},_=>{});
+offlineDown.ClearOnInitialize=false;offlineDown.Initialize(()=>offlineEffects.Add("clear"),()=>new[]{DownItem(10)},false);
+Require(offlineDown.Count==0 && offlineEffects.SequenceEqual(new[]{"clear","download"}),"Original offline initialization request quirk changed");
+
+var downPath=Path.Combine(Path.GetTempPath(),"vietk-down-store-"+Guid.NewGuid()+".db");
+using(var downDb=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=downPath,Pooling=false }.ToString()))
+{
+    downDb.Open();var store=new DownloadListStore(downDb);store.UpgradeSchema();store.UpgradeSchema();
+    var first=DownItem(10);Require(store.Add(null)==0 && store.Add(first)>0 && store.GetTableNumber(1)==8 && store.GetTableNumber(99)==-1,
+        "Download base creation/null insertion/table number lookup differs");
+    store.Add(DownItem(20));store.Add(DownItem(30));store.Add(DownItem(40));
+    Require(store.Top(4) && store.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{10,40,20,30}),"Download DAO Top differs");
+    Require(store.Delete(3) && store.Delete(99) && !store.Delete(0) &&
+        store.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,2,3}),"Download DAO delete transaction/renumbering differs");
+    var raw=store.ReadStoredEntries()[0];Require(raw.LegacyPlayType is null && raw.Song.Name==first.PlayName && raw.Song.FlowId==first.FlowId &&
+        raw.Song.Stage==2 && raw.Song.TableId==8,"Download metadata/legacy type did not round-trip");
+    store.Add(DownItem(70,"youtube"));
+    var runtime=store.Restore(_=>null,_=>Array.Empty<SongMedia>(),_=>null);
+    Require(runtime.Count==1 && runtime[0].PlayType=="youtube" && runtime[0].LocalFlag==0 && runtime[0].CustomerId=="" &&
+        runtime[0].InfoId=="youtube||70||Mộng 'dưới hoa' 70","Download restore used selected-list synthetic/local/customer defaults");
+    store.Clear();store.Add(DownItem(10));store.Add(DownItem(20));store.Add(DownItem(10));store.Add(DownItem(40));
+    Require(store.DeleteBySong(10) && !store.DeleteBySong(999) && store.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,3}),
+        "Download repeated-song deletion repaired the original single sequence shift");
+    store.Add(DownItem(50));Require(store.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,3,3}),"Download append used max sequence instead of count");
+    using(var trigger=downDb.CreateCommand())
+    { trigger.CommandText="CREATE TRIGGER down_fail BEFORE INSERT ON tblSongDownList WHEN NEW.songid=999 BEGIN SELECT RAISE(ABORT,'fixture'); END";trigger.ExecuteNonQuery(); }
+    Require(store.Add(DownItem(999))==-1 && store.ReadStoredEntries().Count==3,"Failed download insertion fabricated persistence success");
+    store.Clear();store.Add(DownItem(10));store.Add(DownItem(20));store.Add(DownItem(30));
+    using(var trigger=downDb.CreateCommand())
+    { trigger.CommandText="CREATE TRIGGER down_top_fail BEFORE UPDATE ON tblSongDownList WHEN OLD.sequence=0 AND NEW.sequence=2 BEGIN SELECT RAISE(ABORT,'fixture'); END";trigger.ExecuteNonQuery(); }
+    Require(!store.Top(3) && store.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{10,20,30}) &&
+        store.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,2,3}),"Failed download Top did not roll back its earlier moves");
+}
+using(var reopened=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=downPath,Pooling=false }.ToString()))
+{
+    reopened.Open();var store=new DownloadListStore(reopened);store.UpgradeSchema();
+    Require(store.ReadStoredEntries().Count==3 && store.ReadStoredEntries().All(row=>row.Song.Name!.Contains("Mộng 'dưới hoa'")),"Download store lost metadata across reopen");
+}
+File.Delete(downPath);
+Console.WriteLine("Original download queue/store verified: restore, Top, progress/errors, public insertion, cancellation, registry order, metadata, repeat deletion and persistence.");

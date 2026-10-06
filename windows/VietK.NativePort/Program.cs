@@ -208,6 +208,15 @@ public static class Program
                         throw new InvalidDataException("Original selected item reconstruction differs");
                     selected.Clear();
                     var gridFixture=browser.CreateVerificationFixture(fixtureSongs);
+                    var downloads=imported.DownloadList;downloads.Clear();
+                    var downloadId=downloads.Add(restoredItem);var downloadRow=downloads.ReadStoredEntries().Single();
+                    var restoredDownload=downloads.Restore(id=>imported.GetSongById(id),imported.GetMedia,_=>null).Single();
+                    if(downloadId<=0 || downloadRow.Sequence!=1 || downloadRow.LegacyPlayType is not null ||
+                        downloadRow.Song.SongId!=101000 || downloadRow.Song.FlowId!="fixture-flow" ||
+                        restoredDownload.LocalFlag!=0 || restoredDownload.CustomerId!="" || restoredDownload.CanScoreInDatabase ||
+                        restoredDownload.InfoId!="normal||101000||Mộng dưới hoa (sc)")
+                        throw new InvalidDataException("Original download table creation/metadata/reconstruction differs");
+                    downloads.Clear();
                     var gridBottom=bottom.Create();Canvas.SetTop(gridBottom,bottomContract.Y);gridFixture.Children.Add(gridBottom);
                     gridFixture.Measure(new Size(1280,800));gridFixture.Arrange(new Rect(0,0,1280,800));gridFixture.UpdateLayout();
                     var gridImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);gridImage.Render(gridFixture);
@@ -302,6 +311,7 @@ public static class Program
                     originalSelectedItemReconstructionVerified = true,
                     nativeQueueWorkerObserverIntegrationVerified = true,
                     nativeOrderPluginAdmissionVerified = true,
+                    originalDownloadListStorageVerified = true,
                     firmwareReportTableActivityCount = orderDependencies.ReportTableActivityCount,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
