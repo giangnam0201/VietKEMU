@@ -39,6 +39,8 @@ public sealed class YouTubeMusicScreen : IDisposable
     internal Func<string>? MobileConnectionInfo { get; set; }
     internal Action? RePairMobile { get; set; }
     internal Action? OpenMobilePairing { get; set; }
+    internal Action? OpenCollectionLogin { get; set; }
+    internal Action? LogoutCollection { get; set; }
     internal OriginalQueueRemote? OriginalQueue { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
         volume=playback.Decoder.OutputVolumeStep,muted=playback.Decoder.Muted,
@@ -183,6 +185,8 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Dùng phiên YouTube từ Firefox",()=> { cookieFile="";useFirefoxCookies=true;SaveSettings();_=Search(); });
         Add("Chọn file cookies…",ChooseCookies);
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
+        Add("Đăng nhập bộ sưu tập VietK",()=>OpenCollectionLogin?.Invoke());
+        Add("Thoát bộ sưu tập VietK",()=>LogoutCollection?.Invoke());
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Tắt / Bật tiếng",()=>playback.Command("mute"));
         Add("Chữ chạy trên TV…",EditMarquee);

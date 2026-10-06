@@ -41,7 +41,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
             void Icon(string name,string? pressed,string action,double rightMargin)
             {
                 var data=contract.Icons[name];
-                var image=new Image { Source=Bitmap(data.File),Width=data.Width,Height=data.Height,Stretch=Stretch.Fill,
+                var image=new Image { Source=Bitmap(data.File),Width=data.Width,Height=data.Height,Stretch=Stretch.Fill,Tag=action+":"+song.Id,
                     VerticalAlignment=VerticalAlignment.Center,Margin=new(0,0,rightMargin,0),
                     RenderTransformOrigin=new(.5,.5),RenderTransform=new ScaleTransform(1,1) };
                 actionWidth+=data.Width+rightMargin;actions.Children.Add(image);

@@ -166,8 +166,14 @@ public static class Program
                 text=>System.Diagnostics.Trace.WriteLine(text),
                 (action,mode)=>System.Diagnostics.Trace.WriteLine($"Original report plugin request {action}, mode {mode}; plugin execution pending"),AvailableMedia);
             YouTubeMusicScreen? youtube=null;
+            var collectionProfiles=new OriginalCollectionProfiles(stateDirectory);
+            var collectionControls=new NativeCollectionControls(collectionProfiles,
+                ()=>app.MainWindow?.Content is Viewbox { Child:Canvas panel }?panel:null,browser.SetConfirmedCollectedSongs);
             browser.SongActionRequested+=(song,action)=>
-            { if(action is "order" or "top")songOrder.Request(song.Id,action=="top"); };
+            {
+                if(action is "order" or "top")songOrder.Request(song.Id,action=="top");
+                else if(action=="collect")collectionControls.Collect(song.Id);
+            };
             Canvas Panel(int screen = 0)
             {
                 var panel = screen switch { 34 when youtube is not null => youtube.Create(),
@@ -488,6 +494,8 @@ public static class Program
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             playback = nativePlayback;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
+            youtubeMusic.OpenCollectionLogin=()=>collectionControls.Login();
+            youtubeMusic.LogoutCollection=collectionControls.Logout;
             originalRemote=new OriginalQueueRemote(selectedQueue,downloadQueue,nativePlayback,bottom,()=>
             {
                 if(selectedQueue.Count>0)StartQueuedMedia();

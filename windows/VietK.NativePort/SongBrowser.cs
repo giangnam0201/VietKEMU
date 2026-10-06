@@ -30,11 +30,14 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     public IReadOnlyList<CatalogueSong> Results { get; private set; } = [];
     public bool Alphabetic { get; private set; } = true;
     private IReadOnlySet<int> confirmedQueued=new HashSet<int>();
+    private IReadOnlySet<int> confirmedCollected=new HashSet<int>();
     private Action? refreshSelection;
     private Action? refreshQuery;
     public void Refresh()=>refreshQuery?.Invoke();
     public void SetConfirmedQueuedSongs(IReadOnlySet<int> songIds)
     { confirmedQueued=songIds;refreshSelection?.Invoke(); }
+    public void SetConfirmedCollectedSongs(IReadOnlySet<int> songIds)
+    { confirmedCollected=songIds;refreshSelection?.Invoke(); }
 
     public Canvas Create()=>CreateCore(null);
     internal Canvas CreateVerificationFixture(IReadOnlyList<CatalogueSong> songs)=>CreateCore(songs);
@@ -75,7 +78,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         {
             Results=songs;empty.Visibility=songs.Count==0?Visibility.Visible:Visibility.Collapsed;
             if(songGrid is not null)area.Children.Remove(songGrid);
-            songGrid=gridFactory.Create(songs,confirmedQueued);songGrid.HorizontalAlignment=HorizontalAlignment.Left;
+            songGrid=gridFactory.Create(songs,confirmedQueued,confirmedCollected);songGrid.HorizontalAlignment=HorizontalAlignment.Left;
             songGrid.VerticalAlignment=VerticalAlignment.Top;songGrid.Margin=new(0,50,6,0);
             songGrid.Visibility=songs.Count==0?Visibility.Collapsed:Visibility.Visible;area.Children.Add(songGrid);
         }

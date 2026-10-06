@@ -706,6 +706,7 @@ BarrageMotionChecks.Run();
 BarrageRetainerChecks.Run();
 QueueOrderChecks.Run();
 MobileQrChecks.Run();
+CollectionProfileChecks.Run();
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();
 TransferWriteRecoveryChecks.Run().GetAwaiter().GetResult();
