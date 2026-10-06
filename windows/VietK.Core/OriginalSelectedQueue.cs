@@ -4,14 +4,14 @@ namespace VietK.Core;
 // must enqueue them in order; observer/playback requests are separate effects.
 public sealed record SelectedQueueCommand(int What,int Arg1=0,int Arg2=0,SelectedPlaylistItem? Item=null)
 {
-    public void Apply(SelectedListStore store)
+    public void Apply(SelectedListStore store,Func<SelectedPlaylistItem,bool> scoreAvailable)
     {
         switch(What)
         {
             case 1:store.DeleteSong(Arg1);break;
             case 2:store.DeleteSongBySongId(Arg1);break;
             case 3:store.TopSong(Arg1);break;
-            case 4:if(Item is not null) { var entry=Item.ToStoredSong();store.AddSong(entry);Item.CustomerId=entry.CustomerId; }break;
+            case 4:if(Item is not null) { var entry=Item.ToStoredSong(scoreAvailable(Item));store.AddSong(entry);Item.CustomerId=entry.CustomerId; }break;
             case 5:store.Clear();break;
             case 6:store.SortLocalSong(Arg1,Arg2);break;
             default:throw new ArgumentOutOfRangeException(nameof(What));

@@ -151,7 +151,10 @@ rows: catalogue-backed normal/mdream/kmtrain/photomv types skip absent songs;
 other types use the original synthetic Song defaults. Saved display metadata
 remains distinct from catalogue metadata, and null getters normalize as in
 KmPlayListItem. Scoring is enabled when Song's raw CanScore is zero, while the
-selected table writes booleans as 1/0. Media selection prefers the first path
+selected table writes booleans as 1/0.
+Scoring availability additionally requires a resolved subtitle/ERC path and
+an existing file; DAO dispatch uses that runtime result, not just the raw flag.
+Media selection prefers the first path
 resolved by storage discovery, otherwise the first metadata entry. A filename
 or a download URL alone never establishes a local file.
 

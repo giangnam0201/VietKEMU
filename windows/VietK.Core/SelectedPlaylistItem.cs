@@ -11,7 +11,7 @@ public sealed class SelectedPlaylistItem
     public int TableId { get; }
     public int Stage { get; }
     public int LocalFlag { get; set; }
-    public bool CanScore { get; }
+    public bool CanScoreInDatabase { get; }
     public bool IsDisco { get; }
     public int SongSpecies { get; }
     public bool Broadcast => false;
@@ -34,7 +34,7 @@ public sealed class SelectedPlaylistItem
     {
         SongMetadata=song;Sequence=sequence;CustomerId=customerId;VideoMedia=media;
         TableId=song.ReportTableNumber;Stage=song.Stage;LocalFlag=song.LocalFlag;
-        CanScore=song.ScoringEnabled;IsDisco=song.Types[0]==8;SongSpecies=song.SongSpecies;
+        CanScoreInDatabase=song.ScoringEnabled;IsDisco=song.Types[0]==8;SongSpecies=song.SongSpecies;
         SingerName=song.Singer;
     }
 
@@ -44,7 +44,14 @@ public sealed class SelectedPlaylistItem
         // KmPlayListItem.copy leaves these at its constructor defaults.
         copy.DownloadState=200;copy.DownloadProgress=0;return copy;
     }
-    public SelectedSong ToStoredSong()=>new(SongMetadata.Id,CanScore,CustomerId,TableId,Stage,
+    // isSongCanScore also requires an existing local ERC/subtitle file. The
+    // host supplies getSubtitlePath's storage result and real file existence.
+    public bool IsSongCanScore(Func<SongMedia,string?> subtitlePath,Func<string,bool> fileExists)
+    {
+        if(!CanScoreInDatabase || VideoMedia is null)return false;
+        var path=subtitlePath(VideoMedia);return path is not null && fileExists(path);
+    }
+    public SelectedSong ToStoredSong(bool scoreAvailable)=>new(SongMetadata.Id,scoreAvailable,CustomerId,TableId,Stage,
         PlayType,PlayName,PlayUrl,SingerName,PlayId,FlowId,CustomerContent);
 
     public static IReadOnlyList<SelectedPlaylistItem> Restore(IEnumerable<StoredSelectedSong> rows,

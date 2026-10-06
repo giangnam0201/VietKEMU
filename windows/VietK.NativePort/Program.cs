@@ -160,7 +160,7 @@ public static class Program
                         throw new InvalidDataException("Original seed selected-list schema/storage round-trip differs");
                     var restoredItem=SelectedPlaylistItem.Restore(selected.ReadStoredEntries(),
                         id=>imported.GetSongById(id),imported.GetMedia,_=>null).Single();
-                    if(restoredItem.SongMetadata.Id!=101000 || restoredItem.CanScore ||
+                    if(restoredItem.SongMetadata.Id!=101000 || restoredItem.CanScoreInDatabase ||
                         restoredItem.VideoMedia?.FileName!="101000.MPG" || restoredItem.LocalFlag!=0 ||
                         restoredItem.InfoId!="normal||101000||Mộng dưới hoa (sc)" ||
                         restoredItem.FlowId!="fixture-flow" || restoredItem.DownloadState!=200 || restoredItem.DownloadFinished)
