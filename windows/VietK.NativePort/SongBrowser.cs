@@ -18,7 +18,8 @@ public sealed record SongBrowserContract(string Title, string EmptyMessage, stri
 // First local SongNameFragment path. Song tiles/actions, alternate input modes,
 // Phantom video and YouTube service navigation are separate unfinished ports.
 public sealed class SongBrowser(string root, SongBrowserContract contract,
-    MoreContract more, LocalSongDatabase local, SongGridContract gridContract)
+    MoreContract more, LocalSongDatabase local, SongGridContract gridContract,
+    Func<SongQueryContext>? queryContext=null)
 {
     public event Action? HomeRequested;
     public event Action<string>? YoutubeRequested;
@@ -29,6 +30,8 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     public bool Alphabetic { get; private set; } = true;
     private IReadOnlySet<int> confirmedQueued=new HashSet<int>();
     private Action? refreshSelection;
+    private Action? refreshQuery;
+    public void Refresh()=>refreshQuery?.Invoke();
     public void SetConfirmedQueuedSongs(IReadOnlySet<int> songIds)
     { confirmedQueued=songIds;refreshSelection?.Invoke(); }
 
@@ -106,11 +109,13 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             timer.Tick+=(_,_)=> { timer.Stop();timers.Remove(timer);callback(); };timers.Add(timer);timer.Start();
         });
         Input=input;
+        var lastSpell="";
         input.TextChanged+=()=> { display.Text=input.Text.Length==0?contract.Hint:input.Text;
             display.Foreground=input.Text.Length==0?Brush("#33ffffff"):Brushes.White; };
         input.SpellRequested+=spell=>
         {
-            ShowResults(local.Search.BySpell(spell,0,0,new(),new()));
+            lastSpell=spell;
+            ShowResults(local.Search.BySpell(spell,0,0,new(),queryContext?.Invoke()??new()));
         };
         canvas.Unloaded+=(_,_)=> { foreach(var timer in timers) timer.Stop();timers.Clear(); };
         void BuildKeys()
@@ -138,7 +143,8 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             Key("",50,350+2*contract.KeyGap,3,()=>InputModeRequested?.Invoke(2),"icon_pen.png");
             Key("",50,400+3*contract.KeyGap,3,()=>InputModeRequested?.Invoke(10),"keyboard_earth.png");
         }
-        BuildKeys();input.Clear();ShowResults(fixtureSongs??local.Search.BySpell("",0,0,new(),new()));
+        refreshQuery=()=>ShowResults(fixtureSongs??local.Search.BySpell(lastSpell,0,0,new(),queryContext?.Invoke()??new()));
+        BuildKeys();input.Clear();refreshQuery();
         return canvas;
     }
 

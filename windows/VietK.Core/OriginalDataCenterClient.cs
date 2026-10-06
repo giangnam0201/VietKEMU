@@ -45,6 +45,8 @@ public sealed class OriginalDataCenterClient(OriginalDataCenterTokens tokens,Fun
         }
     }
     public JsonObject Send(JsonObject request)=>SendInternal(request,false,null);
+    // Host replacement for the Android service's explicit initial login task.
+    public void Connect() { lock(gate) { if(!networkConnected())throw new IOException("Network conn error.");if(!IsLoggedIn)Login(); } }
     public JsonObject SendTo(JsonObject request,string? uri)=>SendInternal(request,true,uri);
     private JsonObject SendInternal(JsonObject request,bool explicitUri,string? uri)
     {

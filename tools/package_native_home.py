@@ -398,13 +398,13 @@ def package_bottom(app, destination, entries, strings):
 
 
 def package_player_reference(decoded, destination, firmware):
-    app = decoded / 'daulkmboxosdtv'
+    app = decoded / 'dualkmbox'
     entries = {entry['path']: entry for entry in json.loads((app / 'original-entries.json').read_text())}
     original = app / 'apktool/assets/grade_video.mp4'
     if original.exists():
         payload = original.read_bytes()
     else:
-        apk = next(firmware.glob('vendor/app/daulkmboxosdtv/*.apk'))
+        apk = next(firmware.glob('vendor/app/dualkmbox/*.apk'))
         with zipfile.ZipFile(apk) as archive:
             payload = archive.read('assets/grade_video.mp4')
     digest = hashlib.sha256(payload).hexdigest()
@@ -413,7 +413,7 @@ def package_player_reference(decoded, destination, firmware):
     output = destination / 'player'
     output.mkdir(exist_ok=True)
     (output / original.name).write_bytes(payload)
-    shutil.copy2(app / 'apktool/res/layout/activity_osd.xml', output / 'activity_osd.xml')
+    shutil.copy2(decoded / 'daulkmboxosdtv/apktool/res/layout/activity_osd.xml', output / 'activity_osd.xml')
     (output / 'provenance.json').write_text(json.dumps({
         'app': app.name, 'asset': 'assets/grade_video.mp4', 'sha256': digest,
         'scope': 'Original grading video retained for actual Windows decode verification and eventual grading UI; not a karaoke song library.'}, indent=2))

@@ -46,6 +46,11 @@ public static class Program
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
                 Path.Combine(stateDirectory,"song-browser-state.db"));
+            if(!capturing && !verifyingPlayback)
+            {
+                songState.ImportOnlineCatalogue(Path.Combine(root,"wholekmbox.db"));
+                songState.ImportOnlineMedia(Path.Combine(root,"wholekmbox.db"));
+            }
             using var queueDispatcher=new SelectedQueueDispatcher(Path.Combine(stateDirectory,"song-browser-state.db"),
                 // No discovered storage/ERC resolver yet: metadata cannot prove
                 // a usable local subtitle. Replace with original storage port.
@@ -100,6 +105,7 @@ public static class Program
             musicServer.Progress+=(id,received,total)=> { downloadQueue.SetProgressBySong(id,total,received);QueueChanged(); };
             musicServer.Completed+=(id,cached)=>
             {
+                songState.ConfirmDownloadedSong(id);
                 // LocalOnlineSongManager.handleDownloadSuccess/moveItem: reverse
                 // matching entries, transfer to local list, then remove download.
                 for(var index=downloadQueue.Count-1;index>=0;index--)
@@ -114,16 +120,18 @@ public static class Program
             };
             musicServer.Failed+=async (id,code,detail)=>
             {
-                downloadQueue.SetError(id,code);downloadSelection.Reset();
+                if(id>0) { downloadQueue.SetError(id,code);downloadSelection.Reset(); }
                 if(code==1015)downloadSelection.Stop();
                 QueueChanged();
                 MessageBox.Show($"Song {id}: download error {code}\n\n{detail}","VietK music server",MessageBoxButton.OK,MessageBoxImage.Error);
-                if(code!=1016) { await Task.Delay(1000);downloadSelection.DownloadNext(); }
+                if(id>0 && code!=1016) { await Task.Delay(1000);downloadSelection.DownloadNext(); }
             };
             QueueChanged();
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
-            var browser = new SongBrowser(root, songContract, moreContract, songState,gridContract);
+            var browser = new SongBrowser(root, songContract, moreContract, songState,gridContract,
+                ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected));
+            musicServer.ConnectionChanged+=browser.Refresh;
             queueBrowser=browser;
             var orderDependencies=JsonSerializer.Deserialize<OrderDependencies>(File.ReadAllText(Path.Combine(root,"order-dependencies.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original order dependencies");
@@ -442,12 +450,13 @@ public static class Program
             {
                 if (selectedQueue.Count > 0) selectedQueue.DeleteByIndex(0);
             };
-            window.Loaded += (_, _) =>
+            window.Loaded += async (_, _) =>
             {
                 nativePlayback.ShowTelevision(window);
                 // Developer probe, separate from the original song-library UI.
                 if (args.Length == 2 && args[0] == "--play-media" && !nativePlayback.PlayMedia(Path.GetFullPath(args[1])))
                     throw new InvalidDataException("Playback probe source is unavailable");
+                await musicServer.Connect();
             };
             bottom.CommandRequested += command =>
             {

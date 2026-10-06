@@ -167,5 +167,12 @@ public sealed class LocalSongDatabase : IDisposable
             String(23),row.GetInt32(24),row.GetInt32(25));
     }
 
+    // LocalOnlineSongManager.updateInfoBeforePlay after a verified download.
+    public void ConfirmDownloadedSong(int songId)
+    {
+        using var update=connection.CreateCommand();
+        update.CommandText="UPDATE tblSong SET IsLocalExist=CASE WHEN hasRemote<>0 THEN hasRemote ELSE 1 END WHERE SongID=$id";
+        update.Parameters.AddWithValue("$id",songId);update.ExecuteNonQuery();
+    }
     public void Dispose() => connection.Dispose();
 }

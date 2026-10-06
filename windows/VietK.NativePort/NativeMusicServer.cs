@@ -33,6 +33,16 @@ public sealed class NativeMusicServer : IDisposable
     public event Action<int,long,long>? Progress;
     public event Action<int,CachedMusic>? Completed;
     public event Action<int,int,string>? Failed;
+    public event Action? ConnectionChanged;
+    public bool IsConnected=>client.IsLoggedIn && NetworkConnected;
+    public bool HasIdentity=>!string.IsNullOrWhiteSpace(Configuration.ChipId) &&
+        !string.IsNullOrWhiteSpace(Configuration.Mac) && !string.IsNullOrWhiteSpace(Configuration.UserAgent);
+    public async Task Connect()
+    {
+        if(!HasIdentity)return;
+        try { await Task.Run(client.Connect);ConnectionChanged?.Invoke(); }
+        catch(Exception ex) { Failed?.Invoke(0,1013,string.IsNullOrEmpty(client.LoginErrorMessage)?ex.Message:client.LoginErrorMessage); }
+    }
 
     public NativeMusicServer(Dispatcher dispatcher,string stateDirectory,Func<int,LocalSong?> lookup)
     {
