@@ -489,6 +489,7 @@ public static class Program
             using var mobileRemote=new MobileRemoteServer(app.Dispatcher,youtubeMusic,nativePlayback,ambience:ambienceExpressions);
             youtubeMusic.MobileConnectionInfo=()=>mobileRemote.ConnectionInfo;
             youtubeMusic.RePairMobile=mobileRemote.RePair;
+            youtubeMusic.OpenMobilePairing=()=>mobileRemote.ShowPairingPanel(window);
             youtube=youtubeMusic;
             window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(34) };
             youtube.HomeRequested+=()=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel() };

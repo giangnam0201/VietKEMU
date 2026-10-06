@@ -29,8 +29,11 @@ with sync_playwright() as p:
     expect(page.locator('#rows .row').nth(2)).to_contain_text('Remote search result')
     page.locator('#rows .row').nth(2).get_by_role('button', name='Xóa', exact=True).click()
     expect(page.locator('#count')).to_have_text('2')
+    volume = int(page.locator('#volume').inner_text().split()[-1].split('/')[0])
     page.locator('[data-command=voldec]').click()
+    expect(page.locator('#volume')).to_have_text(f'Âm lượng {max(0,volume-1)}/20')
     page.locator('[data-command=volinc]').click()
+    expect(page.locator('#volume')).to_have_text(f'Âm lượng {volume}/20')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflows horizontally'
     page.screenshot(path=str(output / 'phone-queue.png'), full_page=True)
     page.locator('#songsTab').click()

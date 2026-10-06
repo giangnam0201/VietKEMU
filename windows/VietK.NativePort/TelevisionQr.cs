@@ -43,6 +43,7 @@ public sealed class TelevisionQr
         Binding=binding;
         if(!binding.CanPresent) { Canvas.Visibility=Visibility.Collapsed;image.Source=null;return; }
         var pixels=OriginalMobileQr.Render(OriginalMobileQr.TelevisionPayload(binding),true);
+        image.Width=image.Height=91*4d/3;
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
         code.Text=binding.TvBindCode;
@@ -51,6 +52,9 @@ public sealed class TelevisionQr
     }
     public void ConfigureLocalRemote(string url)
     {
+        // The LAN pairing token is longer than the original binding code.
+        // Use a larger matrix so it remains readable on a scaled Windows TV.
+        image.Width=image.Height=180;
         var pixels=OriginalMobileQr.Render(url,true);
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);

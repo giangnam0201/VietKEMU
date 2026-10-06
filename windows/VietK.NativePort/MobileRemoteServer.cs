@@ -148,6 +148,38 @@ public sealed class MobileRemoteServer : IDisposable
             .FirstOrDefault(a=>a.AddressFamily==AddressFamily.InterNetwork&&!IPAddress.IsLoopback(a)&&!a.ToString().StartsWith("169.254."));
         if(ip is not null)ShowPairing(ip);
     }
+    public void ShowPairingPanel(System.Windows.Window owner)
+    {
+        if(owner.Content is not System.Windows.Controls.Viewbox { Child:System.Windows.Controls.Canvas panel })return;
+        if(panel.Children.OfType<System.Windows.Controls.Canvas>().Any(c=>Equals(c.Tag,"mobile-pairing")))return;
+        var dim=new System.Windows.Controls.Canvas { Width=1280,Height=800,Tag="mobile-pairing",Background=new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(128,0,0,0)) };
+        var content=new System.Windows.Controls.StackPanel { Margin=new System.Windows.Thickness(22) };
+        var box=new System.Windows.Controls.Border { Width=560,Height=700,CornerRadius=new(12),Background=new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(72,23,64)),Child=content };
+        System.Windows.Controls.Canvas.SetLeft(box,360);System.Windows.Controls.Canvas.SetTop(box,50);dim.Children.Add(box);
+        content.Children.Add(new System.Windows.Controls.TextBlock { Text="Kết nối điện thoại",FontFamily=OriginalFont.Family,FontSize=28,Foreground=System.Windows.Media.Brushes.White });
+        var adapters=new System.Windows.Controls.ComboBox { Margin=new(0,14,0,12),FontSize=20 };
+        var addresses=NetworkInterface.GetAllNetworkInterfaces().Where(n=>n.OperationalStatus==OperationalStatus.Up)
+            .SelectMany(n=>n.GetIPProperties().UnicastAddresses).Select(a=>a.Address)
+            .Where(a=>a.AddressFamily==AddressFamily.InterNetwork&&!IPAddress.IsLoopback(a)&&!a.ToString().StartsWith("169.254.")).Distinct().ToArray();
+        foreach(var address in addresses)adapters.Items.Add(address.ToString());content.Children.Add(adapters);
+        var image=new System.Windows.Controls.Image { Width=240,Height=240,Margin=new(0,0,0,12) };content.Children.Add(image);
+        System.Windows.Media.RenderOptions.SetBitmapScalingMode(image,System.Windows.Media.BitmapScalingMode.NearestNeighbor);
+        void Update()
+        {
+            if(adapters.SelectedItem is not string address||Port==0)return;
+            var uri=$"http://{address}:{Port}/#token={token}";
+            var pixels=OriginalMobileQr.Render(uri,true);
+            image.Source=System.Windows.Media.Imaging.BitmapSource.Create(pixels.Width,pixels.Height,96,96,System.Windows.Media.PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
+            ShowPairing(IPAddress.Parse(address));
+        }
+        adapters.SelectionChanged+=(_,_)=>Update();if(adapters.Items.Count>0)adapters.SelectedIndex=0;
+        content.Children.Add(new System.Windows.Controls.TextBlock { Text=ConnectionInfo,FontFamily=OriginalFont.Family,FontSize=18,TextWrapping=System.Windows.TextWrapping.Wrap,Foreground=System.Windows.Media.Brushes.White,Height=105 });
+        var renew=new System.Windows.Controls.Button { Content="Ngắt điện thoại cũ / tạo QR mới",Height=44,FontSize=18 };
+        renew.Click+=(_,_)=> { RePair();Update(); };content.Children.Add(renew);
+        var close=new System.Windows.Controls.Button { Content="Đóng",Height=44,FontSize=20,Margin=new(0,10,0,0) };
+        close.Click+=(_,_)=>panel.Children.Remove(dim);content.Children.Add(close);
+        dim.MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource==dim)panel.Children.Remove(dim); };panel.Children.Add(dim);
+    }
     public void Dispose()
     {
         using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(3));

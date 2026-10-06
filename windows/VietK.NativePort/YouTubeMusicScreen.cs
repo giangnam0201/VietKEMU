@@ -38,6 +38,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     public event Action? HomeRequested;
     internal Func<string>? MobileConnectionInfo { get; set; }
     internal Action? RePairMobile { get; set; }
+    internal Action? OpenMobilePairing { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
         volume=playback.Decoder.OutputVolumeStep,status=message,transfers=queueTransfers };
     internal Task<IReadOnlyList<YouTubeVideo>> RemoteSearch(string query,CancellationToken cancellation)=>client.Search(query,cancellation);
@@ -168,7 +169,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Chữ chạy trên TV…",EditMarquee);
-        Add("Kết nối điều khiển bằng điện thoại",()=>SetStatus(MobileConnectionInfo?.Invoke()??"Điều khiển điện thoại chưa khởi động."));
+        Add("Kết nối điều khiển bằng điện thoại",()=> { SetStatus(MobileConnectionInfo?.Invoke()??"Điều khiển điện thoại chưa khởi động.");OpenMobilePairing?.Invoke(); });
         Add("Ngắt điện thoại cũ / tạo QR mới",()=> { RePairMobile?.Invoke();SetStatus("Đã đổi mã kết nối. Quét lại QR trên TV."); });
         Add("Chế độ hiển thị mã QR lên TV…",()=>
         {

@@ -56,9 +56,9 @@ internal static class MobileRemoteVerification
             using var browser=System.Diagnostics.Process.Start(start)!;
             var stdout=browser.StandardOutput.ReadToEndAsync();var stderr=browser.StandardError.ReadToEndAsync();
             await browser.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
-            // Never write subprocess diagnostics: a failed browser navigation could contain the pairing secret.
-            Require(browser.ExitCode==0,"Phone browser verification failed (diagnostics suppressed to protect its pairing token)");
-            await stdout;await stderr;
+            // Failed navigation diagnostics may include the secret fragment: redact before reporting.
+            var browserOutput=await stdout;var browserError=await stderr;
+            Require(browser.ExitCode==0,"Phone browser verification failed: "+(browserOutput+browserError).Replace(server.TestToken,"[redacted]",StringComparison.Ordinal));
         }
         await Send(new { action="add",id="fixture0003" });Require((await Queue()).Length==3,"Phone add did not reach actual panel queue");
         await Send(new { action="top",id="fixture0003" });Require((await Queue())[1]=="fixture0003","Phone priority failed");
@@ -69,6 +69,14 @@ internal static class MobileRemoteVerification
         var volume=playback.Decoder.OutputVolumeStep;
         await Send(new { action="command",id="voldec" });Require(playback.Decoder.OutputVolumeStep==Math.Max(0,volume-1)&&playback.Television.Overlay.LastControl=="play_ctrl_audio_bg","Phone volume/TV feedback failed");
         await Send(new { action="command",id="volinc" });
+        await Send(new { action="screen" });Require(playback.Television.IsScreenMasked,"Phone blackout did not reach TV");
+        await Send(new { action="screen" });Require(!playback.Television.IsScreenMasked,"Phone did not restore TV picture");
+        await Send(new { action="command",id="pause_imv" });
+        Require(playback.Player.State==OriginalVideoState.Pause,"Phone did not pause the native player");
+        await Send(new { action="command",id="play_imv" });
+        Require(playback.Player.State==OriginalVideoState.Play,"Phone did not resume native playback");
+        await Send(new { action="command",id="replay_imv" });Require(playback.Television.Overlay.LastControl=="replay","Phone replay TV feedback missing");
+        await Send(new { action="command",id="cut_song_imv" });Require((await Queue()).Length==0&&playback.IsPlayingIdle,"Phone next did not clear last song and restore idle video");
         using(var invalid=await client.PostAsJsonAsync("api/action",new { action="command",id="shutdown" }))Require(invalid.StatusCode==HttpStatusCode.BadRequest,"Unknown phone command accepted");
         using(var unknown=await client.PostAsJsonAsync("api/action",new { action="add",id="unsearched1" }))Require(unknown.StatusCode==HttpStatusCode.BadRequest,"Unsearched arbitrary media accepted");
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
@@ -76,6 +84,7 @@ internal static class MobileRemoteVerification
         playback.Television.Overlay.Qr.Configure(new());
         File.WriteAllText(Path.Combine(directory,"verification.json"),JsonSerializer.Serialize(new { realHttp=true,pairedAuthorization=true,originRejection=true,searchFixture=true,
             nativeQueueAdd=true,priority=true,reorder=true,remove=true,clearProtectsPlaying=true,volumeAndTvFeedback=true,revocation=true,
+            pauseResume=true,replay=true,nextRestoresIdle=true,blackout=true,phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
     }
 }
