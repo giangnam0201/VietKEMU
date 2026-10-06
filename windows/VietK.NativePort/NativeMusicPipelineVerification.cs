@@ -28,7 +28,7 @@ static class NativeMusicPipelineVerification
         {
             var serving=Task.Run(async()=>
             {
-                for(var index=0;index<3;index++)
+                for(var index=0;index<4;index++)
                 {
                     using var socket=await listener.AcceptTcpClientAsync();
                     await using var stream=socket.GetStream();
@@ -69,7 +69,7 @@ static class NativeMusicPipelineVerification
                     {
                         if(first?.StartsWith("GET /video ")!=true)throw new InvalidDataException("Returned media URL was not downloaded");
                         await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: "+new FileInfo(source).Length+"\r\nConnection: close\r\n\r\n"));
-                        await using var file=File.OpenRead(source);await file.CopyToAsync(stream);
+                        if(index==3) { await using var file=File.OpenRead(source);await file.CopyToAsync(stream); }
                     }
                 }
             });

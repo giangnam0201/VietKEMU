@@ -77,8 +77,13 @@ not a second karaoke-file API replacing `sn_song_media_list`.
   immediate stop on 404, `Range: bytes=0-`, `Accept: */*` and identity encoding.
   Its transfer buffer is the original 32768 bytes. After failed opening, the
   original closes its connection before reading the status, so the resulting
-  AppDownItem error is 1004 even on 404. Separate file-write retries, downloader
-  User-Agent parity, NAS handling and all error transitions remain incomplete.
+  AppDownItem error is 1004 even on 404. The separate length probe is closed
+  before each single-attempt write connection. Read failures/timeouts use 1007,
+  delete the partial file and permit up to three write attempts with notification
+  1018. Cache write failures use 1009 and accept a full-size file or restart.
+  Downloader User-Agent parity, NAS handling, screen-off behavior and all error
+  transitions remain incomplete. The original's premature-EOF loop is not
+  reproduced: the Windows adapter rejects incomplete files instead of spinning.
 - Completed downloads update the local-song flag, move matching download entries
   to the selected queue, and start the next download. Cache metadata contains the
   returned vocal/accompaniment indexes and per-song gain. Windows paths are

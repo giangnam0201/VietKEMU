@@ -15,7 +15,7 @@ static class RealTransportChecks
         {
             var serve=Task.Run(async()=>
             {
-                for(var index=0;index<3;index++)
+                for(var index=0;index<7;index++)
                 {
                     using var socket=await listener.AcceptTcpClientAsync();
                     await using var stream=socket.GetStream();
@@ -43,7 +43,9 @@ static class RealTransportChecks
                     else
                     {
                         await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: "+payload.Length+"\r\nConnection: close\r\n\r\n"));
-                        await stream.WriteAsync(index==1?payload:payload.AsMemory(0,400));
+                        // Header-only length probes at 1 and 3; the three
+                        // short write attempts follow at 4, 5 and 6.
+                        if(index is not (1 or 3))await stream.WriteAsync(index==2?payload:payload.AsMemory(0,400));
                     }
                 }
             });

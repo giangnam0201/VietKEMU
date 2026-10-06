@@ -16,7 +16,7 @@ static class TransferConnectionChecks
         {
             var serving=Task.Run(async()=>
             {
-                for(var index=0;index<7;index++)
+                for(var index=0;index<8;index++)
                 {
                     using var socket=await listener.AcceptTcpClientAsync();
                     await using var stream=socket.GetStream();
@@ -30,10 +30,10 @@ static class TransferConnectionChecks
                         headers.GetValueOrDefault("Accept-Encoding")!="identity" ||
                         headers.GetValueOrDefault("Accept")!="*/*")
                         throw new InvalidDataException("Original media HTTP headers differ");
-                    var status=index==2?"200 OK":index==6?"404 Not Found":"503 Service Unavailable";
-                    var body=index==2?payload:[];
-                    await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 "+status+"\r\nContent-Length: "+body.Length+"\r\nConnection: close\r\n\r\n"));
-                    await stream.WriteAsync(body);
+                    var status=index is 2 or 3?"200 OK":index==7?"404 Not Found":"503 Service Unavailable";
+                    var length=index is 2 or 3?payload.Length:0;
+                    await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 "+status+"\r\nContent-Length: "+length+"\r\nConnection: close\r\n\r\n"));
+                    if(index==3)await stream.WriteAsync(payload);
                 }
             });
             using var transfer=new OriginalMusicTransfer();
@@ -51,7 +51,7 @@ static class TransferConnectionChecks
                     throw new InvalidDataException("Failed connection left a playable or temporary file");
             }
             await serving.WaitAsync(TimeSpan.FromSeconds(10));
-            if(requests.Count(line=>line.StartsWith("GET /recovery "))!=3 ||
+            if(requests.Count(line=>line.StartsWith("GET /recovery "))!=4 ||
                 requests.Count(line=>line.StartsWith("GET /exhausted "))!=3 ||
                 requests.Count(line=>line.StartsWith("GET /missing "))!=1)
                 throw new InvalidDataException("Original three-attempt/404 connection policy differs");

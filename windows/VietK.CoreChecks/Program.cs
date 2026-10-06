@@ -677,3 +677,4 @@ Require(ktvClient.IsLoggedIn && authPosts.Count==2 && authPosts.All(request=>req
 Console.WriteLine("Original data-center login/request state verified: URI tokens, signing routes, headers, permission gates, config/broadcast order, partial failure state and response truncation.");
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();
+TransferWriteRecoveryChecks.Run().GetAwaiter().GetResult();

@@ -52,12 +52,15 @@ public static class NativePlaybackVerification
                     var url="http://127.0.0.1:"+((IPEndPoint)listener.LocalEndpoint).Port+"/stereo.mkv";
                     var serving=Task.Run(async()=>
                     {
+                        for(var request=0;request<2;request++)
+                        {
                         using var socket=await listener.AcceptTcpClientAsync();
                         await using var stream=socket.GetStream();
                         using var reader=new StreamReader(stream,Encoding.ASCII,false,1024,true);
                         while(!string.IsNullOrEmpty(await reader.ReadLineAsync())) { }
                         await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: "+new FileInfo(sourceStereo).Length+"\r\nConnection: close\r\n\r\n"));
-                        await using var file=File.OpenRead(sourceStereo);await file.CopyToAsync(stream);
+                        if(request==1) { await using var file=File.OpenRead(sourceStereo);await file.CopyToAsync(stream); }
+                        }
                     });
                     using var transfer=new OriginalMusicTransfer();
                     stereo=await transfer.Download(101000,url,Path.Combine(output,"downloaded"),(_,_)=>{},CancellationToken.None);

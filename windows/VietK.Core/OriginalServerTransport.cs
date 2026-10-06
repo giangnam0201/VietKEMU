@@ -56,11 +56,11 @@ public sealed class OriginalMusicTransfer : IDisposable
         { Timeout=Timeout.InfiniteTimeSpan };
     // HttpFile.open(uri, 0, 3): three connection attempts, immediate stop on
     // 404, Range and identity encoding. This covers the original opening phase;
-    // AppDownItem's separate file-write recovery remains a separate port task.
-    private async Task<HttpResponseMessage> Open(Uri uri,CancellationToken cancellation)
+    // AppDownItem uses a separate, single-attempt open for each file write.
+    private async Task<HttpResponseMessage> Open(Uri uri,CancellationToken cancellation,int attempts=3)
     {
         Exception? lastError=null;
-        for(var attempt=0;attempt<3;attempt++)
+        for(var attempt=0;attempt<attempts;attempt++)
         {
             cancellation.ThrowIfCancellationRequested();
             using var request=new HttpRequestMessage(HttpMethod.Get,uri);
@@ -86,7 +86,7 @@ public sealed class OriginalMusicTransfer : IDisposable
         throw new OriginalTransferException(1004,lastError?.Message??"Music server connection failed",lastError);
     }
     public async Task<string> Download(int songId,string url,string directory,
-        Action<long,long> progress,CancellationToken cancellation)
+        Action<long,long> progress,CancellationToken cancellation,Action<int>? notification=null)
     {
         if(songId<=0)throw new ArgumentOutOfRangeException(nameof(songId));
         if(!Uri.TryCreate(url,UriKind.Absolute,out var uri) || uri.Scheme is not ("http" or "https"))
@@ -98,38 +98,70 @@ public sealed class OriginalMusicTransfer : IDisposable
         var destination=Path.Combine(directory,filename);
         try
         {
-            using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            using var response=await Open(uri,cancellation);
-            var total=response.Content.Headers.ContentLength;
-            if(total is null or <=0)throw new OriginalTransferException(1003,"Music server did not provide a valid file length");
-            await using var input=await response.Content.ReadAsStreamAsync(cancellation);
-            await using(var output=new FileStream(temporary,FileMode.Create,FileAccess.Write,FileShare.None,32768,true))
+            long total;
+            using(var probe=await Open(uri,cancellation))
             {
-                var buffer=new byte[32768];long written=0;
-                var lastProgress=System.Diagnostics.Stopwatch.StartNew();
-                while(true)
-                {
-                    timeout.CancelAfter(TimeSpan.FromSeconds(10));
-                    var count=await input.ReadAsync(buffer,timeout.Token);
-                    if(count==0)break;
-                    await output.WriteAsync(buffer.AsMemory(0,count),cancellation);
-                    written+=count;
-                    // AppDownItem publishes progress every two seconds, plus
-                    // its final byte count. Avoid flooding a weak PC's UI.
-                    if(lastProgress.ElapsedMilliseconds>=2000 || written>=total.Value)
-                    { progress(written,total.Value);lastProgress.Restart(); }
-                }
-                await output.FlushAsync(cancellation);
-                if(written<total.Value)throw new OriginalTransferException(1014,"Incomplete music file");
+                total=probe.Content.Headers.ContentLength??0;
+                if(total<=0)throw new OriginalTransferException(1003,"Music server did not provide a valid file length");
             }
-            cancellation.ThrowIfCancellationRequested();
-            File.Move(temporary,destination,true);
-            return destination;
+            // LocalOnlineSongManager deletes the old temporary file before
+            // handing this song to AppDownItem. Length probing is a separate
+            // GET; each write attempt reopens with the current Range offset.
+            try { using var empty=File.Create(temporary); }
+            catch(IOException ex) { throw new OriginalTransferException(1001,"Cannot create music temporary file",ex); }
+            for(var attempt=0;attempt<3;attempt++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                try
+                {
+                    await Write(uri,temporary,total,progress,cancellation);
+                    cancellation.ThrowIfCancellationRequested();
+                    File.Move(temporary,destination,true);
+                    return destination;
+                }
+                catch(OriginalTransferException ex) when(ex.Code is 1007 or 1009)
+                {
+                    if(ex.Code==1009 && new FileInfo(temporary).Length==total)
+                    { cancellation.ThrowIfCancellationRequested();File.Move(temporary,destination,true);return destination; }
+                    if(File.Exists(temporary))File.Delete(temporary);
+                    notification?.Invoke(1018);
+                    if(attempt==2)throw;
+                }
+            }
+            throw new InvalidOperationException("Write attempts exhausted without a result");
         }
-        catch(OperationCanceledException) when(!cancellation.IsCancellationRequested)
-        { throw new OriginalTransferException(1007,"Music server read timed out"); }
-        catch(HttpRequestException ex) { throw new OriginalTransferException(1002,"Music server connection failed",ex); }
         finally { if(File.Exists(temporary))File.Delete(temporary); }
+    }
+    private async Task Write(Uri uri,string temporary,long total,Action<long,long> progress,CancellationToken cancellation)
+    {
+        using var response=await Open(uri,cancellation,1);
+        await using var input=await response.Content.ReadAsStreamAsync(cancellation);
+        await using var output=new FileStream(temporary,FileMode.Append,FileAccess.Write,FileShare.None,32768,true);
+        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+        var buffer=new byte[32768];long written=output.Length;
+        var lastProgress=System.Diagnostics.Stopwatch.StartNew();
+        while(written<total)
+        {
+            int count;
+            try
+            {
+                timeout.CancelAfter(TimeSpan.FromSeconds(10));
+                count=await input.ReadAsync(buffer.AsMemory(0,(int)Math.Min(buffer.Length,total-written)),timeout.Token);
+            }
+            catch(OperationCanceledException) when(!cancellation.IsCancellationRequested)
+            { throw new OriginalTransferException(1007,"Music server read timed out"); }
+            catch(IOException ex) { throw new OriginalTransferException(1007,"Music server read failed",ex); }
+            // HttpURLConnection/localRead's premature-EOF loop is not reproduced
+            // by this Windows stream adapter. Keep incomplete bytes unplayable.
+            if(count==0)throw new OriginalTransferException(1014,"Incomplete music file");
+            try { await output.WriteAsync(buffer.AsMemory(0,count),cancellation); }
+            catch(IOException ex) { throw new OriginalTransferException(1009,"Music cache write failed",ex); }
+            written+=count;
+            if(lastProgress.ElapsedMilliseconds>=2000 || written>=total)
+            { progress(written,total);lastProgress.Restart(); }
+        }
+        try { await output.FlushAsync(cancellation); }
+        catch(IOException ex) { throw new OriginalTransferException(1009,"Music cache flush failed",ex); }
     }
     public void Dispose()=>client.Dispose();
 }
