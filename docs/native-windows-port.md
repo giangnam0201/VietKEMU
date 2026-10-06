@@ -391,3 +391,13 @@ and Roboto files with hashes. The default sans-serif family is Roboto. The Windo
 resource job packages those exact fonts, and startup checks the normal and bold
 GlyphTypeface URIs to reject silent fallback. Labels inherit the recovered font;
 this does not prove identical Android/WPF shaping, padding or line metrics.
+
+Windows build 37418046425 (application commit `fe19fd8`) passed core checks,
+original asset/font packaging, Windows compilation/capture and test ZIP packaging.
+The screenshot was inspected: original VietK logo visible, Roboto loaded, and
+the Language button stays within the 1280px panel. The prior font build's capture
+caught a WPF deferred-margin layout problem that clipped the right header edge;
+positioning now includes the three icon margins explicitly. Verification retained
+at `artifacts/native-verification-v22`; Windows ZIP at `artifacts/windows-test-v17`.
+Playback, TV rendering, authenticated downloads and complete feature parity are
+still pending; the UI capture is not a physical-device parity comparison.
