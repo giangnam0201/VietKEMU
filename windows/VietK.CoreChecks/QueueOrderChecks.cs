@@ -17,6 +17,11 @@ internal static class QueueOrderChecks
         Require(queue.Count==0 && !OriginalQueueOrder.Shuffle(queue,_=>0),"Idle clear or empty shuffle differs");
         OriginalQueueOrder.ClearExceptPlaying(queue,false);
         Require(queue.Count==0,"Empty clear introduced a song");
+        Require(new QueueTransferDisplay(Waiting:true).Caption=="Chờ đợi","Queue waiting label differs");
+        Require(new QueueTransferDisplay(45,100).Percent==45 && new QueueTransferDisplay(45,100).Caption=="45%","Known byte progress differs");
+        Require(new QueueTransferDisplay(1048576).Percent is null && new QueueTransferDisplay(1048576).Caption.EndsWith(" MiB"),"Unknown streaming total invented a percentage");
+        Require(new QueueTransferDisplay(-10,100).Percent==0 && new QueueTransferDisplay(long.MaxValue,1).Percent==100,"Progress bounds or integer overflow differ");
+        Require(new QueueTransferDisplay(Error:"failure").Caption=="Lỗi tải","Failure is displayed as successful progress");
         Console.WriteLine("Original selected queue top, tail-only shuffle and clear-except-playing rules verified.");
     }
 }

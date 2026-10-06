@@ -68,4 +68,15 @@ playing preserves the head; shuffle affects only the tail; top inserts at index
 one. Changes persist without restarting the decoder. Windows capture checks click
 top/delete/shuffle and both confirmation choices. Queue PNGs are imported from
 the owner's local original-resource supplement, not published in the release.
-History, drag ordering and original download-progress decorations remain pending.
+The selected/history header switches reproduce `PlayListDialog`, including the
+transparent selected tab and dark unselected tab. `SungListManager.addItem`
+excludes YouTube, so that tab remains empty for the native YouTube queue. Native
+catalogue recording/history integration and drag ordering remain pending.
+
+Download labels now follow waiting/progress/error states with the original 40x3
+bitmap bar. The native YouTube adaptation uses real byte counters; streaming
+without a known total displays MiB, never a fabricated percent. Progress updates
+keep the same row and scrolling position while the TV continues playing. Failure
+keeps the song available for retry; validated completion removes its decoration.
+Toolbar buttons use the APK's 25ms scale animation from 1 to .8 and back.
+Windows capture checks both tabs and unknown/known/error/completed transfer views.

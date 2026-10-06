@@ -65,8 +65,10 @@ Available to test:
 - Decoder failures return to idle and keep the selected YouTube song for retry.
 - Selected queue: original panel layout, cut/delete, move to next, shuffle waiting
   songs and confirmed clear-all. Clearing while playing keeps the current song.
-  Queue icons use the local original-resource supplement. History and dragging
-  are not yet ported.
+  Queue icons use the local original-resource supplement. The history tab stays
+  empty for YouTube, as in the firmware. Catalogue history and dragging remain
+  pending. Download rows show real percentages when totals are known, MiB while
+  streaming, and errors for retry, with the original progress-bar resources.
 - Server login/media-request transport and music file download to playback queue.
 - Pause, replay, seek, original/accompaniment and output volume controls.
 

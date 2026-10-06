@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Media.Animation;
 using VietK.Core;
 
 namespace VietK.NativePort;
@@ -15,30 +16,59 @@ public sealed class SelectedQueueDialog
     private readonly Action<YouTubeVideo> remove,top;
     private readonly Action clear,shuffle,retry;
     private readonly Canvas panel;
+    private readonly Canvas content;
+    private readonly Grid toolbar;
+    private readonly ScrollViewer list;
+    private readonly Border selectedTab,historyTab;
+    private readonly Dictionary<string,Canvas> transfers=[];
+    private string? playingId;
+    public bool ShowingHistory { get; private set; }
     public Canvas Overlay { get; }=new() { Width=1280,Height=800,Background=new SolidColorBrush(Color.FromArgb(128,0,0,0)) };
     public StackPanel Rows { get; }=new();
     public SelectedQueueDialog(Canvas panel,Action<YouTubeVideo> remove,Action<YouTubeVideo> top,Action clear,Action shuffle,Action retry,string? resources=null)
     {
         this.panel=panel;this.remove=remove;this.top=top;this.clear=clear;this.shuffle=shuffle;this.retry=retry;
         this.resources=resources??Path.Combine(OriginalSupplement.Root,"ambience","playlist");
-        var content=new Canvas { Width=563,Height=596,ClipToBounds=true };
+        content=new Canvas { Width=563,Height=596,ClipToBounds=true };
         var border=new Border { Width=563,Height=596,CornerRadius=new CornerRadius(10),Background=new SolidColorBrush(Color.FromRgb(0x48,0x17,0x40)),Child=content };
         Put(Overlay,border,1280-563,84);Overlay.MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource==Overlay)Close(); };
-        var title=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
-        var selected=Icon("play_list_select_light",40,40);selected.Margin=new Thickness(0,0,5,0);title.Children.Add(selected);
-        title.Children.Add(Text("Đã đặt bài",20));Put(content,new Border { Width=281.5,Height=62,Child=title,
-            Background=new SolidColorBrush(Color.FromArgb(30,255,255,255)) },0,0);
-        var toolbar=new Grid { Width=585,Height=65 };toolbar.ColumnDefinitions.Add(new());toolbar.ColumnDefinitions.Add(new());
+        selectedTab=Tab("Đã đặt bài",()=>SwitchTab(false));historyTab=Tab("Lịch sử",()=>SwitchTab(true));
+        Put(content,selectedTab,0,0);Put(content,historyTab,281.5,0);
+        toolbar=new Grid { Width=585,Height=65 };toolbar.ColumnDefinitions.Add(new());toolbar.ColumnDefinitions.Add(new());
         var clearControl=ActionIcon("selected_list_clear_all","Xóa tất cả",()=>ConfirmClear());toolbar.Children.Add(clearControl);
         var shuffleControl=ActionIcon("selected_list_shuffle","Xáo Trộn",shuffle);Grid.SetColumn(shuffleControl,1);toolbar.Children.Add(shuffleControl);
         Put(content,toolbar,0,62);
-        Put(content,new ScrollViewer { Width=585,Height=449,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=Rows },0,130);
+        var divider=new Border { Width=1,Height=20,Background=new SolidColorBrush(Color.FromArgb(51,255,255,255)),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Center,IsHitTestVisible=false };
+        toolbar.Children.Add(divider);
+        list=new ScrollViewer { Width=585,Height=449,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=Rows };
+        Put(content,list,0,130);SwitchTab(false);
         panel.Children.Add(Overlay);
     }
-    public void Refresh(IReadOnlyList<YouTubeVideo> queue,bool playing)
+    private Border Tab(string label,Action action)
     {
-        Rows.Children.Clear();
+        var tab=new Border { Width=281.5,Height=62,Background=Brushes.Transparent };
+        tab.MouseLeftButtonUp+=(_,e)=> { action();e.Handled=true; };tab.Tag=label;return tab;
+    }
+    internal void SwitchTab(bool history)
+    {
+        ShowingHistory=history;
+        void Style(Border tab,string icon,bool selected)
+        {
+            var title=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center };
+            var image=Icon(icon+(selected?"_light":""),40,40);image.Margin=new Thickness(0,0,5,0);title.Children.Add(image);
+            var text=Text((string)tab.Tag,20);text.Foreground=selected?Brushes.White:new SolidColorBrush(Color.FromArgb(128,255,255,255));title.Children.Add(text);
+            tab.Child=title;tab.Background=selected?Brushes.Transparent:new SolidColorBrush(Color.FromArgb(48,0,0,0));
+        }
+        Style(selectedTab,"play_list_select",!history);Style(historyTab,"play_list_sung",history);
+        toolbar.Visibility=history?Visibility.Collapsed:Visibility.Visible;
+        // SungListManager.addItem explicitly excludes YouTube. Keep its sung
+        // tab empty rather than fabricating recordings or replay/share actions.
+        list.Content=history?new StackPanel():Rows;Canvas.SetTop(list,history?65:130);
+    }
+    public void Refresh(IReadOnlyList<YouTubeVideo> queue,bool playing,IReadOnlyDictionary<string,QueueTransferDisplay>? downloadStates=null)
+    {
+        Rows.Children.Clear();transfers.Clear();playingId=playing?queue.FirstOrDefault()?.Id:null;
         for(var index=0;index<queue.Count;index++)
         {
             var position=index;var video=queue[index];var row=new Canvas { Width=585,Height=65,Background=Brushes.Transparent };
@@ -52,12 +82,36 @@ public sealed class SelectedQueueDialog
             if(index==0 && playing)name.Foreground=new SolidColorBrush(Color.FromRgb(255,207,17));
             name.Measure(new Size(250,65));Put(row,name,70,(65-name.DesiredSize.Height)/2);
             Put(row,Icon("icon_youtube",33,30),70+name.DesiredSize.Width+15,17.5);
+            var transfer=new Canvas { Width=80,Height=50,IsHitTestVisible=false };
+            Put(row,transfer,350,7.5);transfers[video.Id]=transfer;
+            if(downloadStates?.TryGetValue(video.Id,out var state)==true)SetTransfer(video.Id,state);
             if(index>1)Put(row,ClickIcon("ic_top_song",()=>top(video)),448,0);
             if(index==0)Put(row,ClickIcon("ic_cut_song",()=>remove(video)),448,0);
             Put(row,ClickIcon("ic_delete",()=>remove(video)),499,0);
             var retryHit=new Border { Width=440,Height=65,Background=Brushes.Transparent };
             retryHit.MouseLeftButtonUp+=(_,e)=> { if(position==0 && !playing)retry();e.Handled=true; };Put(row,retryHit,0,0);
             Rows.Children.Add(row);
+        }
+    }
+    public void SetTransfer(string id,QueueTransferDisplay? state)
+    {
+        if(!transfers.TryGetValue(id,out var area))return;
+        area.Children.Clear();
+        if(area.Parent is Canvas host)
+        {
+            var title=host.Children.OfType<TextBlock>().Last();title.MaxWidth=state is null?250:180;title.Measure(new Size(title.MaxWidth,65));
+            title.Foreground=id==playingId?new SolidColorBrush(Color.FromRgb(255,207,17)):state is null?Brushes.White:new SolidColorBrush(Color.FromRgb(128,128,128));
+            var youtube=host.Children.OfType<Image>().Last();Canvas.SetLeft(youtube,70+title.DesiredSize.Width+15);
+        }
+        if(state is null)return;
+        // The original right-aligned label and 40x3 bitmap bar. This native
+        // YouTube adaptation reports bytes when streaming has no known total.
+        var caption=Text(state.Caption,16);caption.Width=80;caption.TextAlignment=TextAlignment.Center;
+        caption.ToolTip=state.Error.Length>0?state.Error:null;Put(area,caption,0,10);
+        if(state.Percent is int percent && !state.Waiting && state.Error.Length==0)
+        {
+            var track=Icon("selected_item_download_bg",40,3);track.Stretch=Stretch.Fill;Put(area,track,20,34);
+            var fill=Icon("selected_item_download_progress",40,3);fill.Stretch=Stretch.Fill;fill.Clip=new RectangleGeometry(new Rect(0,0,40*percent/100d,3));Put(area,fill,20,34);
         }
     }
     private void ConfirmClear()
@@ -91,7 +145,15 @@ public sealed class SelectedQueueDialog
     {
         var area=new StackPanel { Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center,Background=Brushes.Transparent };
         var image=Icon(icon,36,36);image.Margin=new Thickness(0,0,5,0);area.Children.Add(image);area.Children.Add(Text(label,20));
-        area.MouseLeftButtonUp+=(_,e)=> { action();e.Handled=true; };return area;
+        var scale=new ScaleTransform(1,1);area.RenderTransform=scale;area.RenderTransformOrigin=new Point(.5,.5);
+        void Animate(double from,double to)
+        {
+            var animation=new DoubleAnimation(from,to,TimeSpan.FromMilliseconds(25)) { EasingFunction=new SineEase { EasingMode=EasingMode.EaseInOut } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty,animation);scale.BeginAnimation(ScaleTransform.ScaleYProperty,animation);
+        }
+        area.MouseLeftButtonDown+=(_,_)=>Animate(1,.8);
+        area.MouseLeave+=(_,_)=>Animate(.8,1);
+        area.MouseLeftButtonUp+=(_,e)=> { Animate(.8,1);action();e.Handled=true; };return area;
     }
     private FrameworkElement ClickIcon(string icon,Action action)
     {

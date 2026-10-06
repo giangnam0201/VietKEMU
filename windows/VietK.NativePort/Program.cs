@@ -436,6 +436,7 @@ public static class Program
                     youtubeMainPanelNativeRendering = true,
                     youtubeSixCardPaginationAndBoundsVerified = true,
                     selectedQueueTopDeleteShuffleAndPreservePlayingVerified = true,
+                    selectedQueueTabsAndRealByteProgressStatesVerified = true,
                     androidRuntimeUsed = false,
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,

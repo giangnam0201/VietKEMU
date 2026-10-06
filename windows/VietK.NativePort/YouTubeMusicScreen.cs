@@ -20,6 +20,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     private readonly BottomBar bottom;
     private readonly YouTubeMusicClient client;
     private readonly List<YouTubeVideo> queue=[];
+    private readonly Dictionary<string,QueueTransferDisplay> queueTransfers=[];
     private CancellationTokenSource? searching,downloading;
     private ProgressiveVideo? liveTransfer;
     private WrapPanel? results;
@@ -202,6 +203,19 @@ public sealed class YouTubeMusicScreen : IDisposable
             var image=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);image.Render(panel);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(image));
             using(var file=File.Create(Path.Combine(captureDirectory,"native-selected-queue.png")))encoder.Save(file);
+            var content=(Canvas)((Border)queueDialog.Overlay.Children[0]).Child;
+            Click(content.Children.OfType<Border>().Single(b=>Equals(b.Tag,"Lịch sử")));
+            Require(queueDialog.ShowingHistory && queue.Count==4 && queueDialog.Rows.Parent is null,"History switch changed the queue or fabricated sung YouTube rows");
+            Click(content.Children.OfType<Border>().Single(b=>Equals(b.Tag,"Đã đặt bài")));
+            Require(!queueDialog.ShowingHistory && queueDialog.Rows.Parent is not null,"Selected tab did not restore queue rows");
+            Canvas TransferArea()=>((Canvas)queueDialog.Rows.Children[0]).Children.OfType<Canvas>().Single();
+            SetQueueTransfer(queue[0].Id,new(1048576));
+            Require(TransferArea().Children.OfType<TextBlock>().Single().Text.EndsWith(" MiB") && TransferArea().Children.OfType<Image>().Count()==0,"Streaming bytes invented percentage/bar coverage");
+            SetQueueTransfer(queue[0].Id,new(45,100));
+            Require(TransferArea().Children.OfType<TextBlock>().Single().Text=="45%" && ((RectangleGeometry)TransferArea().Children.OfType<Image>().Last().Clip).Rect.Width==18,"Known-size download bar differs");
+            SetQueueTransfer(queue[0].Id,new(Error:"Verification failure"));
+            Require(TransferArea().Children.OfType<TextBlock>().Single().Text=="Lỗi tải" && TransferArea().Children.Count==1,"Failed transfer still displays a success bar");
+            SetQueueTransfer(queue[0].Id,null);Require(TransferArea().Children.Count==0,"Completed transfer decoration remains visible");
             Click(IconAt(3,"ic_top_song"));Require(queue.Select(v=>v.Id).SequenceEqual(new[]{"queue-fixture-0","queue-fixture-3","queue-fixture-1","queue-fixture-2"}),"Queue top callback differs");
             Click(IconAt(2,"ic_delete"));Require(queue.Count==3 && queue.All(v=>v.Id!="queue-fixture-1"),"Pending-song delete callback failed");
             var toolbar=((Canvas)((Border)queueDialog.Overlay.Children[0]).Child).Children.OfType<Grid>().Single();
@@ -249,7 +263,8 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private void RefreshQueue()
     {
-        bottom.SetConfirmedQueueCount(queue.Count);queueDialog?.Refresh(queue,active);
+        foreach(var id in queueTransfers.Keys.Where(id=>queue.All(item=>item.Id!=id)).ToArray())queueTransfers.Remove(id);
+        bottom.SetConfirmedQueueCount(queue.Count);queueDialog?.Refresh(queue,active,queueTransfers);
         UpdateMarquee();
         foreach(var (id,title) in visibleTitles)
             title.Foreground=queue.Any(item=>item.Id==id)?new SolidColorBrush(Color.FromRgb(255,231,97)):Brushes.White;
@@ -265,7 +280,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         playback.Player.Stop();active=false;liveTransfer?.Dispose();liveTransfer=null;
         if(queue.Count==0) { playback.StartIdleDemo();return; }
         var video=queue[0];var cancellation=new CancellationTokenSource();downloading=cancellation;
-        SetStatus("Đang tải: "+video.Title);
+        SetStatus("Đang tải: "+video.Title);SetQueueTransfer(video.Id,new(Waiting:true));RefreshQueue();
         try
         {
             var file=await client.VerifiedCachedVideo(video,cancellation.Token);
@@ -273,8 +288,7 @@ public sealed class YouTubeMusicScreen : IDisposable
             {
             liveTransfer=client.StartProgressive(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
             {
-                if(stamp==generation)SetStatus("Đang tải: "+video.Title+" — "+(progress.Total>0?
-                    (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
+                if(stamp==generation) { SetQueueTransfer(video.Id,new(progress.Received,progress.Total));SetStatus("Đang tải: "+video.Title+" — "+queueTransfers[video.Id].Caption); }
             }),cancellation.Token);
             try { await liveTransfer.WaitUntilReady(cancellation.Token);file=liveTransfer.Url; }
             catch(YouTubeIncompleteAudioException)
@@ -283,11 +297,12 @@ public sealed class YouTubeMusicScreen : IDisposable
                 SetStatus("Âm thanh tải chưa đủ — đang tải lại bài bằng chế độ đầy đủ…");
                 file=await client.Download(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
                 {
-                    if(stamp==generation)SetStatus("Đang tải lại: "+video.Title+" — "+(progress.Received/1048576)+" MiB");
+                    if(stamp==generation) { SetQueueTransfer(video.Id,new(progress.Received,progress.Total));SetStatus("Đang tải lại: "+video.Title+" — "+queueTransfers[video.Id].Caption); }
                 }),cancellation.Token);
             }
             }
             if(stamp!=generation || disposed)return;
+            if(liveTransfer is null)SetQueueTransfer(video.Id,null);
             if(!playback.PlayMedia(file,preserveStereo:true))throw new IOException("Không phát được video đã tải.");
             active=true;SetStatus("Đang phát: "+video.Title);RefreshQueue();
             playback.Television.Overlay.SetSong(video.Title,queue.Skip(1).FirstOrDefault()?.Title??"");
@@ -299,11 +314,11 @@ public sealed class YouTubeMusicScreen : IDisposable
                     if(stamp!=generation || disposed)return;
                     var resumeAt=playback.Decoder.Position;
                     active=false;liveTransfer.Dispose();liveTransfer=null;playback.Player.Stop();
+                    SetQueueTransfer(video.Id,new(Waiting:true));RefreshQueue();
                     SetStatus("Âm thanh tải chưa đủ — đang tải lại bài bằng chế độ đầy đủ…");
                     var repaired=await client.Download(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
                     {
-                        if(stamp==generation)SetStatus("Đang tải lại âm thanh: "+video.Title+" — "+(progress.Total>0?
-                            (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
+                        if(stamp==generation) { SetQueueTransfer(video.Id,new(progress.Received,progress.Total));SetStatus("Đang tải lại âm thanh: "+video.Title+" — "+queueTransfers[video.Id].Caption); }
                     }),cancellation.Token);
                     if(stamp!=generation || disposed)return;
                     if(!playback.PlayMedia(repaired,preserveStereo:true))throw new IOException("Không phát được video đã tải lại.");
@@ -314,7 +329,7 @@ public sealed class YouTubeMusicScreen : IDisposable
                     if(stamp!=generation || disposed)return;
                     if(playback.Player.State==OriginalVideoState.Play && resumeAt>0 && resumeAt<playback.Decoder.Duration)playback.Player.Seek(resumeAt);
                 }
-                if(stamp==generation && !disposed)SetStatus("Đang phát: "+video.Title+" — đã tải xong");
+                if(stamp==generation && !disposed) { SetQueueTransfer(video.Id,null);SetStatus("Đang phát: "+video.Title+" — đã tải xong"); }
             }
         }
         catch(OperationCanceledException) { }
@@ -323,10 +338,16 @@ public sealed class YouTubeMusicScreen : IDisposable
             if(stamp==generation && !disposed)
             {
                 active=false;liveTransfer?.Dispose();liveTransfer=null;playback.StartIdleDemo();
+                SetQueueTransfer(video.Id,new(Error:ex.Message));RefreshQueue();
                 SetStatus(ex.Message+" — bấm Thử lại hoặc chọn bài khác.");
             }
         }
         finally { if(ReferenceEquals(downloading,cancellation))downloading=null;cancellation.Dispose(); }
+    }
+    private void SetQueueTransfer(string id,QueueTransferDisplay? state)
+    {
+        if(state is null)queueTransfers.Remove(id);else queueTransfers[id]=state;
+        queueDialog?.SetTransfer(id,state);
     }
     private bool Command(string command)
     {
