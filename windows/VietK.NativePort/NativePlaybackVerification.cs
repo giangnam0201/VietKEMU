@@ -35,7 +35,6 @@ public static class NativePlaybackVerification
             {
                 playback.ShowTelevision(host);
                 await NativeCollectionVerification.Run(host,root,output);
-                await NativeSongPreviewVerification.Run(host,playback,fixtures,output);
                 Require(new WindowInteropHelper(host).Handle != IntPtr.Zero &&
                     new WindowInteropHelper(playback.Television).Handle != IntPtr.Zero &&
                     playback.Television.Owner is null, "Independent panel/TV window handles missing");
@@ -49,6 +48,7 @@ public static class NativePlaybackVerification
                 Require(playback.StartIdleDemo(),"Bundled original idle background unavailable");
                 await Until(()=>played>0 && playback.DecodedPreviewFrames>idlePreviewBefore,
                     "Bundled original idle background did not decode into the panel preview");
+                await NativeSongPreviewVerification.Run(host,playback,fixtures,output);
                 Require(!string.IsNullOrWhiteSpace(playback.Television.Overlay.MarqueeText),"Idle marquee missing");
                 var marquee=playback.Television.Overlay;var scrollBefore=marquee.MarqueeOffset;
                 await Task.Delay(300);
