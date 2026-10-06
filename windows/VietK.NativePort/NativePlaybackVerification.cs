@@ -75,7 +75,7 @@ public static class NativePlaybackVerification
                 modeDialog=new TvQrModeDialog(panel,qr);modeDialog.Select(1);modeDialog.Confirm(false);
                 Require(qr.State.Mode==1&&!qr.State.ImageVisible,"Original mode-one visibility branch was replaced");
                 qr.SetMode(savedMode,false);qr.Configure(savedBinding);
-                await MobileRemoteVerification.Run(playback,bottom,panel,root,output);
+                await MobileRemoteVerification.Run(playback,bottom,panel,root,fixtures,output,(expected,unwanted,message)=>Tone(tap,expected,unwanted,message));
                 var idleEncoder=new PngBitmapEncoder();idleEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
                 using(var idleFile=File.Create(Path.Combine(output,"bundled-idle-preview.png")))idleEncoder.Save(idleFile);
                 played=0;
@@ -100,6 +100,17 @@ public static class NativePlaybackVerification
                 using(var previewFile=File.Create(Path.Combine(output,"panel-tv-preview.png")))previewEncoder.Save(previewFile);
 
                 var sourceStereo = Path.GetFullPath(Path.Combine(fixtures, "stereo.mkv"));
+                foreach(var tracks in new[]{(0,5),(5,0)})
+                {
+                    Require(playback.PlayMedia(sourceStereo,Metadata(sourceStereo,tracks.Item1,tracks.Item2)),"Stereo-only karaoke fixture rejected");
+                    await Until(()=>playback.Player.State==OriginalVideoState.Play,"Stereo-only karaoke fixture did not start");
+                    await Stereo(tap);
+                    Require(!playback.CanSwitchVocal,"APK stereo-only mode allowed vocal switching");
+                    var beforeMode=playback.Player.SingMode;
+                    playback.Command("ori_imv");
+                    Require(playback.Player.SingMode==beforeMode,"Unavailable vocal mode changed the requested mode");
+                    await Stereo(tap);
+                }
                 var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
                 string stereo;
                 try

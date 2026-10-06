@@ -11,12 +11,19 @@ namespace VietK.NativePort;
 
 internal static class MobileRemoteVerification
 {
-    public static async Task Run(NativePlayback playback,BottomBar bottom,Canvas panel,string root,string output)
+    public static async Task Run(NativePlayback playback,BottomBar bottom,Canvas panel,string root,string fixtures,string output,Func<int,int,string,Task> checkTone)
     {
         var directory=Path.Combine(output,"mobile-remote");Directory.CreateDirectory(directory);
         void Checkpoint(string message)=>File.AppendAllText(Path.Combine(output,"mobile-checkpoint.txt"),message+Environment.NewLine);
         Checkpoint("Starting native mobile test");
         using var music=new YouTubeMusicScreen(root,directory,playback,bottom);
+        var stereo=Path.GetFullPath(Path.Combine(fixtures,"stereo.mkv"));
+        var metadata=new SongMedia(1,101000,stereo,100,0,1,"0","0",1,"","","","",0,null,null,"remote-vocal-fixture");
+        playback.Player.SetSingMode(OriginalSingMode.Original);
+        RequireMedia(playback.PlayMedia(stereo,metadata));
+        var deadline=DateTime.UtcNow.AddSeconds(15);
+        while(playback.Player.State!=OriginalVideoState.Play)
+        { if(DateTime.UtcNow>=deadline)throw new TimeoutException("Remote vocal fixture did not start");await Task.Delay(50); }
         music.SeedRemoteFixture();
         var before=panel.Children.Count;
         bottom.CommandRequested+=playback.Command;
@@ -80,6 +87,16 @@ internal static class MobileRemoteVerification
         await Send(new { action="command",id="voldec" });Require(playback.Decoder.OutputVolumeStep==Math.Max(0,volume-1)&&playback.Television.Overlay.LastControl=="play_ctrl_audio_bg","Phone volume/TV feedback failed");
         Require(!playback.Decoder.Muted,"Phone volume control failed to clear mute");
         await Send(new { action="command",id="volinc" });
+        // Exercise the APK's phone play-control value 4 through the real HTTP
+        // route, with the YouTube screen installed as the command override.
+        playback.Player.Seek(0);playback.Player.SetSingMode(OriginalSingMode.Original);
+        await checkTone(880,440,"Remote original vocal baseline missing");
+        await Send(new { action="command",id="ori_imv" });
+        await checkTone(440,880,"Phone accompaniment did not switch actual PCM");
+        Require(!bottom.OriginalVocal&&playback.Television.Overlay.LastControl=="accompany","Phone accompaniment panel/TV feedback missing");
+        await Send(new { action="command",id="accp_imv" });
+        await checkTone(880,440,"Phone original vocal did not restore actual PCM");
+        Require(bottom.OriginalVocal&&playback.Television.Overlay.LastControl=="original","Phone original vocal panel/TV feedback missing");
         await Send(new { action="screen" });Require(playback.Television.IsScreenMasked,"Phone blackout did not reach TV");
         await Send(new { action="screen" });Require(!playback.Television.IsScreenMasked,"Phone did not restore TV picture");
         await Send(new { action="command",id="pause_imv" });
@@ -88,6 +105,11 @@ internal static class MobileRemoteVerification
         Require(playback.Player.State==OriginalVideoState.Play,"Phone did not resume native playback");
         await Send(new { action="command",id="replay_imv" });Require(playback.Television.Overlay.LastControl=="replay","Phone replay TV feedback missing");
         await Send(new { action="command",id="cut_song_imv" });Require((await Queue()).Length==0&&playback.IsPlayingIdle,"Phone next did not clear last song and restore idle video");
+        using(var idleState=JsonDocument.Parse(await client.GetStringAsync("api/state")))
+            Require(!idleState.RootElement.GetProperty("canSwitchVocal").GetBoolean(),"Idle phone state enabled unavailable vocals");
+        var idleMode=playback.Player.SingMode;
+        await Send(new { action="command",id="ori_imv" });
+        Require(playback.Player.SingMode==idleMode,"Phone changed vocal mode during idle playback");
         using(var invalid=await client.PostAsJsonAsync("api/action",new { action="command",id="shutdown" }))Require(invalid.StatusCode==HttpStatusCode.BadRequest,"Unknown phone command accepted");
         using(var unknown=await client.PostAsJsonAsync("api/action",new { action="add",id="unsearched1" }))Require(unknown.StatusCode==HttpStatusCode.BadRequest,"Unsearched arbitrary media accepted");
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
@@ -96,7 +118,8 @@ internal static class MobileRemoteVerification
         playback.Television.Overlay.Qr.Configure(new());
         File.WriteAllText(Path.Combine(directory,"verification.json"),JsonSerializer.Serialize(new { realHttp=true,pairedAuthorization=true,originRejection=true,searchFixture=true,
             nativeQueueAdd=true,priority=true,reorder=true,remove=true,clearProtectsPlaying=true,volumeAndTvFeedback=true,revocation=true,
-            pauseResume=true,replay=true,nextRestoresIdle=true,blackout=true,muteAndVolumeUnmute=true,phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
+            pauseResume=true,replay=true,nextRestoresIdle=true,blackout=true,muteAndVolumeUnmute=true,vocalActualPcmAndTvFeedback=true,phoneSizedBrowserTested=Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1",
             physicalPhoneWifiTested=false,manufacturerCloudCompatibility=false }));
     }
+    private static void RequireMedia(bool accepted) { if(!accepted)throw new InvalidDataException("Remote vocal fixture rejected"); }
 }

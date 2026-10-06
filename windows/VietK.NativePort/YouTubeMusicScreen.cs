@@ -40,7 +40,9 @@ public sealed class YouTubeMusicScreen : IDisposable
     internal Action? RePairMobile { get; set; }
     internal Action? OpenMobilePairing { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
-        volume=playback.Decoder.OutputVolumeStep,muted=playback.Decoder.Muted,status=message,transfers=queueTransfers.ToDictionary(pair=>pair.Key,pair=>pair.Value) };
+        volume=playback.Decoder.OutputVolumeStep,muted=playback.Decoder.Muted,
+        canSwitchVocal=playback.CanSwitchVocal,originalVocal=playback.ConfirmedOriginalVocal,vocalUnavailableReason=playback.VocalUnavailableReason,
+        status=message,transfers=queueTransfers.ToDictionary(pair=>pair.Key,pair=>pair.Value) };
     internal Task<IReadOnlyList<YouTubeVideo>> RemoteSearch(string query,CancellationToken cancellation)=>client.Search(query,cancellation);
     internal void RemoteAdd(YouTubeVideo video,bool first)=>Add(video,first);
     internal void SeedRemoteFixture()
@@ -435,7 +437,12 @@ public sealed class YouTubeMusicScreen : IDisposable
         if(command=="decoder_completed") { if(!active)return false;Next();return true; }
         if(command=="cut_song_imv") { Next();return true; }
         if(command is "ori_imv" or "accp_imv")
-        { SetStatus("Video YouTube không có thông tin kênh nguyên xướng / nhạc đệm của VietK.");return true; }
+        {
+            if(playback.CanSwitchVocal)return false;
+            SetStatus(playback.Decoder.PreserveStereo&&playback.CurrentMedia is null?
+                "Video YouTube không có thông tin kênh nguyên xướng / nhạc đệm của VietK.":playback.VocalUnavailableReason);
+            return true;
+        }
         if(command is "order_bg" or "orderlist_imv") { ShowQueue();return true; }
         return false;
     }

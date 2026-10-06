@@ -38,6 +38,12 @@ with sync_playwright() as p:
     expect(page.locator('#mute')).to_have_text('Bật tiếng')
     page.locator('#mute').click()
     expect(page.locator('#mute')).to_have_text('Tắt tiếng')
+    expect(page.locator('#vocal')).to_be_enabled()
+    expect(page.locator('#vocal')).to_have_text('Ngắt lời')
+    page.locator('#vocal').click()
+    expect(page.locator('#vocal')).to_have_text('Nguyên xướng')
+    page.locator('#vocal').click()
+    expect(page.locator('#vocal')).to_have_text('Ngắt lời')
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'Mobile page overflows horizontally'
     page.screenshot(path=str(output / 'phone-queue.png'), full_page=True)
     page.locator('#songsTab').click()

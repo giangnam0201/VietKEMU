@@ -243,6 +243,18 @@ public sealed class NativePlayback : IDisposable
     private string idleVideoPath="";
     private OriginalSingMode? pendingTrackFeedback;
     public bool IsPlayingIdle=>playingIdle;
+    public bool ConfirmedOriginalVocal=>bottom.OriginalVocal;
+    // KmPlayCtrlUtil.checkCanSwitchTrack / ResourceTypeUtil.getStereoAudioType.
+    // A missing mode is not the opposite channel of a stereo-only resource.
+    public string VocalUnavailableReason=>CurrentMedia switch
+    {
+        { OriginalTrack:0,AccompanyTrack:5 }=>"The current song only supports original stereo playback",
+        { OriginalTrack:5,AccompanyTrack:0 }=>"Bài hát hiện tại chỉ hổ trợ âm thanh Ngắt lời",
+        _ when playingIdle || Decoder.PreserveStereo || CurrentMedia is null=>"The current song does not support switching the original accompaniment",
+        _ when Player.State is not (OriginalVideoState.Play or OriginalVideoState.Pause or OriginalVideoState.Buffering)=>"Chưa có bài hát đang phát.",
+        _=>""
+    };
+    public bool CanSwitchVocal=>VocalUnavailableReason.Length==0;
     public string? IdleVideoSource { get; private set; }
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
@@ -332,7 +344,7 @@ public sealed class NativePlayback : IDisposable
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
         LocalMediaRequested?.Invoke();
         playingIdle=false;Player.Stop(); CurrentMedia = metadata;ResetPreview();
-        Decoder.PreserveStereo=preserveStereo;
+        Decoder.PreserveStereo=preserveStereo || metadata is { OriginalTrack:0,AccompanyTrack:5 } or { OriginalTrack:5,AccompanyTrack:0 };
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
         // KmPlayerCtrlImpl.getMediaVolume; configured HDD scale defaults to 1.
         var gain=(metadata?.DefaultVolume??100)/100f;
@@ -351,7 +363,7 @@ public sealed class NativePlayback : IDisposable
                 if(Player.State==OriginalVideoState.Play)Television.Overlay.ShowControl("play");
                 break;
             case "ori_imv": case "accp_imv":
-                if (CurrentMedia is { OriginalTrack: 0, AccompanyTrack: 5 } or { OriginalTrack: 5, AccompanyTrack: 0 }) break;
+                if(!CanSwitchVocal)break;
                 var mode=Player.SingMode==OriginalSingMode.Original?OriginalSingMode.Accompaniment:OriginalSingMode.Original;
                 pendingTrackFeedback=Player.State is OriginalVideoState.Play or OriginalVideoState.Pause or OriginalVideoState.Buffering?mode:null;
                 Player.SetSingMode(mode);
