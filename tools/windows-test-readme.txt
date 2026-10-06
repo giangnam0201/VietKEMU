@@ -37,7 +37,9 @@ Available to test:
   resources are available. The eight factory images and paired WAV sounds use
   the original Vietnamese labels. Effects appear on both TV and panel preview,
   loop their sound at half volume, and disappear after six seconds. Karaoke
-  playback continues. Wishes/barrage, TV-mask and lighting tabs are still pending.
+  playback continues. TV tab > Tat man hinh TV blanks the entire TV picture and
+  panel preview while the song continues. Toggle it again to restore output.
+  Wishes/barrage and lighting tabs are still pending.
 - Home and More screens using extracted original resources.
 - Song browser, Vietnamese keyboard, song grid and catalogue search.
 - Native database and queue logic translated from the original app.

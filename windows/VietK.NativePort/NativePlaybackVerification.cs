@@ -235,8 +235,10 @@ public static class NativePlaybackVerification
                 picture.Frames.Add(BitmapFrame.Create(BitmapSource.Create(184,184,96,96,PixelFormats.Bgra32,null,red,184*4)));
                 using(var file=File.Create(Path.Combine(expressionDirectory,"memeda.png")))picture.Save(file);
                 File.Copy(Path.Combine(root,"player","pause.png"),Path.Combine(expressionDirectory,"dc_overseas_popup_close.png"));
+                File.Copy(Path.Combine(root,"player","pause.png"),Path.Combine(expressionDirectory,"dc_overseas_set_off.png"));
+                File.Copy(Path.Combine(root,"player","play.png"),Path.Combine(expressionDirectory,"dc_overseas_set_on.png"));
                 File.Copy(Path.Combine(fixtures,"expression.wav"),Path.Combine(expressionDirectory,"memeda.wav"));
-                using(var expressions=new AmbienceExpressions(playback.Television.Overlay))
+                using(var expressions=new AmbienceExpressions(playback.Television.Overlay,playback.Television))
                 using(var expressionTap=new PcmTap(expressions.Sound))
                 {
                     var beforeChildren=panel.Children.Count;expressions.ShowDialog(host,expressionRoot);
@@ -252,6 +254,21 @@ public static class NativePlaybackVerification
                     Require(center[2]>240 && center[0]<10 && center[1]<10,"Panel preview omitted the TV expression pixels");
                     await Task.Delay(1600);await Tone(expressionTap,1600,880,"Expression sound did not loop beyond its first second");
                     Require(playback.Decoder.Position>before+1000 && playback.Decoder.PreserveStereo,"Expression replaced or interrupted karaoke playback");
+                    var dialog=(Canvas)panel.Children[panel.Children.Count-1];var content=(Canvas)((Border)dialog.Children[0]).Child;
+                    var tvHeading=content.Children.OfType<Border>().Single(child=>child.Child is TextBlock { Text:"TV" });
+                    Click(tvHeading);Require(expressions.CurrentTab==12,"Original TV tab did not select");
+                    var tvPage=content.Children.OfType<Canvas>().Single();
+                    var toggle=tvPage.Children.OfType<Image>().Single();Click(toggle);
+                    Require(playback.Television.IsScreenMasked,"Original TV mask toggle did not blank output");
+                    var hidden=playback.Television.CompositePreview(playback.Decoder.VideoSurface);
+                    VerifyBlack(hidden,"TV mask left video or OSD visible in the panel preview");
+                    playback.Television.UpdateLayout();
+                    var actualTv=new RenderTargetBitmap(1280,720,96,96,PixelFormats.Pbgra32);actualTv.Render(playback.Television.VideoLayers);
+                    VerifyBlack(actualTv,"TV mask was not above the complete live TV visual");
+                    var maskedPosition=playback.Decoder.Position;await Stereo(tap);await Task.Delay(400);
+                    Require(playback.Decoder.Position>maskedPosition+200,"TV mask stopped the song clock");
+                    Click(toggle);Require(!playback.Television.IsScreenMasked,"TV mask toggle did not restore output");
+                    Require(playback.Television.Overlay.ExpressionVisible,"TV mask destroyed the active expression");
                     await Until(()=>!playback.Television.Overlay.ExpressionVisible,"Expression did not disappear at the original timeout");
                     Require(expressions.ActiveExpression=="" && !expressions.Sound.IsPlaying,"Expression sound continued after its TV image expired");
                     panel.Children.RemoveAt(panel.Children.Count-1);playback.Player.Stop();
@@ -274,6 +291,7 @@ public static class NativePlaybackVerification
                     configuredIdleDemoDecoderAndLoopVerified=true,
                     localSupplementImportIdlePrecedenceAndTraversalRejectionVerified=true,
                     expressionDialogSharedPreviewLoopingSoundAndTimeoutVerified=true,
+                    tvMaskButtonFullOutputSharedPreviewAndContinuedStereoPlaybackVerified=true,
                     idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
                     playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,
@@ -298,6 +316,15 @@ public static class NativePlaybackVerification
     }
     private static SongMedia Metadata(string path, int original, int accompaniment) =>
         new(1, 101000, path, 100, original, accompaniment, "0", "0", 1, "", "", "", "", 0, null, null, "decoder-fixture");
+    private static void Click(UIElement element)=>element.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+        System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount,System.Windows.Input.MouseButton.Left)
+        { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
+    private static void VerifyBlack(BitmapSource image,string message)
+    {
+        var pixels=new byte[image.PixelWidth*image.PixelHeight*4];image.CopyPixels(pixels,image.PixelWidth*4,0);
+        for(var offset=0;offset<pixels.Length;offset+=4)
+            if(pixels[offset]!=0 || pixels[offset+1]!=0 || pixels[offset+2]!=0 || pixels[offset+3]!=255)throw new InvalidDataException(message);
+    }
     private static async Task VerifyAudioFile(string path,bool expected)
     {
         var start=new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory,"YouTubeTools","ffprobe.exe")) {

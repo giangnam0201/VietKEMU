@@ -152,6 +152,9 @@ public sealed class TelevisionWindow : Window
 {
     private bool allowClose;
     private readonly Border black;
+    private readonly Border screenMask=new() { Background=Brushes.Black,Visibility=Visibility.Collapsed };
+    public bool IsScreenMasked=>screenMask.Visibility==Visibility.Visible;
+    public event Action<bool>? ScreenMaskChanged;
     public Grid VideoLayers { get; }
     public TelevisionOverlay Overlay { get; }
     public bool BlackVisible => black.Visibility == Visibility.Visible;
@@ -165,9 +168,17 @@ public sealed class TelevisionWindow : Window
         VideoLayers=new Grid { Width=1280,Height=720,Background=Brushes.Black };
         VideoLayers.Children.Add(new Image { Source=surface,Stretch=Stretch.Uniform });
         VideoLayers.Children.Add(black);VideoLayers.Children.Add(Overlay.Canvas);
+        // BlackScreen is a separate dialog above the entire original output,
+        // unlike the decoder black cover below OSD. Keep decoding/audio running.
+        VideoLayers.Children.Add(screenMask);
         Content = new Viewbox { Child=VideoLayers,Stretch=Stretch.Uniform };
     }
     public void SetBlack(bool visible) => black.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    public void SetScreenMask(bool visible)
+    {
+        if(IsScreenMasked==visible)return;
+        screenMask.Visibility=visible?Visibility.Visible:Visibility.Collapsed;ScreenMaskChanged?.Invoke(visible);
+    }
     protected override void OnClosing(CancelEventArgs e)
     {
         if (!allowClose) { e.Cancel = true; Hide(); }
@@ -186,8 +197,11 @@ public sealed class TelevisionWindow : Window
         var drawing=new DrawingVisual();using(var context=drawing.RenderOpen())
         {
             var bounds=new Rect(0,0,640,360);context.DrawRectangle(Brushes.Black,null,bounds);
-            if(!BlackVisible && video is not null)context.DrawImage(video,bounds);
-            context.DrawImage(overlayImage,bounds);
+            if(!IsScreenMasked)
+            {
+                if(!BlackVisible && video is not null)context.DrawImage(video,bounds);
+                context.DrawImage(overlayImage,bounds);
+            }
         }
         var result=new RenderTargetBitmap(640,360,96,96,PixelFormats.Pbgra32);result.Render(drawing);result.Freeze();return result;
     }

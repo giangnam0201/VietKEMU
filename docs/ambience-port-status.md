@@ -20,11 +20,21 @@ Implemented from the decoded firmware:
 The TV and panel use the same overlay. Expressions do not replace the song
 source or alter the selected queue.
 
+The TV tab ports `DiscoMaskView` with its original 56 by 35 on/off images,
+Vietnamese title/tip and 136-high settings row. `BlackScreen` covers the entire
+video and OSD; audio/decoding continue. The same topmost cover appears in the
+shared preview. Mask state and the selected expression/TV tab survive closing
+and reopening the dialog within the current session.
+
 Windows CI uses a synthetic red image and a one-second 1600 Hz WAV to verify
 preview pixels, sound looping, timeout and concurrent karaoke decoding. These
 fixtures verify the native path; they do not prove visual equivalence of every
 factory asset or audio-device mixing on a physical Windows PC.
 
-Still pending: wishes/barrage tab and original scheduling, TV-mask tab,
-remembered tab selection, peripheral lighting, and complete original dialog
+Windows CI clicks the actual TV-tab and toggle handlers, checks every pixel of
+the TV visual and preview is opaque black, and checks stereo PCM and the song
+clock continue. Unmasking preserves the running expression.
+
+Still pending: wishes/barrage tab and original scheduling, room-state reset
+integration, peripheral lighting, and complete original dialog
 navigation. The expression page is a partial port, not proof of full fidelity.

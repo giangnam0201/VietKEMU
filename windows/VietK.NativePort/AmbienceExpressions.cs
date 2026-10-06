@@ -17,13 +17,16 @@ public sealed class AmbienceExpressions : IDisposable
     [ ("memeda","Hôn"),("xianhua","Tặng hoa"),("zan","Thích"),("baodeng","Yêu"),
       ("wuyafeiguo","Vỗ tay"),("zajidan","Chê"),("birthday","Mừng sinh nhật"),("zaiyiqi","Bên nhau") ];
     private readonly TelevisionOverlay overlay;
+    private readonly TelevisionWindow? television;
+    public int CurrentTab { get; private set; }=10;
     private readonly LibVLC library;
     public LibVLCSharp.Shared.MediaPlayer Sound { get; }
     private Media? media;
     private readonly DispatcherTimer expiry=new() { Interval=TimeSpan.FromMilliseconds(6000) };
     public string ActiveExpression { get; private set; }="";
-    public AmbienceExpressions(TelevisionOverlay overlay)
+    public AmbienceExpressions(TelevisionOverlay overlay,TelevisionWindow? television=null)
     {
+        this.television=television;
         this.overlay=overlay;library=new LibVLC("--no-video","--no-video-title-show");
         Sound=new LibVLCSharp.Shared.MediaPlayer(library) { Volume=50 };
         Sound.Playing+=(_,_)=>Sound.Volume=50;
@@ -67,12 +70,41 @@ public sealed class AmbienceExpressions : IDisposable
             Background=new LinearGradientBrush(Color.FromRgb(0xc0,0x37,0xd0),Color.FromRgb(0x74,0x37,0xe9),0),
             Child=new TextBlock { Text="Biểu cảm",FontSize=22,Foreground=Brushes.White,FontFamily=OriginalFont.Family } };
         Put(content,heading,30,10);
+        var televisionHeading=new Border { CornerRadius=new CornerRadius(30),Padding=new Thickness(15,0,15,0),
+            Background=Brushes.Transparent,Child=new TextBlock { Text="TV",FontSize=22,Foreground=Brushes.White,FontFamily=OriginalFont.Family } };
+        if(television is not null)Put(content,televisionHeading,315,10);
         var close=new Image { Width=30,Height=30,Source=LoadImage(Path.Combine(directory,"dc_overseas_popup_close.png")) };
         close.MouseLeftButtonUp+=(_,_)=>Close();Put(content,close,730,10);
         var grid=new Canvas { Width=704,Height=340 };
         var scroll=new ScrollViewer { Width=740,Height=358,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=grid };
         Put(content,scroll,40,60);
+        Canvas? tvPage=null;
+        if(television is not null)
+        {
+            tvPage=new Canvas { Width=780,Height=390,Visibility=Visibility.Collapsed };
+            var text=new StackPanel();text.Children.Add(new TextBlock { Text="Tắt màn hình TV",FontSize=18,Foreground=Brushes.White,FontFamily=OriginalFont.Family });
+            text.Children.Add(new TextBlock { Text="Có thể tắt màn hình TV, chỉ phát nhạc",FontSize=16,
+                Foreground=new SolidColorBrush(Color.FromRgb(0x9b,0x8d,0xb0)),FontFamily=OriginalFont.Family });
+            Put(tvPage,text,90,47);
+            var toggle=new Image { Width=56,Height=35,Tag="original-tv-mask-toggle" };
+            void UpdateToggle(bool value)=>toggle.Source=LoadImage(Path.Combine(directory,value?"dc_overseas_set_on.png":"dc_overseas_set_off.png"));
+            UpdateToggle(television.IsScreenMasked);toggle.MouseLeftButtonUp+=(_,e)=>
+            { television.SetScreenMask(!television.IsScreenMasked);e.Handled=true; };
+            television.ScreenMaskChanged+=UpdateToggle;
+            dim.Unloaded+=(_,_)=>television.ScreenMaskChanged-=UpdateToggle;
+            Put(tvPage,toggle,554,50.5);Put(content,tvPage,0,50);
+        }
+        void SelectTab(int tab)
+        {
+            CurrentTab=tab;scroll.Visibility=tab==10?Visibility.Visible:Visibility.Collapsed;
+            if(tvPage is not null)tvPage.Visibility=tab==12?Visibility.Visible:Visibility.Collapsed;
+            var selected=new LinearGradientBrush(Color.FromRgb(0xc0,0x37,0xd0),Color.FromRgb(0x74,0x37,0xe9),0);
+            heading.Background=tab==10?selected:Brushes.Transparent;televisionHeading.Background=tab==12?selected:Brushes.Transparent;
+        }
+        heading.MouseLeftButtonUp+=(_,e)=> { SelectTab(10);e.Handled=true; };
+        televisionHeading.MouseLeftButtonUp+=(_,e)=> { SelectTab(12);e.Handled=true; };
+        SelectTab(CurrentTab);
         for(var i=0;i<Items.Length;i++)
         {
             var item=Items[i];var imagePath=Path.Combine(directory,item.File+".png");if(!File.Exists(imagePath))continue;
