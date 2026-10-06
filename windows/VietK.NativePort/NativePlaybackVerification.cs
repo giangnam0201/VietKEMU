@@ -296,6 +296,15 @@ public static class NativePlaybackVerification
                     Require(Enumerable.Range(0,pixels.Length/4).Any(pixel=>pixels[pixel*4+2]>245 && pixels[pixel*4]<10 && pixels[pixel*4+1]<10),
                         "Shared panel preview omitted the moving barrage bitmap");
                     barrage.Clear();Require(barrage.VisibleCount==0 && barrage.PendingCount==0,"Barrage clear left delayed messages running");
+                    for(var index=0;index<12;index++)Require(barrage.Send("Chúc mừng",expressionRoot),"Barrage saturation fixture was not submitted");
+                    await Until(()=>barrage.PendingCount==0 && barrage.Canvas.Children.Count==barrage.VisibleCount,
+                        "Delayed barrage burst did not reach layout");
+                    Require(barrage.VisibleCount==9,"Original measured-height overflow filtering admitted overlapping rows or merged duplicate messages");
+                    var rows=barrage.Canvas.Children.OfType<Image>().Where(image=>image.Visibility==Visibility.Visible)
+                        .Select(image=>(System.Windows.Media.TranslateTransform)image.RenderTransform).OrderBy(transform=>transform.Y).ToArray();
+                    Require(rows.Length==9 && rows[0].Y==5 && rows[^1].Y==597 &&
+                        rows.Zip(rows.Skip(1)).All(pair=>pair.Second.Y-pair.First.Y==74),"TV barrage burst ignored retained row positions");
+                    barrage.Clear();Require(barrage.VisibleCount==0,"Barrage clear did not remove saturated rows");
                     panel.Children.RemoveAt(panel.Children.Count-1);playback.Player.Stop();
                 }
                 var unsafeSupplement=Path.Combine(output,"unsafe-supplement-fixture.zip");
@@ -318,6 +327,7 @@ public static class NativePlaybackVerification
                     expressionDialogSharedPreviewLoopingSoundAndTimeoutVerified=true,
                     tvMaskButtonFullOutputSharedPreviewAndContinuedStereoPlaybackVerified=true,
                     wishesInputDelayRightToLeftMovementAndSharedPreviewVerified=true,
+                    barrageBurstDuplicateRetentionAndVerticalOverflowVerified=true,
                     idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
                     playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,

@@ -43,15 +43,20 @@ yellow 30px text at baseline 45, and the original 1280 by 64 message bitmap.
 Scrolling duration and float motion are translated from `classes11.dex`:
 `BaseDanmakuParser`, `DanmakuFactory`, `Duration`, `R2LDanmaku` and the two-item
 collision check in `DanmakuUtils`. Messages start after 1200ms. Native rendering
-prevents overlapping messages in up to ten rows and filters vertical overflow.
+retains one representative per row using `RLDanmakusRetainer.fix`, applies the
+original traversed-line limit and overlap filter, and handles vertical overflow.
 Duplicate messages are not merged. A growing message bitmap retains its width,
 matching `BarrageManager`.
 
 Core checks cover duration clamps, midpoint/end position and catch-up collisions.
+Retainer checks cover different measured heights, row reuse, replacement before
+filter rejection, the ten-line threshold, vertical overflow and allowed overwrite.
 Windows checks click the wishes tab/send button and verify the delayed moving
 message appears in the shared preview. Exact Android `StaticLayout` font metrics,
-line retention under saturation, and screenshot equivalence remain unverified.
+and screenshot equivalence remain unverified. Windows checks also submit twelve
+identical messages and verify nine retained visible rows with the current 74px
+line-height model, rather than merging duplicates or drawing overflow.
 
-Still pending: complete Android barrage layout/retainer equivalence, room-state reset
+Still pending: complete Android barrage font/layout equivalence, room-state reset
 integration, peripheral lighting, and complete original dialog
 navigation. The expression page is a partial port, not proof of full fidelity.

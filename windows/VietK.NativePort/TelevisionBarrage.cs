@@ -11,13 +11,15 @@ using VietK.Core;
 namespace VietK.NativePort;
 
 // BarrageManager's local-user bitmap, original delayed R2L motion, no duplicate
-// merging. Android font metrics/retainer edge cases still need visual comparison.
+// merging. Retention follows the APK bytecode; Android font metrics still need
+// visual comparison before the bitmap line height is fully verified.
 public sealed class TelevisionBarrage : IDisposable
 {
     public Canvas Canvas { get; }=new() { Width=1280,Height=720,ClipToBounds=true,IsHitTestVisible=false };
     private readonly Stopwatch clock=Stopwatch.StartNew();
     private readonly DispatcherTimer timer=new() { Interval=TimeSpan.FromMilliseconds(15) };
     private readonly List<Message> messages=[];
+    private readonly OriginalBarrageRetainer retainer=new(720);
     private int bitmapWidth=1280;
     public int PendingCount=>messages.Count(message=>message.Start>clock.ElapsedMilliseconds);
     public int VisibleCount=>messages.Count(message=>message.Placed);
@@ -57,22 +59,17 @@ public sealed class TelevisionBarrage : IDisposable
             if(now-message.Start>=message.Motion.Duration) { Remove(message);continue; }
             if(!message.Placed)
             {
-                // Maximum ten R2L lines, prevent overlapping and vertical overflow.
-                // Paint includes 5px padding on each side; shadow contributes 3px
-                // to measured width, as AndroidDisplayer records in the APK.
-                var lane=-1;
-                for(var candidate=0;candidate<10 && (candidate+1)*74<=720;candidate++)
-                    if(!messages.Any(previous=>previous.Placed && previous.Lane==candidate &&
-                        previous.Motion.WillHit(message.Motion,previous.Start,message.Start,now))) { lane=candidate;break; }
-                if(lane<0) { Remove(message);continue; }
-                message.Lane=lane;message.Placed=true;message.Transform.Y=lane*74+5;message.Image.Visibility=Visibility.Visible;
+                if(now==message.Start)continue; // BaseDanmaku.isOutside at its exact start.
+                var placement=retainer.Place(message.Layout,now);
+                if(!placement.Accepted) { Remove(message);continue; }
+                message.Placed=true;message.Transform.Y=placement.Top+5;message.Image.Visibility=Visibility.Visible;
             }
             message.Transform.X=message.Motion.Left(now-message.Start)+5;
         }
         if(messages.Count==0)timer.Stop();
     }
     private void Remove(Message message) { Canvas.Children.Remove(message.Image);messages.Remove(message); }
-    public void Clear() { timer.Stop();Canvas.Children.Clear();messages.Clear(); }
+    public void Clear() { timer.Stop();Canvas.Children.Clear();messages.Clear();retainer.Clear(); }
     public void Dispose()=>Clear();
     private sealed class Message(long start,OriginalBarrageMotion motion,Image image,TranslateTransform transform)
     {
@@ -81,6 +78,6 @@ public sealed class TelevisionBarrage : IDisposable
         public Image Image { get; }=image;
         public TranslateTransform Transform { get; }=transform;
         public bool Placed { get; set; }
-        public int Lane { get; set; }
+        public OriginalBarrageRetainer.Item Layout { get; }=new(motion,start,74);
     }
 }
