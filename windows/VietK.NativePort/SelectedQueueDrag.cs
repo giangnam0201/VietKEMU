@@ -35,6 +35,7 @@ internal sealed class SelectedQueueDrag
     public SelectedQueueDrag(Canvas overlay,ScrollViewer list,StackPanel rows,Action<YouTubeVideo,int> move,string resources)
     {
         this.overlay=overlay;this.list=list;this.rows=rows;this.move=move;
+        overlay.Focusable=true;
         var path=Path.Combine(resources,"selected_order_into.png");
         var image=File.Exists(path)?new BitmapImage(new Uri(Path.GetFullPath(path))):null;
         marker=new Image { Width=image?.PixelWidth??514,Height=image?.PixelHeight??12,Source=image,IsHitTestVisible=false,Visibility=Visibility.Hidden };
@@ -64,7 +65,8 @@ internal sealed class SelectedQueueDrag
     private bool Begin(Canvas row,YouTubeVideo item,int index,bool capture)
     {
         hold.Stop();if(index<1 || index>=rows.Children.Count || row.Parent!=rows)return false;
-        if(capture && !overlay.CaptureMouse())return false;
+        if(capture && !overlay.CaptureMouse()) { Cancel();return false; }
+        if(capture)overlay.Focus();
         heldRow=row;video=item;source=index;position=new();
         Ghost=new Border { Width=643,Height=66,Opacity=.8,IsHitTestVisible=false,
             Background=new SolidColorBrush(Color.FromArgb(242,72,74,77)),
