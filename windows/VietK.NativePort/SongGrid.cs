@@ -18,6 +18,7 @@ public sealed record SongGridContract(Dictionary<string,GridIcon> Icons,string P
 public sealed class SongGrid(string root,SongGridContract contract)
 {
     public event Action<CatalogueSong,string>? ActionRequested;
+    public event Action<string>? SingerRequested;
     private long lastPreviewClick;
 
     public ScrollViewer Create(IReadOnlyList<CatalogueSong> songs,
@@ -73,13 +74,9 @@ public sealed class SongGrid(string root,SongGridContract contract)
             Icon(isCollected?"button_add_song_item_collected_normal":"button_add_song_item_collect",
                 isCollected?"button_add_song_item_collected_select":"button_add_song_item_collect_selected","collect",5);
             Icon("ic_top_song",null,"top",10);
-            var singer=new TextBlock { Text=song.Singer.Replace(",",", "),FontSize=16,Foreground=Brushes.White,
-                FontFamily=OriginalFont.Family,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,
-                VerticalAlignment=VerticalAlignment.Center,Margin=new(10,0,actionWidth,0) };
+            var singer=OriginalSingerText.Create(song.Singer,16,name=>SingerRequested?.Invoke(name),"song-singers:"+song.Id);
+            singer.TextWrapping=TextWrapping.NoWrap;singer.Margin=new(10,0,actionWidth,0);
             bar.Children.Add(singer);bar.Children.Add(actions);
-            // Singer spans/navigation require the original singer DAO + handler.
-            // Block parent ordering when its singer text is pressed.
-            singer.MouseLeftButtonUp+=(_,e)=> { ActionRequested?.Invoke(song,"singer");e.Handled=true; };
             tile.MouseLeftButtonUp+=(_,e)=> { ActionRequested?.Invoke(song,"order");e.Handled=true; };
         }
         return new ScrollViewer { Width=738,Height=440,Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,

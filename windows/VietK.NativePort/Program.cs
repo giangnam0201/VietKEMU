@@ -52,6 +52,7 @@ public static class Program
             {
                 songState.ImportOnlineCatalogue(Path.Combine(root,"wholekmbox.db"));
                 songState.ImportOnlineMedia(Path.Combine(root,"wholekmbox.db"));
+                songState.ImportReferencedSingers(Path.Combine(root,"wholekmbox.db"));
             }
             using var queueDispatcher=new SelectedQueueDispatcher(Path.Combine(stateDirectory,"song-browser-state.db"),
                 // No discovered storage/ERC resolver yet: metadata cannot prove
@@ -67,6 +68,7 @@ public static class Program
             OriginalQueueRemote? originalRemote=null;
             OriginalCollectionBrowser? collectionBrowser=null;
             OriginalSongPreview? songPreview=null;
+            OriginalSingerNavigation? singerNavigation=null;
             using var musicServer=new NativeMusicServer(app.Dispatcher,stateDirectory,id=>songState.GetSongById(id));
             IReadOnlyList<SongMedia> AvailableMedia(int id)=>musicServer.Get(id) is { } cached?
                 new[]{cached.Metadata}.Concat(songState.GetMedia(id)).ToArray():songState.GetMedia(id);
@@ -91,6 +93,7 @@ public static class Program
                 queueBrowser?.SetConfirmedQueuedSongs(combined.Select(item=>item.SongMetadata.Id).ToHashSet());
                 collectionBrowser?.RefreshMedia();
                 songPreview?.RefreshQueue();
+                singerNavigation?.SetConfirmedQueuedSongs(combined.Select(item=>item.SongMetadata.Id).ToHashSet());
             }
             selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
                 command=> { if(!queueDispatcher.Post(command))throw new InvalidOperationException("Playlist database worker stopped"); },
@@ -172,7 +175,8 @@ public static class Program
             YouTubeMusicScreen? youtube=null;
             var collectionProfiles=new OriginalCollectionProfiles(stateDirectory);
             var collectionControls=new NativeCollectionControls(collectionProfiles,
-                ()=>app.MainWindow?.Content is Viewbox { Child:Canvas panel }?panel:null,browser.SetConfirmedCollectedSongs);
+                ()=>app.MainWindow?.Content is Viewbox { Child:Canvas panel }?panel:null,
+                ids=> { browser.SetConfirmedCollectedSongs(ids);singerNavigation?.SetConfirmedCollectedSongs(ids); });
             using var collectionScreen=new OriginalCollectionBrowser(root,collectionProfiles,id=>songState.GetSongById(id),
                 ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected),
                 ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).ToArray(),collectionControls,gridContract);
@@ -194,6 +198,7 @@ public static class Program
             };
             Canvas Panel(int screen = 0)
             {
+                singerNavigation?.Clear();
                 var panel = screen switch { 34 when youtube is not null => youtube.Create(),
                     38 => more.Create(), 14 => collectionScreen.Create(), 2 => browser.Create(), _ => renderer.Create() };
                 TextElement.SetFontFamily(panel, OriginalFont.Family);
@@ -505,6 +510,20 @@ public static class Program
             using var ambienceExpressions=new AmbienceExpressions(nativePlayback.Television.Overlay,nativePlayback.Television,nativePlayback);
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             playback = nativePlayback;
+            singerNavigation=new OriginalSingerNavigation(root,songContract,moreContract,songState,gridContract,()=>window,
+                panel=> { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);panel.Children.Add(bar);panel.Children.Add(top.Create()); },
+                ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected),()=>nativePlayback,
+                ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).Select(item=>item.SongMetadata.Id).ToHashSet(),()=>collectionProfiles.Snapshot().ToHashSet());
+            browser.SingerRequested+=name=>singerNavigation.Open(name);
+            collectionScreen.SingerRequested+=name=>singerNavigation.Open(name);
+            singerNavigation.FragmentRequested+=fragment=>System.Diagnostics.Trace.WriteLine($"Original singer directory fragment {fragment} requested; directory UI pending");
+            singerNavigation.SongActionRequested+=(song,action)=>
+            {
+                if(action is "order" or "top")songOrder.Request(song.Id,action=="top");
+                else if(action=="collect")collectionControls.Collect(song.Id);
+                else if(action=="preview"&&songState.GetSongById(song.Id) is { } originalSong)previewScreen.Show(originalSong);
+            };
+            musicServer.ConnectionChanged+=singerNavigation.Refresh;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
             youtubeMusic.OpenCollectionLogin=()=>collectionControls.Login();
             youtubeMusic.LogoutCollection=collectionControls.Logout;
@@ -526,6 +545,11 @@ public static class Program
             {
                 var panel=youtube.Create(query);panel.Children.Add(top.Create());
                 var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);panel.Children.Add(bar);
+                window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=panel };
+            };
+            singerNavigation.YoutubeRequested+=query=>
+            {
+                var panel=youtube.Create(query);panel.Children.Add(top.Create());var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);panel.Children.Add(bar);
                 window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=panel };
             };
             nativePlayback.NextRequested += () =>

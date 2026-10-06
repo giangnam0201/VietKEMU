@@ -19,9 +19,11 @@ public sealed record SongBrowserContract(string Title, string EmptyMessage, stri
 // The phantom shares the TV decoder's preview and overlay composition.
 public sealed class SongBrowser(string root, SongBrowserContract contract,
     MoreContract more, LocalSongDatabase local, SongGridContract gridContract,
-    Func<SongQueryContext>? queryContext=null)
+    Func<SongQueryContext>? queryContext=null,OriginalSinger? singer=null)
 {
     public event Action? HomeRequested;
+    public event Action? BackRequested;
+    public event Action<string>? SingerRequested;
     public NativePlayback? Playback { get; set; }
     public event Action<string>? YoutubeRequested;
     public event Action<int>? InputModeRequested;
@@ -29,6 +31,8 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     public VietnameseSearchInput? Input { get; private set; }
     public IReadOnlyList<CatalogueSong> Results { get; private set; } = [];
     public bool Alphabetic { get; private set; } = true;
+    public OriginalSinger? Singer=>singer;
+    internal bool SingerPortraitAvailable { get; private set; }
     private IReadOnlySet<int> confirmedQueued=new HashSet<int>();
     private IReadOnlySet<int> confirmedCollected=new HashSet<int>();
     private Action? refreshSelection;
@@ -58,7 +62,15 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         area.Children.Add(frame);Put(canvas, area, contract.ContainerX, contract.ContainerY);
         var category = new StackPanel { Orientation=Orientation.Horizontal, Height=contract.CategoryHeight,
             HorizontalAlignment=HorizontalAlignment.Left, VerticalAlignment=VerticalAlignment.Top, Margin=new(15,10,0,0) };
-        var title = Text(contract.Title,22); title.FontWeight=FontWeights.Bold;
+        category.Tag=singer is null?"song-category-home":"singer-category-home";
+        if(singer is not null)
+        {
+            var portrait=Path.Combine(OriginalSupplement.Root,"ambience","singer","defaultsmall.png");
+            SingerPortraitAvailable=File.Exists(portrait);
+            category.Children.Add(new Border { Width=27,Height=27,CornerRadius=new(10),ClipToBounds=true,Margin=new(10,0,0,0),
+                Child=SingerPortraitAvailable?new Image { Source=new BitmapImage(new Uri(Path.GetFullPath(portrait))),Stretch=Stretch.Fill }:null });
+        }
+        var title = Text(singer?.Name??contract.Title,22); title.FontWeight=FontWeights.Bold;
         title.Margin=new(10,0,0,0); title.VerticalAlignment=VerticalAlignment.Center;
         category.Children.Add(title);
         category.Children.Add(new Border { Width=2,Height=16,Background=Brush("#33ffffff"),Margin=new(12,0,15,0),VerticalAlignment=VerticalAlignment.Center });
@@ -73,19 +85,28 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         Click(youtube,()=>YoutubeRequested?.Invoke(Input?.Text ?? "")); empty.Children.Add(youtube); area.Children.Add(empty);
         var gridFactory=new SongGrid(root,gridContract);
         gridFactory.ActionRequested+=(song,action)=>SongActionRequested?.Invoke(song,action);
+        gridFactory.SingerRequested+=name=>SingerRequested?.Invoke(name);
+        var nextPageTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(150) };
+        nextPageTimer.Tick+=(_,_)=> { nextPageTimer.Stop();LoadNextPage(); };
+        var currentPage=0;var lastTotalSize=0;
         ScrollViewer? songGrid=null;
-        void ShowResults(IReadOnlyList<CatalogueSong> songs)
+        void ShowResults(IReadOnlyList<CatalogueSong> songs,bool preserveOffset=false)
         {
+            var offset=preserveOffset?songGrid?.VerticalOffset??0:0;
             Results=songs;empty.Visibility=songs.Count==0?Visibility.Visible:Visibility.Collapsed;
             if(songGrid is not null)area.Children.Remove(songGrid);
             songGrid=gridFactory.Create(songs,confirmedQueued,confirmedCollected);songGrid.HorizontalAlignment=HorizontalAlignment.Left;
             songGrid.VerticalAlignment=VerticalAlignment.Top;songGrid.Margin=new(0,50,6,0);
             songGrid.Visibility=songs.Count==0?Visibility.Collapsed:Visibility.Visible;area.Children.Add(songGrid);
+            songGrid.ScrollToVerticalOffset(offset);
+            if(singer is not null)songGrid.ScrollChanged+=(_,e)=>
+            { if(e.VerticalChange!=0&&canvas.IsLoaded) { nextPageTimer.Stop();nextPageTimer.Start(); } };
         }
-        refreshSelection=()=>ShowResults(Results);
+        refreshSelection=()=>ShowResults(Results,true);
         var back=new Border { Width=more.BackWidth,Height=more.BackHeight,CornerRadius=new(more.BackCorner),
             Background=Gradient(more.BackStartColor,more.BackEndColor),Child=Icon("icon_back.png",27,20) };
-        Click(back,()=>HomeRequested?.Invoke()); Put(canvas,back,contract.BackX,contract.BackY);
+        back.Tag=singer is null?"song-browser-back":"singer-song-back";
+        Click(back,()=> { if(singer is null)HomeRequested?.Invoke();else BackRequested?.Invoke(); }); Put(canvas,back,contract.BackX,contract.BackY);
 
         var shell=new Grid { Width=contract.KeyboardWidth };
         // Android 6 GradientDrawable: omitted endColor defaults to transparent,
@@ -120,9 +141,9 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         input.SpellRequested+=spell=>
         {
             lastSpell=spell;
-            ShowResults(local.Search.BySpell(spell,0,0,new(),queryContext?.Invoke()??new()));
+            ResetQuery();
         };
-        canvas.Unloaded+=(_,_)=> { foreach(var timer in timers) timer.Stop();timers.Clear(); };
+        canvas.Unloaded+=(_,_)=> { nextPageTimer.Stop();foreach(var timer in timers) timer.Stop();timers.Clear(); };
         void BuildKeys()
         {
             keys.Children.Clear();
@@ -148,7 +169,19 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             Key("",50,350+2*contract.KeyGap,3,()=>InputModeRequested?.Invoke(2),"icon_pen.png");
             Key("",50,400+3*contract.KeyGap,3,()=>InputModeRequested?.Invoke(10),"keyboard_earth.png");
         }
-        refreshQuery=()=>ShowResults(fixtureSongs??local.Search.BySpell(lastSpell,0,0,new(),queryContext?.Invoke()??new()));
+        IReadOnlyList<CatalogueSong> QueryPage(int page)=>singer is null?
+            local.Search.BySpell(lastSpell,0,0,new(page),queryContext?.Invoke()??new()):
+            local.Singers.BySpell(singer.Id,lastSpell,0,0,new(page),queryContext?.Invoke()??new());
+        void ResetQuery() { currentPage=0;lastTotalSize=0;nextPageTimer.Stop();ShowResults(fixtureSongs??QueryPage(0)); }
+        void LoadNextPage()
+        {
+            if(singer is null||fixtureSongs is not null||songGrid is null||Results.Count==0||lastTotalSize==Results.Count)return;
+            var lastVisible=Math.Min(Results.Count-1,(int)((songGrid.VerticalOffset+songGrid.ViewportHeight-1)/147)*3+2);
+            // Preserve the source's unusually early last-visible > count/3 gate.
+            if(lastVisible<=Results.Count/3)return;
+            lastTotalSize=Results.Count;ShowResults(Results.Concat(QueryPage(++currentPage)).ToArray(),true);
+        }
+        refreshQuery=ResetQuery;
         BuildKeys();input.Clear();refreshQuery();
         return canvas;
     }

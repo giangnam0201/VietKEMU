@@ -38,6 +38,7 @@ for name in ['dc_overseas_popup_close','dc_overseas_set_on','dc_overseas_set_off
 add(panel,'res/drawable-mdpi-v4/icon_favorite_for_login.png','ambience/collection/icon_favorite_for_login.png','dualkmbox.apk')
 for name in ['preview_dialog_button_addsong','dialog_common_close_n','dialog_common_close_h']:
     add(panel,f'res/drawable-mdpi-v4/{name}.png',f'ambience/preview/{name}.png','dualkmbox.apk')
+add(panel,'res/drawable-mdpi-v4/defaultsmall.png','ambience/singer/defaultsmall.png','dualkmbox.apk')
 for name in ['ic_cut_song','ic_cut_song_press','ic_delete','ic_delete_press','ic_top_song','ic_top_song_press',
              'icon_youtube','play_list_select','play_list_select_light','selected_list_clear_all',
              'selected_list_shuffle','selected_song_playing','play_list_sung','play_list_sung_light',

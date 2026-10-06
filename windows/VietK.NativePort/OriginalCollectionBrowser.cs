@@ -40,6 +40,7 @@ public sealed class OriginalCollectionBrowser : IDisposable
     internal bool LoginArtworkAvailable { get; private set; }
     public event Action? HomeRequested;
     public event Action<LocalSong,string>? ActionRequested;
+    public event Action<string>? SingerRequested;
     public OriginalCollectionBrowser(string root,OriginalCollectionProfiles profiles,Func<int,LocalSong?> lookup,
         Func<SongQueryContext> context,Func<IReadOnlyList<SelectedPlaylistItem>> queue,NativeCollectionControls controls,SongGridContract icons)
     {
@@ -142,8 +143,8 @@ public sealed class OriginalCollectionBrowser : IDisposable
         var tipWidth=new FormattedText(tip,System.Globalization.CultureInfo.GetCultureInfo("vi-VN"),FlowDirection.LeftToRight,new Typeface(OriginalFont.Family,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal),18,Brushes.White,1).Width;
         var title=Text(song.Name,28,double.NaN);title.MaxWidth=Math.Max(0,400-tipWidth);title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=68;title.Foreground=tip.Length==0?Brushes.White:Brush("#ffffe761");title.Measure(new Size(title.MaxWidth,68));
         Put(row,title,15,(74-title.DesiredSize.Height)/2);Put(row,marker,15+title.DesiredSize.Width+6,27);
-        var singer=Text(song.Singer.Replace(",",", "),24,100);singer.MaxHeight=68;singer.TextWrapping=TextWrapping.Wrap;singer.TextTrimming=TextTrimming.CharacterEllipsis;singer.Measure(new Size(100,68));
-        singer.MouseLeftButtonUp+=(_,e)=> { ActionRequested?.Invoke(song,"singer");e.Handled=true; };Put(row,singer,477,(74-singer.DesiredSize.Height)/2);
+        var singer=OriginalSingerText.Create(song.Singer,24,name=>SingerRequested?.Invoke(name),"collection-singers:"+song.Id);
+        singer.Width=100;singer.MaxHeight=68;singer.TextWrapping=TextWrapping.Wrap;singer.Measure(new Size(100,68));Put(row,singer,477,(74-singer.DesiredSize.Height)/2);
         var collected=profiles.Contains(song.Id);var local=song.LocalFlag is >=1 and <=2;var midi=song.Id is >=100000000 and <=100999999;
         var preview=Icon("preview_dialog_button",34);preview.Visibility=local&&!midi?Visibility.Visible:Visibility.Hidden;preview.Tag="collection-preview:"+song.Id;
         Wire(preview,()=> { var now=Environment.TickCount64;if(now-lastPreviewClick>500) { lastPreviewClick=now;ActionRequested?.Invoke(song,"preview"); } });Put(row,preview,592,20);
