@@ -39,13 +39,14 @@ public static class NativePlaybackVerification
                 await NativeMusicPipelineVerification.Run(playback,root,fixtures,output);
                 played=0;
                 var clip = Path.GetFullPath(Path.Combine(root, "player", "grade_video.mp4"));
+                var previewFramesBefore=playback.DecodedPreviewFrames;
                 Require(playback.PlayMedia(clip), "Original APK grading video rejected");
                 await Until(() => played > 0 && playback.Decoder.Position > 0, "Original video did not decode/render");
                 Require(!playback.Television.BlackVisible, "Original black cover stayed above playing media");
                 var snapshot = Path.GetFullPath(Path.Combine(output, "original-tv-video.png"));
                 Require(playback.Decoder.Native.TakeSnapshot(0, snapshot, 0, 0), "Native video snapshot request failed");
                 await Until(() => File.Exists(snapshot) && new FileInfo(snapshot).Length > 1024, "Decoded video snapshot missing");
-                await Until(() => playback.DecodedPreviewFrames>0 && playback.PreviewFrame is not null,
+                await Until(() => playback.DecodedPreviewFrames>previewFramesBefore && playback.PreviewFrame is not null,
                     "Panel preview did not receive real decoder pixels");
                 var previewEncoder=new PngBitmapEncoder();previewEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
                 using(var previewFile=File.Create(Path.Combine(output,"panel-tv-preview.png")))previewEncoder.Save(previewFile);

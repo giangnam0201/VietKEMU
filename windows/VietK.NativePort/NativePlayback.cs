@@ -317,6 +317,7 @@ public sealed class NativePlayback : IDisposable
             }
         }
         catch(IOException) { }
+        catch(System.IO.FileFormatException) { }
         catch(System.NotSupportedException) { }
     }
     public void Dispose() { previewTimer.Stop();Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
