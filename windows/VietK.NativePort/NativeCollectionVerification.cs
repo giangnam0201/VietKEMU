@@ -51,7 +51,8 @@ internal static class NativeCollectionVerification
             Require(windows==2,"Collection login opened a third window");Capture("original-collection-login.png");
             Confirm("tiny","a");Require(controls.Username is not null&&!model.Contains(1),"Invalid login confirmed pending favorite");
             Confirm("fixture","fixture");Require(model.Contains(1)&&controls.Username is null,"Original login did not retry pending favorite");
-            Require(((BitmapImage)Favorite().Source).UriSource.LocalPath.EndsWith(contract.Icons["button_add_song_item_collected_normal"].File,StringComparison.OrdinalIgnoreCase),"Favorite icon did not reflect confirmed profile");
+            host.UpdateLayout();
+            Require(((BitmapImage)Favorite().Source).UriSource.LocalPath==Path.GetFullPath(Path.Combine(root,contract.Icons["button_add_song_item_collected_normal"].File)),"Favorite icon did not reflect confirmed profile");
             Require(new OriginalCollectionProfiles(directory).Contains(1),"Native favorite was not persisted");Capture("original-collection-confirmed.png");
             await ClickFavorite();Require(!model.Contains(1)&&new OriginalCollectionProfiles(directory).Snapshot().Count==0,"Favorite icon did not remove persisted song");
             controls.Logout();await ClickFavorite();controls.Close();Require(!model.Contains(1),"Cancel collected a pending song");

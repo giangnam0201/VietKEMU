@@ -73,7 +73,7 @@ public sealed class NativeCollectionControls
             if(result==CollectionLoginResult.Success) { Close();completed?.Invoke();return; }
             Feedback(result switch {
                 CollectionLoginResult.WrongPassword=>"Sai mật mã, vui lòng nhập lại!",
-                CollectionLoginResult.InvalidLength when empty=>"Tên người dùng và mật khẩu không được để trống",
+                CollectionLoginResult.InvalidLength when empty=>"Tên người dùng và mật khẩu không thể để trống",
                 CollectionLoginResult.InvalidLength=>"Tên người dùng và mật khẩu không thể ít hơn 4 chữ số",
                 _=>"Tạo người dùng thất bại" });
             // Android clears both fields after a valid-length login attempt.
