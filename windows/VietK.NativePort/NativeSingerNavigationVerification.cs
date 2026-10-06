@@ -67,6 +67,8 @@ internal static class NativeSingerNavigationVerification
             Require(active.Results.Select(song=>song.Id).Distinct().Count()==72&&active.Results.All(song=>song.Id<70000073),"Singer pagination leaked another singer or duplicated songs");
             active.Input!.Letter("F");active.Input.Letter("A");await Until(()=>active.Results.Count==1,"Singer search did not stay restricted to the active ID");
             Require(active.Results.Single().Id==70000001,"Singer spell search returned another title");
+            host.UpdateLayout();var resultBody=(Canvas)Descendants<ScrollViewer>(panel).Single().Content;
+            Require(Math.Abs(((FrameworkElement)resultBody.Children[0]).TranslatePoint(new Point(0,0),panel).Y-(contract.ContainerY+50))<1,"A short singer result list was centered instead of placed directly below the category");
             collected.Add(70000001);navigation.SetConfirmedCollectedSongs(collected);host.UpdateLayout();
             var favorite=Descendants<Image>(panel).Single(image=>Equals(image.Tag,"collect:70000001"));
             Require(favorite.Source is BitmapImage bitmap&&bitmap.UriSource.LocalPath==Path.GetFullPath(Path.Combine(root,grid.Icons["button_add_song_item_collected_normal"].File)),"Singer screen did not confirm the saved favorite state");
@@ -89,7 +91,7 @@ internal static class NativeSingerNavigationVerification
             Require(Application.Current.Windows.Count==2,"Singer routing introduced an extra native window");
             File.WriteAllText(Path.Combine(output,"singer-navigation-verification.json"),JsonSerializer.Serialize(new {
                 referencedSingerImport=true,individualDuetSpans=true,exactSingerMembership=true,originalInitialPageSize=true,
-                continuousNextPage=true,singerScopedSearch=true,confirmedFavoriteState=true,sharedActionCallback=true,
+                continuousNextPage=true,singerScopedSearch=true,shortResultListTopAligned=true,confirmedFavoriteState=true,sharedActionCallback=true,
                 unknownSingerNoOp=true,restoresPreviousViewAndInput=true,nestedSingerBack=true,collectionSingerRoute=true,
                 categoryDirectoryRequest=true,directoryScreen=false,twoWindows=true,manufacturerSingerPictures=false
             },new JsonSerializerOptions { WriteIndented=true }));

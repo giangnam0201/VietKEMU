@@ -24,7 +24,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
     public ScrollViewer Create(IReadOnlyList<CatalogueSong> songs,
         IReadOnlySet<int>? queued=null,IReadOnlySet<int>? collected=null)
     {
-        var body=new Canvas { Width=738,Height=((songs.Count+2)/3)*147 };
+        var body=new Canvas { Width=738,Height=((songs.Count+2)/3)*147,VerticalAlignment=VerticalAlignment.Top,HorizontalAlignment=HorizontalAlignment.Left };
         for(int index=0;index<songs.Count;index++)
         {
             var song=songs[index];
@@ -80,7 +80,8 @@ public sealed class SongGrid(string root,SongGridContract contract)
             tile.MouseLeftButtonUp+=(_,e)=> { ActionRequested?.Invoke(song,"order");e.Handled=true; };
         }
         return new ScrollViewer { Width=738,Height=440,Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,
-            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,CanContentScroll=false,ClipToBounds=true };
+            HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,CanContentScroll=false,ClipToBounds=true,
+            VerticalContentAlignment=VerticalAlignment.Top,HorizontalContentAlignment=HorizontalAlignment.Left };
     }
 
     private BitmapImage Bitmap(string file)=>new(new Uri(Path.Combine(root,file)));
