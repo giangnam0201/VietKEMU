@@ -59,7 +59,7 @@ internal sealed class SelectedQueueDrag
         {
             Cancel();heldRow=row;video=item;source=index;pressed=e.GetPosition(overlay);hold.Start();e.Handled=true;
         };
-        target.MouseLeave+=(_,_)=> { if(!IsDragging)Cancel(); };
+        target.MouseLeave+=(_,_)=> { if(hold.IsEnabled && !IsDragging)Cancel(); };
         target.AddHandler(UIElement.MouseLeftButtonUpEvent,new MouseButtonEventHandler((_,_)=> { if(!IsDragging)Cancel(); }),true);
     }
     private bool Begin(Canvas row,YouTubeVideo item,int index,bool capture)

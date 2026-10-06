@@ -227,9 +227,10 @@ public sealed class YouTubeMusicScreen : IDisposable
             Require(queueDialog.Drag.BeginForVerification(1),"Waiting song could not start a drag");
             Require(queueDialog.Drag.Ghost is { Width:643,Height:66,Opacity:.8 },"Original drag preview geometry differs");
             queueDialog.Drag.Update(195);Require(queueDialog.Drag.Target==3 && queueDialog.Drag.MarkerTop==398,"Drag insertion position differs");
-            panel.UpdateLayout();var dragImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);dragImage.Render(panel);
+            panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));panel.UpdateLayout();
+            var dragImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);dragImage.Render(panel);
             var markerPixel=new byte[4];dragImage.CopyPixels(new Int32Rect(1242,403,1,1),markerPixel,4,0);
-            Require(markerPixel.All(value=>value==255),"Insertion bitmap did not render above the drag preview");
+            Require(markerPixel.All(value=>value==255),"Insertion bitmap did not render above the drag preview: BGRA="+string.Join(",",markerPixel));
             var dragEncoder=new PngBitmapEncoder();dragEncoder.Frames.Add(BitmapFrame.Create(dragImage));
             using(var dragFile=File.Create(Path.Combine(captureDirectory,"native-queue-drag-fixture.png")))dragEncoder.Save(dragFile);
             Click(queueDialog.Overlay);Require(queue.Select(v=>v.Id).SequenceEqual(new[]{"queue-fixture-0","queue-fixture-2","queue-fixture-3","queue-fixture-1"}) && !queueDialog.Drag.IsDragging,"Drag release failed to reorder or remove its ghost");
