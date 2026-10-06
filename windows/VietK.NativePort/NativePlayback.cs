@@ -279,6 +279,7 @@ public sealed class NativePlayback : IDisposable
     public Func<int,NativeIdleSong?>? ResolveIdleSong { get; set; }
     public Func<int,bool>? IdleSongExists { get; set; }
     public int? IdleSongId { get; private set; }
+    public string? UsbIdleVideo=>new[] { idleVideoPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4") }.FirstOrDefault(File.Exists);
     public OriginalMarqueeSettings MarqueeSettings { get; }
     public void SetLocalMarquee(string text) { MarqueeSettings.SaveLocal(text);Television.Overlay.RefreshAdvertisement(); }
     public NativePlayback(BottomBar bottom, string stateDirectory)
@@ -376,10 +377,10 @@ public sealed class NativePlayback : IDisposable
         idleVideoPath="";SavePreferences();
         if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
     }
-    public void ImportIdlePlaylist(string json)
+    public void ImportIdlePlaylist(string json,bool restartIdle=true)
     {
         IdlePlaylist.Import(json);idleVideoPath="";SavePreferences();
-        if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
+        if(restartIdle&&(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped))StartIdleDemo();
     }
     private void SavePreferences()
     {

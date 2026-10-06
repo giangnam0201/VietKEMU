@@ -52,6 +52,7 @@ public static class NativePlaybackVerification
                 await NativeSingerNavigationVerification.Run(host,playback,root,output);
                 await NativeBroadcastVolumeVerification.Run(host,root,fixtures,output);
                 await NativeBroadcastPlaylistVerification.Run(host,root,fixtures,output);
+                await NativeBroadcastEditorVerification.Run(host,root,fixtures,output);
                 await NativeSongGridAnimationVerification.Run(host,root,output);
                 Require(!string.IsNullOrWhiteSpace(playback.Television.Overlay.MarqueeText),"Idle marquee missing");
                 var marquee=playback.Television.Overlay;var scrollBefore=marquee.MarqueeOffset;

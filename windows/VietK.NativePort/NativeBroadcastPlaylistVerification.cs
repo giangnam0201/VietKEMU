@@ -40,7 +40,7 @@ internal static class NativeBroadcastPlaylistVerification
             File.WriteAllText(Path.Combine(output,"broadcast-playlist-verification.json"),JsonSerializer.Serialize(new {
                 realDecodedPlaylist=true,completionAdvances=true,replayKeepsCurrentSong=true,duplicateAndUnavailableSkip=true,
                 wrapsInOrder=true,songInterruptionPreservesCursor=true,customAndLegacyDemoPriority=true,
-                malformedImportPreservesState=true,factoryResetClearsPlaylist=true,originalListEditorPorted=false,cloudPlaylistTested=false
+                malformedImportPreservesState=true,factoryResetClearsPlaylist=true,originalLocalListEditorVerifiedSeparately=true,cloudPlaylistTested=false
             },new JsonSerializerOptions { WriteIndented=true }));
         }
         finally

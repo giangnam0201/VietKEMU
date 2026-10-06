@@ -539,6 +539,13 @@ public static class Program
             };
             musicServer.ConnectionChanged+=singerNavigation.Refresh;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
+            youtubeMusic.OpenBroadcastPlaylist=()=>
+            {
+                if(window.Content is Viewbox { Child:Canvas panel })new OriginalBroadcastPlaylistDialog(panel,nativePlayback,
+                    id=>songState.GetSongById(id),(text,page)=>songState.Search.ByBroadcastSpell(text,new SongPage(page,50),new SongQueryContext(true,musicServer.IsConnected))
+                        .Select(song=>songState.GetSongById(song.Id)).OfType<LocalSong>().ToArray(),
+                    id=>AvailableMedia(id).Any(media=>musicServer.LocalPath(media) is { } path&&File.Exists(path)),id=>songOrder.Request(id,false));
+            };
             youtubeMusic.SearchOptions=searchOptions;
             youtubeMusic.OpenCollectionLogin=()=>collectionControls.Login();
             youtubeMusic.LogoutCollection=collectionControls.Logout;

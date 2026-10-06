@@ -43,6 +43,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     internal Action? OpenMobilePairing { get; set; }
     internal Action? OpenCollectionLogin { get; set; }
     internal Action? LogoutCollection { get; set; }
+    internal Action? OpenBroadcastPlaylist { get; set; }
     internal OriginalQueueRemote? OriginalQueue { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
         volume=playback.Decoder.OutputVolumeStep,muted=playback.Decoder.Muted,
@@ -215,6 +216,7 @@ public sealed class YouTubeMusicScreen : IDisposable
             if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new TvQrModeDialog(panel,playback.Television.Overlay.Qr);
         });
         Add("Chọn video chờ (Demo.mp4)…",ChooseIdleVideo);
+        Add("Video màn hình chờ…",()=>OpenBroadcastPlaylist?.Invoke());
         Add("Nhập danh sách video chờ VietK…",()=>
         {
             var dialog=new Microsoft.Win32.OpenFileDialog { Title="Danh sách video chờ VietK",Filter="VietK playlist|*.init;*.json|All files|*.*",CheckFileExists=true };

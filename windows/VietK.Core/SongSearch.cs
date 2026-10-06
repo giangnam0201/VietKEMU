@@ -18,8 +18,12 @@ public sealed class SongSearch(SqliteConnection database,string anonymousSinger=
     public IReadOnlyList<CatalogueSong> ByName(string name, int limitLength,
         SongPage page, SongQueryContext context) => Query(name, true, limitLength, 0, page, context);
 
+    // PublicPlaySongPageLoadPresenter -> SongDAO.getSongBySpellName.
+    public IReadOnlyList<CatalogueSong> ByBroadcastSpell(string value,SongPage page,SongQueryContext context)=>
+        Query(value,false,0,0,page,context,broadcast:true);
+
     private IReadOnlyList<CatalogueSong> Query(string value, bool byName, int length,
-        int language, SongPage page, SongQueryContext context)
+        int language, SongPage page, SongQueryContext context,bool broadcast=false)
     {
         if (page.Index < 0 || page.Size <= 0) throw new ArgumentOutOfRangeException(nameof(page));
         var clauses = new List<string>();
@@ -27,13 +31,13 @@ public sealed class SongSearch(SqliteConnection database,string anonymousSinger=
         using var command = database.CreateCommand();
         if (value.Length > 0)
         {
-            clauses.Add(byName ? "(SongName LIKE $match OR song_name_en LIKE $match)"
+            clauses.Add(broadcast?"(SongPy LIKE $match OR song_name_en LIKE $match OR SongName LIKE $match)":byName ? "(SongName LIKE $match OR song_name_en LIKE $match)"
                                : "(SongPy LIKE $match OR song_name_en LIKE $match)");
             command.Parameters.AddWithValue("$match", byName ? "%" + value + "%" : value + "%");
             command.Parameters.AddWithValue("$prefix", value + "%");
             if (byName) clauses.Add("length(SongPy)>0");
         }
-        if (!context.PslEnabled) clauses.Add("is_psl=0");
+        if (!context.PslEnabled&&(!broadcast||value.Length>0)) clauses.Add("is_psl=0");
         // Name searches apply word length only when the name isn't empty;
         // spell searches apply it even for the initial empty input.
         if (length > 0 && (!byName || value.Length > 0))
@@ -58,7 +62,7 @@ public sealed class SongSearch(SqliteConnection database,string anonymousSinger=
             orders.Add(byName ? "SongName LIKE $prefix DESC" : "SongPy LIKE $prefix DESC");
             orders.Add("length(SongPy)");
         }
-        else orders.Add("IsLocalExist=0");
+        else if(!broadcast)orders.Add("IsLocalExist=0");
         orders.Add("(LanguageTypeID=8 OR LanguageTypeID=4) DESC");
         orders.Add("PlayNum DESC");
         command.CommandText = $"""
