@@ -112,12 +112,13 @@ public static class Program
                 }
                 downloadSelection.Reset();downloadSelection.DownloadFirst();QueueChanged();
             };
-            musicServer.Failed+=(id,code,detail)=>
+            musicServer.Failed+=async (id,code,detail)=>
             {
                 downloadQueue.SetError(id,code);downloadSelection.Reset();
                 if(code==1015)downloadSelection.Stop();
                 QueueChanged();
                 MessageBox.Show($"Song {id}: download error {code}\n\n{detail}","VietK music server",MessageBoxButton.OK,MessageBoxImage.Error);
+                if(code!=1016) { await Task.Delay(1000);downloadSelection.DownloadNext(); }
             };
             QueueChanged();
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),

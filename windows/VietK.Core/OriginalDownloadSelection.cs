@@ -9,14 +9,18 @@ public sealed class OriginalDownloadSelection(OriginalDownloadQueue queue,Action
     public bool IsStopped { get; private set; }
     public int CurrentSongId { get; private set; }
     public int CurrentState { get; private set; } // Java default 0; reset assigns 200.
-    public void DownloadFirst()
+    private int currentIndex;
+    public void DownloadFirst()=>Select(false);
+    public void DownloadNext()=>Select(true);
+    private void Select(bool next)
     {
         queue.WithLockedItems(items=>
         {
             if(IsStopped || IsDownloading)return;
             IsDownloading=true;
-            if(items.Count==0) { IsDownloading=false;return; }
-            var first=items[0];
+            currentIndex=next?currentIndex+1:0;
+            if(items.Count<=currentIndex) { IsDownloading=false;return; }
+            var first=items[currentIndex];
             if(first.PlayType is "normal" or "kmtrain" or "photomv" or "mdream")
             {
                 CurrentSongId=first.SongMetadata.Id;

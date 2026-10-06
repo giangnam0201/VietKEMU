@@ -91,7 +91,7 @@ public sealed class OriginalMusicTransfer : IDisposable
             return destination;
         }
         catch(OperationCanceledException) when(!cancellation.IsCancellationRequested)
-        { throw new OriginalTransferException(1006,"Music server read timed out"); }
+        { throw new OriginalTransferException(1007,"Music server read timed out"); }
         catch(HttpRequestException ex) { throw new OriginalTransferException(1002,"Music server connection failed",ex); }
         finally { if(File.Exists(temporary))File.Delete(temporary); }
     }

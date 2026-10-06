@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
-def package(decoded, destination, firmware_ui):
+def package(decoded, destination, firmware_ui, firmware=None):
     destination.mkdir(parents=True, exist_ok=True)
     package_fonts(firmware_ui, destination)
     app = decoded / 'dualkmbox'
@@ -87,7 +87,7 @@ def package(decoded, destination, firmware_ui):
     package_song_browser(app, destination, entries, strings, values)
     package_song_grid(app, destination, entries)
     package_order_dependencies(decoded, destination, strings)
-    package_player_reference(decoded, destination)
+    package_player_reference(decoded, destination, firmware)
     seed = app / 'apktool/assets/kmbox.jpg'
     seed_digest = hashlib.sha256(seed.read_bytes()).hexdigest()
     if entries['assets/kmbox.jpg']['sha256'] != seed_digest:
@@ -397,11 +397,16 @@ def package_bottom(app, destination, entries, strings):
     (destination / 'bottom-provenance.json').write_text(json.dumps(provenance, indent=2))
 
 
-def package_player_reference(decoded, destination):
+def package_player_reference(decoded, destination, firmware):
     app = decoded / 'daulkmboxosdtv'
     entries = {entry['path']: entry for entry in json.loads((app / 'original-entries.json').read_text())}
     original = app / 'apktool/assets/grade_video.mp4'
-    payload = original.read_bytes()
+    if original.exists():
+        payload = original.read_bytes()
+    else:
+        apk = next(firmware.glob('vendor/app/daulkmboxosdtv/*.apk'))
+        with zipfile.ZipFile(apk) as archive:
+            payload = archive.read('assets/grade_video.mp4')
     digest = hashlib.sha256(payload).hexdigest()
     if entries['assets/grade_video.mp4']['sha256'] != digest:
         raise RuntimeError('Original TV reference video differs')
@@ -447,5 +452,6 @@ if __name__ == '__main__':
     parser.add_argument('decoded', type=Path)
     parser.add_argument('destination', type=Path)
     parser.add_argument('--firmware-ui', type=Path, required=True)
+    parser.add_argument('--firmware', type=Path)
     args = parser.parse_args()
-    package(args.decoded, args.destination, args.firmware_ui)
+    package(args.decoded, args.destination, args.firmware_ui, args.firmware)

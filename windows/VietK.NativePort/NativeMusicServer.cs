@@ -62,7 +62,7 @@ public sealed class NativeMusicServer : IDisposable
     }
     public CachedMusic? Get(int songId)=>cache.GetValueOrDefault(songId);
     public string? LocalPath(SongMedia media)=>Get(media.SongId)?.Path;
-    public void Cancel()=>current?.Cancel();
+    public void Cancel() { var task=current;current=null;task?.Cancel(); }
     public void Request(int songId)
     {
         if(current is not null)return;
@@ -89,13 +89,15 @@ public sealed class NativeMusicServer : IDisposable
             cache[songId]=cached;
             var temp=cacheFile+".tmp";
             File.WriteAllText(temp,JsonSerializer.Serialize(cache.Values));File.Move(temp,cacheFile,true);
-            current=null;
+            if(ReferenceEquals(current,cancellation))current=null;
             Completed?.Invoke(songId,cached);
         }
-        catch(OperationCanceledException) when(cancellation.IsCancellationRequested) { current=null; }
+        catch(OperationCanceledException) when(cancellation.IsCancellationRequested)
+        { if(ReferenceEquals(current,cancellation))current=null; }
         catch(Exception ex)
         {
-            current=null;
+            if(cancellation.IsCancellationRequested)return;
+            if(ReferenceEquals(current,cancellation))current=null;
             var code=ex is OriginalTransferException transferError?transferError.Code:1013;
             var detail=string.IsNullOrEmpty(client.LoginErrorMessage)?ex.Message:client.LoginErrorMessage;
             Failed?.Invoke(songId,code,detail);

@@ -30,8 +30,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh run download 37417309368 -n original-firmware-ui-assets -D firmware-ui-fonts
+      - name: Retrieve original APK video bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 37324921816 -n firmware-applications -D firmware
       - name: Package the original home and bottom bar resources
-        run: python tools/package_native_home.py decoded original --firmware-ui firmware-ui-fonts
+        run: python tools/package_native_home.py decoded original --firmware-ui firmware-ui-fonts --firmware firmware
       - name: Create decoder verification signals
         run: python tools/create_playback_fixtures.py playback-fixtures
       - uses: actions/upload-artifact@v4
