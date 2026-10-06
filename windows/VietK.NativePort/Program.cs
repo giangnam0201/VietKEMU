@@ -42,7 +42,8 @@ public static class Program
                 ?? throw new InvalidDataException("Missing original song browser contract");
             var capturing = args.Length == 2 && args[0] == "--capture";
             var verifyingPlayback = args.Length == 3 && args[0] == "--verify-playback";
-            var stateDirectory = capturing || verifyingPlayback ? args[^1] : Path.Combine(
+            var verifyingYouTube = args.Length == 3 && args[0] == "--verify-youtube";
+            var stateDirectory = capturing || verifyingPlayback || verifyingYouTube ? args[^1] : Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
                 Path.Combine(stateDirectory,"song-browser-state.db"));
@@ -161,11 +162,13 @@ public static class Program
                     ScannedVolumes:musicServer.StorageAvailable?1:0,QueueCount:selectedQueue.Count+downloadQueue.Count),musicServer.LocalPath,()=>false,
                 text=>System.Diagnostics.Trace.WriteLine(text),
                 (action,mode)=>System.Diagnostics.Trace.WriteLine($"Original report plugin request {action}, mode {mode}; plugin execution pending"),AvailableMedia);
+            YouTubeMusicScreen? youtube=null;
             browser.SongActionRequested+=(song,action)=>
             { if(action is "order" or "top")songOrder.Request(song.Id,action=="top"); };
             Canvas Panel(int screen = 0)
             {
-                var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
+                var panel = screen switch { 34 when youtube is not null => youtube.Create(),
+                    38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
                 TextElement.SetFontFamily(panel, OriginalFont.Family);
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
@@ -174,6 +177,8 @@ public static class Program
             }
             if (verifyingPlayback)
                 return NativePlaybackVerification.Run(app, Panel(), bottom, root, args[1], args[2]);
+            if(verifyingYouTube)
+                return NativeYouTubeVerification.Run(app,Panel(),bottom,args[1],args[2]);
             if (args.Length == 2 && args[0] == "--capture")
             {
                 Directory.CreateDirectory(args[1]);
@@ -404,9 +409,22 @@ public static class Program
                 var guard = new OriginalClickGuard();
                 if (!guard.TryClick(1000) || guard.TryClick(1500) || !guard.TryClick(1501) || !guard.TryClick(1000))
                     throw new InvalidDataException("Original click guard boundary/clock-reset rules differ");
+                var youtubeBottom=new BottomBar(root,bottomContract);
+                using(var youtubePlayback=new NativePlayback(youtubeBottom,args[1]))
+                using(var youtubeCapture=new YouTubeMusicScreen(root,args[1],youtubePlayback,youtubeBottom))
+                {
+                    var youtubeCanvas=youtubeCapture.Create();TextElement.SetFontFamily(youtubeCanvas,OriginalFont.Family);
+                    youtubeCanvas.Children.Add(top.Create());var youtubeBar=youtubeBottom.Create();
+                    Canvas.SetTop(youtubeBar,bottomContract.Y);youtubeCanvas.Children.Add(youtubeBar);
+                    youtubeCanvas.Measure(new Size(1280,800));youtubeCanvas.Arrange(new Rect(0,0,1280,800));youtubeCanvas.UpdateLayout();
+                    var youtubeImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);youtubeImage.Render(youtubeCanvas);
+                    var youtubeEncoder=new PngBitmapEncoder();youtubeEncoder.Frames.Add(BitmapFrame.Create(youtubeImage));
+                    using var captureFile=File.Create(Path.Combine(args[1],"native-youtube.png"));youtubeEncoder.Save(captureFile);
+                }
                 File.WriteAllText(Path.Combine(args[1], "verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsRendering = true,
+                    youtubeMainPanelNativeRendering = true,
                     androidRuntimeUsed = false,
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,
@@ -452,6 +470,16 @@ public static class Program
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             using var nativePlayback = new NativePlayback(bottom, stateDirectory);
             playback = nativePlayback;
+            using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
+            youtube=youtubeMusic;
+            window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(34) };
+            youtube.HomeRequested+=()=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel() };
+            browser.YoutubeRequested+=query=>
+            {
+                var panel=youtube.Create(query);panel.Children.Add(top.Create());
+                var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);panel.Children.Add(bar);
+                window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=panel };
+            };
             nativePlayback.NextRequested += () =>
             {
                 if (selectedQueue.Count > 0) selectedQueue.DeleteByIndex(0);
@@ -462,7 +490,8 @@ public static class Program
                 // Developer probe, separate from the original song-library UI.
                 if (args.Length == 2 && args[0] == "--play-media" && !nativePlayback.PlayMedia(Path.GetFullPath(args[1])))
                     throw new InvalidDataException("Playback probe source is unavailable");
-                await musicServer.Connect();
+                // YouTube is the user-selected primary source. Original server
+                // credentials remain available only through the legacy route.
             };
             bottom.CommandRequested += command =>
             {
@@ -480,7 +509,7 @@ public static class Program
             };
             renderer.NavigationRequested += fragment =>
             {
-                if (fragment is 38 or 2) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment) };
+                if (fragment is 38 or 2 or 34) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment==2?34:fragment) };
             };
             more.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
             browser.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };

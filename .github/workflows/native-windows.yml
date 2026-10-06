@@ -63,6 +63,10 @@ jobs:
           path: windows/VietK.NativePort/Original/
       - name: Compile native Windows executable
         run: dotnet publish windows/VietK.NativePort -c Release -r win-x64 --self-contained true -o artifacts/native-windows
+      - name: Bundle official YouTube fetch and merge tools
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./tools/package_youtube_tools.ps1 -PublishDirectory artifacts/native-windows
       - uses: actions/download-artifact@v4
         with:
           name: playback-decoder-fixtures
@@ -83,6 +87,12 @@ jobs:
           if (Test-Path "$env:TEMP/vietk-native-startup-error.txt") {
             Copy-Item "$env:TEMP/vietk-native-startup-error.txt" artifacts/native-verification/
           }
+      - name: Probe real public YouTube download and native TV frames
+        continue-on-error: true
+        run: |
+          $process = Start-Process -FilePath artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-youtube', 'https://www.youtube.com/watch?v=YE7VzlLtp-4', 'artifacts/native-verification/youtube' -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(300000)) { $process.Kill(); throw 'Live YouTube verification timed out' }
+          if ($process.ExitCode -ne 0) { throw 'Live YouTube fetch failed; inspect youtube-verification.json. This external-service result does not establish working playback.' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

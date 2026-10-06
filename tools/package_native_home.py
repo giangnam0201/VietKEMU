@@ -41,7 +41,7 @@ def package(decoded, destination, firmware_ui, firmware=None):
     for tag, image, label, fragment in specs:
         if f'R.drawable.{image}' not in source or f'case "{tag}"' not in adapter:
             raise RuntimeError('Original home contract differs: ' + tag)
-    assets = ['main_bg.jpg', 'icon_song_name.png'] + [image + '.png' for _,image,_,_ in specs]
+    assets = ['main_bg.jpg', 'icon_song_name.png', 'icon_youtube.png'] + [image + '.png' for _,image,_,_ in specs]
     entries = {entry['path']: entry for entry in json.loads((app / 'original-entries.json').read_text())}
     provenance = []
     for name in assets:

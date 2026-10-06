@@ -678,3 +678,13 @@ Console.WriteLine("Original data-center login/request state verified: URI tokens
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();
 TransferWriteRecoveryChecks.Run().GetAwaiter().GetResult();
+foreach(var address in new[]{"YE7VzlLtp-4","https://youtu.be/YE7VzlLtp-4?t=12",
+    "https://www.youtube.com/watch?v=YE7VzlLtp-4&list=unwanted", "https://m.youtube.com/shorts/YE7VzlLtp-4"})
+    Require(YouTubeMusicClient.VideoId(address)=="YE7VzlLtp-4","YouTube URL normalization failed or admitted a playlist");
+foreach(var address in new[]{"https://youtube.com.evil.invalid/watch?v=YE7VzlLtp-4","file:///YE7VzlLtp-4",
+    "https://youtu.be/../secret", "--exec=bad-command", "https://example.com/watch?v=YE7VzlLtp-4"})
+    Require(YouTubeMusicClient.VideoId(address) is null,"Non-YouTube input became a playable video ID");
+var youtubeEntries=YouTubeMusicClient.ParseSearch("""{"entries":[null,{"id":"invalid"},{"id":"YE7VzlLtp-4","title":"Video tiếng Việt","channel":"Public channel","thumbnails":[{"url":"https://i.ytimg.com/vi/YE7VzlLtp-4/hqdefault.jpg"}]}]}""");
+Require(youtubeEntries.Count==1 && youtubeEntries[0].Title=="Video tiếng Việt" && youtubeEntries[0].Channel=="Public channel",
+    "YouTube search dropped real metadata or admitted invalid entries");
+Console.WriteLine("YouTube public video URL normalization, playlist exclusion, untrusted-host rejection and Unicode metadata parsing verified.");

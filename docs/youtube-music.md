@@ -1,0 +1,46 @@
+# YouTube as the primary music source
+
+The user selected YouTube as the main source, then requested yt-dlp and a clean
+native TV output rather than an embedded YouTube player. This is an explicit
+departure from the original VietK music server and catalogue. It does not restore
+VietK's original recordings, entitlement, vocal-track metadata, scoring or complete
+UI fidelity.
+
+The app now opens its native YouTube panel. Song-name and original YouTube home
+tiles open the same panel. yt-dlp supplies public search results (no Data API key),
+and pasted video links work through the same queue. Cards use the original
+230-by-195 geometry, the firmware background, original YouTube icon, VietK header
+and existing bottom controls; touch keyboard, all menus and pixel parity remain
+unfinished. Queue IDs and displayed metadata persist in `youtube-queue.json`.
+
+yt-dlp fetches video plus audio at up to 1080p. FFmpeg merges/remuxes with no
+requested re-encode; ffprobe checks for both audio and video. Only a successful
+process result and a completed verified file create a cache marker. Cancellation
+kills the process tree and generation checks prevent an old fetch from starting
+after next/clear. Completed files are played by bundled libVLC in the independent
+TV window. No embedded player, WebView, stream URL extraction or automatic cookie
+collection is used. One queued song is fetched at a time. Next cancels the active
+fetch and advances; failures remain visible for retry/removal. Persistent queue
+restoration requires the user to press retry to start playback.
+
+The download tool may fail because of YouTube restrictions or extractor changes.
+This integration does not work around account, age, private-video, DRM or other
+access restrictions. It does not reuse VietK hardware IDs or tokens. No API key
+is required because this implementation uses yt-dlp search rather than the
+YouTube Data API. This implementation should not be described as an official
+YouTube API player.
+
+GitHub bundles official yt-dlp 2026.08.19 (including EJS), Deno v2.9.7, and the
+official yt-dlp FFmpeg-Builds Windows archive. Package provenance retains actual
+executable hashes; upstream checksums are verified for yt-dlp and FFmpeg. Licenses
+and upstream source links are included. The tools can be updated independently
+of the native app. See [yt-dlp](https://github.com/yt-dlp/yt-dlp) and its
+[EJS requirements](https://github.com/yt-dlp/yt-dlp/wiki/EJS).
+
+Core checks cover URL normalization, exclusion of playlist parameters, invalid
+hosts, Unicode metadata and malformed search entries. Existing Windows decoder
+checks exercise real decoded video/audio. A separate live CI probe attempts the
+public Blender demonstration video used in yt-dlp's own README; its external
+service failure is recorded separately and does not block publishing the build.
+A green build alone must not be reported as successful YouTube fetching. Inspect
+`youtube-verification.json` and its native-frame snapshot for live evidence.

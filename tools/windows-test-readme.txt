@@ -3,6 +3,22 @@ VietK native Windows port - partial test build
 Windows 10/11, 64-bit. The .NET runtime is included.
 Extract the ENTIRE ZIP into a folder before opening VietK.NativePort.exe.
 Keep the DLLs and Original folder beside the executable.
+Keep YouTubeTools beside the executable as well.
+
+Main music source: YouTube (yt-dlp + native TV decoder)
+- Search a song name, or paste a YouTube video link into the search field.
+- Click a result to queue it; right-click and choose Hat ngay to play it first.
+- Download progress and errors appear on the panel. Try again with Thu lai.
+- Completed video/audio files are cached locally before native TV playback.
+- Next, pause/play, replay and volume use the existing bottom controls.
+- yt-dlp, Deno, FFmpeg and ffprobe are bundled. No API key is needed for this mode.
+- YouTube availability varies; restricted/unavailable videos can fail to fetch.
+- The downloaded video does not have VietK vocal/accompaniment track metadata.
+  Choose a karaoke/instrumental upload for accompaniment.
+
+YouTube cache: %LOCALAPPDATA%\VietKNativePort\youtube-music
+YouTube queue: %LOCALAPPDATA%\VietKNativePort\youtube-queue.json
+yt-dlp updates: replace YouTubeTools\yt-dlp.exe with the official current release.
 
 Available to test:
 - Home and More screens using extracted original resources.
@@ -25,6 +41,7 @@ App state: %LOCALAPPDATA%\VietKNativePort
 Server configuration: %LOCALAPPDATA%\VietKNativePort\music-server.json
 Fill ChipId, Mac and UserAgent with your authorized device information and restart.
 LoginUrl defaults to the original firmware's http://viet.duochang.cc/login.
+The main YouTube mode does not log in to this server.
 MusicDirectory may specify your song cache folder (500 MiB free required).
 No fabricated device identity, token or authentication success is supplied.
 If startup fails: %TEMP%\vietk-native-startup-error.txt

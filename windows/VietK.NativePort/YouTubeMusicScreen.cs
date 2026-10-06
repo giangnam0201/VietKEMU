@@ -1,0 +1,166 @@
+using System.IO;
+using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using VietK.Core;
+
+namespace VietK.NativePort;
+
+// Original YouTube card dimensions and existing panel theme; yt-dlp supplies
+// public search/media in place of the unavailable manufacturer service.
+public sealed class YouTubeMusicScreen : IDisposable
+{
+    private readonly string root,queueFile;
+    private readonly NativePlayback playback;
+    private readonly BottomBar bottom;
+    private readonly YouTubeMusicClient client;
+    private readonly List<YouTubeVideo> queue=[];
+    private CancellationTokenSource? searching,downloading;
+    private WrapPanel? results;
+    private StackPanel? queueView;
+    private TextBlock? status;
+    private TextBox? input;
+    private int generation;
+    private bool active,disposed;
+    private string message="Tìm bài hát hoặc dán liên kết YouTube. Bấm bài để thêm vào hàng chờ.";
+    public event Action? HomeRequested;
+    public YouTubeMusicScreen(string root,string stateDirectory,NativePlayback playback,BottomBar bottom)
+    {
+        this.root=root;this.playback=playback;this.bottom=bottom;
+        queueFile=Path.Combine(stateDirectory,"youtube-queue.json");
+        client=new(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(stateDirectory,"youtube-music"));
+        if(File.Exists(queueFile))queue.AddRange((JsonSerializer.Deserialize<YouTubeVideo[]>(File.ReadAllText(queueFile))??[])
+            .Where(video=>YouTubeMusicClient.VideoId(video.Id)==video.Id));
+        playback.CommandOverride=Command;
+        playback.LocalMediaRequested+=()=> { active=false; };
+    }
+    public Canvas Create(string? query=null)
+    {
+        var canvas=new Canvas { Width=1280,Height=800,ClipToBounds=true,
+            Background=new ImageBrush(new BitmapImage(new Uri(Path.Combine(root,"main_bg.jpg")))) { Stretch=Stretch.UniformToFill } };
+        Put(canvas,new Image { Width=43,Height=30,Source=new BitmapImage(new Uri(Path.Combine(root,"icon_youtube.png"))) },40,98);
+        Put(canvas,Label("YouTube",28),95,88);
+        var back=Button("‹ Trang chính",()=>HomeRequested?.Invoke());Put(canvas,back,1035,86);
+        results=new WrapPanel { Width=750 };
+        var scroll=new ScrollViewer { Width=775,Height=440,Content=results,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
+        Put(canvas,scroll,25,148);
+        var side=new StackPanel { Width=365 };Put(canvas,side,865,146);
+        side.Children.Add(Label("Tên bài hát / liên kết YouTube",20));
+        input=new TextBox { FontSize=22,Margin=new(0,12,0,8),Padding=new(10),Text=query??"",
+            Background=new SolidColorBrush(Color.FromRgb(55,26,94)),Foreground=Brushes.White,BorderBrush=Brushes.MediumPurple };
+        input.KeyDown+=async (_,e)=> { if(e.Key==Key.Enter) { e.Handled=true;await Search(); } };side.Children.Add(input);
+        var search=Button("Tìm kiếm",()=>_=Search());search.Width=180;side.Children.Add(search);
+        side.Children.Add(Label("Hàng chờ",22));
+        queueView=new StackPanel();side.Children.Add(new ScrollViewer { Content=queueView,Height=220,Margin=new(0,8,0,5) });
+        var actions=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(actions);
+        actions.Children.Add(Button("Thử lại",()=>_=PlayFirst()));actions.Children.Add(Button("Xóa hàng chờ",Clear));
+        status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=1180;Put(canvas,status,38,603);
+        RefreshQueue();
+        if(!string.IsNullOrWhiteSpace(query))_=Search();
+        return canvas;
+    }
+    private async Task Search()
+    {
+        if(input is null || results is null)return;
+        searching?.Cancel();var cancellation=new CancellationTokenSource();searching=cancellation;
+        var target=results;var query=input.Text.Trim();SetStatus("Đang tìm trên YouTube…");
+        try
+        {
+            var videos=await client.Search(query,cancellation.Token);
+            if(!ReferenceEquals(searching,cancellation))return;
+            target.Children.Clear();
+            foreach(var video in videos)
+            {
+                var card=new StackPanel { Width=230,Height=195,Margin=new(7,6,7,6),Cursor=Cursors.Hand };
+                var image=new Image { Width=230,Height=140,Stretch=Stretch.UniformToFill };
+                if(Uri.TryCreate(video.Thumbnail,UriKind.Absolute,out var uri))image.Source=new BitmapImage(uri);
+                card.Children.Add(image);var title=Label(video.Title,18);title.TextAlignment=TextAlignment.Center;
+                title.TextWrapping=TextWrapping.Wrap;title.Height=45;card.Children.Add(title);
+                var frame=new Border { Child=card,CornerRadius=new(5),Background=new SolidColorBrush(Color.FromArgb(90,93,37,140)),Margin=new(2) };
+                frame.MouseLeftButtonUp+=(_,_)=>Add(video,false);
+                var menu=new ContextMenu();var now=new MenuItem { Header="Hát ngay" };now.Click+=(_,_)=>Add(video,true);menu.Items.Add(now);
+                frame.ContextMenu=menu;target.Children.Add(frame);
+            }
+            SetStatus(videos.Count==0?"Không tìm thấy video.":"Bấm bài để thêm vào hàng chờ. Bấm chuột phải để hát ngay.");
+        }
+        catch(OperationCanceledException) { }
+        catch(Exception ex) { if(!disposed)SetStatus(ex.Message); }
+        finally { if(ReferenceEquals(searching,cancellation))searching=null;cancellation.Dispose(); }
+    }
+    private void Add(YouTubeVideo video,bool first)
+    {
+        var wasEmpty=queue.Count==0;
+        if(first) { queue.RemoveAll(item=>item.Id==video.Id);queue.Insert(0,video); }
+        else if(queue.All(item=>item.Id!=video.Id))queue.Add(video);
+        Save();RefreshQueue();
+        if(first || wasEmpty)_=PlayFirst();
+    }
+    private void RefreshQueue()
+    {
+        bottom.SetConfirmedQueueCount(queue.Count);queueView?.Children.Clear();
+        for(var index=0;index<queue.Count;index++)
+        {
+            var video=queue[index];var row=new DockPanel { Margin=new(0,3,0,3) };
+            var remove=Button("×",()=>Remove(video));remove.Width=38;DockPanel.SetDock(remove,Dock.Right);row.Children.Add(remove);
+            var text=Label((index+1)+". "+video.Title,17);text.TextTrimming=TextTrimming.CharacterEllipsis;
+            row.Children.Add(text);queueView?.Children.Add(row);
+        }
+    }
+    private void Remove(YouTubeVideo video)
+    {
+        if(queue.FirstOrDefault()?.Id==video.Id) { Next();return; }
+        queue.RemoveAll(item=>item.Id==video.Id);Save();RefreshQueue();
+    }
+    private async Task PlayFirst()
+    {
+        downloading?.Cancel();var stamp=++generation;
+        playback.Player.Stop();active=false;
+        if(queue.Count==0)return;
+        var video=queue[0];var cancellation=new CancellationTokenSource();downloading=cancellation;
+        SetStatus("Đang tải: "+video.Title);
+        try
+        {
+            var file=await client.Download(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
+            {
+                if(stamp==generation)SetStatus("Đang tải: "+video.Title+" — "+(progress.Total>0?
+                    (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
+            }),cancellation.Token);
+            if(stamp!=generation || disposed)return;
+            if(!playback.PlayMedia(file))throw new IOException("Không phát được video đã tải.");
+            active=true;SetStatus("Đang phát: "+video.Title);RefreshQueue();
+        }
+        catch(OperationCanceledException) { }
+        catch(Exception ex) { if(stamp==generation && !disposed)SetStatus(ex.Message+" — bấm Thử lại hoặc chọn bài khác."); }
+        finally { if(ReferenceEquals(downloading,cancellation))downloading=null;cancellation.Dispose(); }
+    }
+    private bool Command(string command)
+    {
+        if(command=="decoder_completed") { if(!active)return false;Next();return true; }
+        if(command=="cut_song_imv") { Next();return true; }
+        if(command is "ori_imv" or "accp_imv")
+        { SetStatus("Video YouTube không có thông tin kênh nguyên xướng / nhạc đệm của VietK.");return true; }
+        if(command=="orderlist_imv") { RefreshQueue();return true; }
+        return false;
+    }
+    private void Next()
+    { downloading?.Cancel();++generation;active=false;playback.Player.Stop();if(queue.Count>0)queue.RemoveAt(0);Save();RefreshQueue();_=PlayFirst(); }
+    private void Clear()
+    { downloading?.Cancel();++generation;active=false;playback.Player.Stop();queue.Clear();Save();RefreshQueue();SetStatus("Hàng chờ trống."); }
+    private void Save()
+    { File.WriteAllText(queueFile+".tmp",JsonSerializer.Serialize(queue));File.Move(queueFile+".tmp",queueFile,true); }
+    private void SetStatus(string value) { message=value;if(status is not null)status.Text=value; }
+    private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,Foreground=Brushes.White,Margin=new(0,6,0,6) };
+    private static Button Button(string text,Action action)
+    {
+        var button=new Button { Content=text,FontSize=18,Padding=new(12,8,12,8),Margin=new(0,3,8,3),
+            Background=new LinearGradientBrush(Color.FromRgb(192,55,208),Color.FromRgb(116,55,233),0),Foreground=Brushes.White,
+            BorderThickness=new(0) };
+        button.Click+=(_,_)=>action();return button;
+    }
+    private static void Put(Canvas canvas,UIElement element,double x,double y)
+    { Canvas.SetLeft(element,x);Canvas.SetTop(element,y);canvas.Children.Add(element); }
+    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();playback.CommandOverride=null; }
+}

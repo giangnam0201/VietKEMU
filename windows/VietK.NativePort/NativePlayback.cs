@@ -166,6 +166,8 @@ public sealed class NativePlayback : IDisposable
     public OriginalVideoPlayer Player { get; }
     public TelevisionWindow Television { get; }
     public event Action? NextRequested;
+    public event Action? LocalMediaRequested;
+    public Func<string,bool>? CommandOverride { get; set; }
     public SongMedia? CurrentMedia { get; private set; }
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
@@ -178,7 +180,8 @@ public sealed class NativePlayback : IDisposable
         Decoder.ConfirmedPause = paused => bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
         Decoder.ConfirmedTrack = () => bottom.SetConfirmedPlaybackState(Player.State == OriginalVideoState.Pause,
             Player.SingMode == OriginalSingMode.Original);
-        Player.Completed += () => Dispatcher.CurrentDispatcher.BeginInvoke(() => NextRequested?.Invoke());
+        Player.Completed += () => Dispatcher.CurrentDispatcher.BeginInvoke(() =>
+        { if(CommandOverride?.Invoke("decoder_completed")!=true)NextRequested?.Invoke(); });
         if (File.Exists(stateFile)) Decoder.SetOutputVolumeStep(JsonSerializer.Deserialize<PlaybackPreferences>(File.ReadAllText(stateFile))!.Volume);
     }
     public void ShowTelevision(Window panel)
@@ -186,6 +189,7 @@ public sealed class NativePlayback : IDisposable
     public bool PlayMedia(string path, SongMedia? metadata = null)
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
+        LocalMediaRequested?.Invoke();
         Player.Stop(); CurrentMedia = metadata;
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
         // KmPlayerCtrlImpl.getMediaVolume; configured HDD scale defaults to 1.
@@ -195,6 +199,7 @@ public sealed class NativePlayback : IDisposable
     }
     public void Command(string command)
     {
+        if(CommandOverride?.Invoke(command)==true)return;
         switch (command)
         {
             case "play_imv": case "pause_imv":
