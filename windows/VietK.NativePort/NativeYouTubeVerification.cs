@@ -47,6 +47,7 @@ static class NativeYouTubeVerification
                 app.Shutdown(exit);
             }
         };
-        return app.Run(window);
+        app.Run(window);
+        return exit;
     }
 }
