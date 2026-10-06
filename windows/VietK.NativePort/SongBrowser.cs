@@ -68,7 +68,8 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             var portrait=Path.Combine(OriginalSupplement.Root,"ambience","singer","defaultsmall.png");
             SingerPortraitAvailable=File.Exists(portrait);
             category.Children.Add(new Border { Width=27,Height=27,CornerRadius=new(10),ClipToBounds=true,Margin=new(10,0,0,0),
-                Child=SingerPortraitAvailable?new Image { Source=new BitmapImage(new Uri(Path.GetFullPath(portrait))),Stretch=Stretch.Fill }:null });
+                Child=SingerPortraitAvailable?new Image { Source=new BitmapImage(new Uri(Path.GetFullPath(portrait))),Stretch=Stretch.Fill,
+                    Clip=new RectangleGeometry(new Rect(0,0,27,27),10,10) }:null });
         }
         var title = Text(singer?.Name??contract.Title,22); title.FontWeight=FontWeights.Bold;
         title.Margin=new(10,0,0,0); title.VerticalAlignment=VerticalAlignment.Center;
@@ -86,10 +87,11 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         var gridFactory=new SongGrid(root,gridContract);
         gridFactory.ActionRequested+=(song,action)=>SongActionRequested?.Invoke(song,action);
         gridFactory.SingerRequested+=name=>SingerRequested?.Invoke(name);
+        var currentPage=0;var lastTotalSize=0;
+        var lastSpell="";
+        ScrollViewer? songGrid=null;
         var nextPageTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(150) };
         nextPageTimer.Tick+=(_,_)=> { nextPageTimer.Stop();LoadNextPage(); };
-        var currentPage=0;var lastTotalSize=0;
-        ScrollViewer? songGrid=null;
         void ShowResults(IReadOnlyList<CatalogueSong> songs,bool preserveOffset=false)
         {
             var offset=preserveOffset?songGrid?.VerticalOffset??0:0;
@@ -135,7 +137,6 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             timer.Tick+=(_,_)=> { timer.Stop();timers.Remove(timer);callback(); };timers.Add(timer);timer.Start();
         });
         Input=input;
-        var lastSpell="";
         input.TextChanged+=()=> { display.Text=input.Text.Length==0?contract.Hint:input.Text;
             display.Foreground=input.Text.Length==0?Brush("#33ffffff"):Brushes.White; };
         input.SpellRequested+=spell=>
