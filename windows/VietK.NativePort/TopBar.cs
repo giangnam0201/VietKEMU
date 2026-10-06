@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -39,6 +40,7 @@ public sealed class TopBar(string root, TopContract contract, string logoDirecto
         // USB/hotspot are GONE without a registered removable volume/AP.
         // The room-call replacement is GONE for MANAGER_TYPE_NULL.
         var controls = new StackPanel { Orientation = Orientation.Horizontal };
+        TextElement.SetFontFamily(controls, OriginalFont.Family);
         var network = Icon("wifi_no");
         var setting = Icon("setting");
         var shutdown = Icon("shut_down_btn");
@@ -53,8 +55,11 @@ public sealed class TopBar(string root, TopContract contract, string logoDirecto
         foreach (var view in new[] { setting, network, shutdown })
             view.Margin = new Thickness(0, 0, margin, 0);
         language.Margin = new Thickness(0, contract.LanguageTop, 0, 0);
-        controls.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Put(canvas, controls, canvas.Width - controls.DesiredSize.Width, 0);
+        // Child margin invalidation can be deferred until WPF's next layout
+        // pass. Do not position using a cached pre-margin DesiredSize: doing
+        // so clipped the language button by exactly the three icon margins.
+        controls.Width = length + margin * 3;
+        Put(canvas, controls, canvas.Width - controls.Width, 0);
         return canvas;
     }
 
