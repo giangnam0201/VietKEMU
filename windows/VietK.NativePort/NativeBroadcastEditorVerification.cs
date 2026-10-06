@@ -29,7 +29,7 @@ internal static class NativeBroadcastEditorVerification
             while(playback.Player.State!=OriginalVideoState.Play||playback.Player.Position<=0) { if(timer.ElapsedMilliseconds>12000)throw new InvalidDataException("Editor fixture did not start real idle playback");await Task.Delay(30); }
             IReadOnlyList<LocalSong> Search(string text,int page)=>text=="Page"?Enumerable.Range(1000+page*50,page==0?50:10).Select(id=>Song(id,"Page song "+id)).ToArray():songs.Where(s=>s.Name.StartsWith(text,StringComparison.OrdinalIgnoreCase)).ToArray();
             OriginalBroadcastPlaylistDialog Open()=>new(panel,playback,id=>songs.FirstOrDefault(s=>s.Id==id),Search,id=>id!=3,requests.Add);
-            var dialog=Open();host.UpdateLayout();Click(dialog.Overlay,"broadcast:top:2");host.UpdateLayout();
+            var dialog=Open();host.UpdateLayout();RequireFits(dialog.Overlay,"broadcast:add");Click(dialog.Overlay,"broadcast:top:2");host.UpdateLayout();
             Require(dialog.Draft.Select(s=>s.Id).SequenceEqual(new[]{3,1,2}),"Top operation did not move the selected row to index zero");
             Click(dialog.Overlay,"broadcast:delete:1");host.UpdateLayout();
             Require(dialog.Draft.Select(s=>s.Id).SequenceEqual(new[]{3,2})&&requests.Count==0&&File.ReadAllText(Path.Combine(folder,"localbroadcastlist.init"))==config,"Draft operations queued music or saved early");
@@ -49,7 +49,7 @@ internal static class NativeBroadcastEditorVerification
             Click(dialog.Overlay,"broadcast:add");host.UpdateLayout();add=dialog.AddDialog!;
             add.Input.Text="Beta";host.UpdateLayout();Click(add.Overlay,"broadcast-add:result:2");add.Input.Text="B";host.UpdateLayout();Click(add.Overlay,"broadcast-add:result:2");host.UpdateLayout();
             Require(add.Draft.Select(s=>s.Id).SequenceEqual(new[]{2,2}),"Original duplicate selections were silently deduplicated");
-            Capture(host,panel,output,"synthetic-broadcast-add-draft.png");Click(add.Overlay,"broadcast-add:confirm");host.UpdateLayout();
+            RequireFits(add.Overlay,"broadcast-add:confirm");Capture(host,panel,output,"synthetic-broadcast-add-draft.png");Click(add.Overlay,"broadcast-add:confirm");host.UpdateLayout();
             Require(dialog.Draft.Select(s=>s.Id).SequenceEqual(new[]{1,2,3,2,2})&&playback.IdlePlaylist.Entries.Count==3,"Add confirmation saved before parent confirmation");
             var source=playback.Player.Source;Click(dialog.Overlay,"broadcast:confirm");await Task.Delay(150);
             Require(playback.IdlePlaylist.Entries.Select(s=>s.SongId).SequenceEqual(new[]{1,2,3,2,2})&&requests.SequenceEqual(new[]{3}),"Parent confirm lost duplicates or omitted original nonlocal song order");
@@ -64,7 +64,7 @@ internal static class NativeBroadcastEditorVerification
                 realUiSearchAndScrollPagination=true,searchSelectionRetainsInput=true,addDeleteAndBack=true,
                 duplicateSelectionPreserved=true,addConfirmationStagesParent=true,parentConfirmationPersistsOriginalFormat=true,
                 nonlocalSongRoutesToOriginalOrder=true,savingDoesNotInterruptIdlePlayback=true,outsideDismissalDiscards=true,
-                emptyListHint=true,usbFileChooserAdapted=true,originalUsbCopyDeleteDialogPorted=false,linkedCloudEditorPorted=false,
+                emptyListHint=true,createAndConfirmLabelsFit=true,usbFileChooserAdapted=true,originalUsbCopyDeleteDialogPorted=false,linkedCloudEditorPorted=false,
                 originalHintArtworkPresent=File.Exists(Path.Combine(OriginalSupplement.Root,"ambience","settings","dialog_public_play_hint_icon.png"))
             },new JsonSerializerOptions { WriteIndented=true }));
         }
@@ -83,6 +83,13 @@ internal static class NativeBroadcastEditorVerification
     }
     private static void Click(Canvas overlay,string tag)=>Elements(overlay).Single(x=>Equals(x.Tag,tag)).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
     private static void Outside(Canvas overlay)=>overlay.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonDownEvent });
+    private static void RequireFits(Canvas overlay,string tag)
+    {
+        var label=(TextBlock)((Border)Elements(overlay).Single(x=>Equals(x.Tag,tag))).Child;
+        var measured=new FormattedText(label.Text,System.Globalization.CultureInfo.GetCultureInfo("vi-VN"),FlowDirection.LeftToRight,
+            new Typeface(label.FontFamily,label.FontStyle,label.FontWeight,label.FontStretch),label.FontSize,label.Foreground,VisualTreeHelper.GetDpi(label).PixelsPerDip);
+        Require(measured.WidthIncludingTrailingWhitespace<=label.Width,"Translated button text clips: "+tag);
+    }
     private static IEnumerable<FrameworkElement> Elements(DependencyObject parent)
     {
         for(var i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++) { var child=VisualTreeHelper.GetChild(parent,i);if(child is FrameworkElement element)yield return element;foreach(var nested in Elements(child))yield return nested; }

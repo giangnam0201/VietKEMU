@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -37,7 +38,8 @@ public sealed class OriginalBroadcastPlaylistDialog
         BroadcastDialogUi.Body(Overlay,content,300,131);
         BroadcastDialogUi.Put(content,BroadcastDialogUi.Label("Video màn hình chờ",680,60,24,true),0,0);
         BroadcastDialogUi.Put(content,new Border { Width=680,Height=2,Background=new SolidColorBrush(Color.FromArgb(30,255,255,255)) },0,60);
-        add=BroadcastDialogUi.Action("＋ Tạo mới",80,60,18,OpenAdd,"broadcast:add");BroadcastDialogUi.Put(content,add,570,0);
+        // XML is wrap_content with minWidth=80, not a fixed 80-pixel label.
+        add=BroadcastDialogUi.Action("＋ Tạo mới",104,60,18,OpenAdd,"broadcast:add");BroadcastDialogUi.Put(content,add,546,0);
         BroadcastDialogUi.Put(content,BroadcastDialogUi.Label("Chế độ màn hình chờ",310,40,20),30,70);
         usb=new RadioButton { Content="USB",FontSize=20,FontFamily=OriginalFont.Family,Foreground=Brushes.White,Height=40,VerticalContentAlignment=VerticalAlignment.Center,Tag="broadcast:usb" };
         local=new RadioButton { Content="Đầu máy",FontSize=20,FontFamily=OriginalFont.Family,Foreground=Brushes.White,Height=40,VerticalContentAlignment=VerticalAlignment.Center,Tag="broadcast:local" };
@@ -47,7 +49,7 @@ public sealed class OriginalBroadcastPlaylistDialog
         foreach(var (text,x,width) in new[]{("Tên bài hát",10d,185d),("Ca sĩ",195d,137d),("Thể loại",332d,137d),("Hệ điều hành",469d,131d)})
         { var heading=BroadcastDialogUi.Label(text,width,50,18);heading.Foreground=new SolidColorBrush(Color.FromArgb(204,255,255,255));BroadcastDialogUi.Put(headers,heading,x,0); }
         BroadcastDialogUi.Put(content,headers,30,110);
-        list.Content=rows;list.Background=BroadcastDialogUi.EditorBrush;BroadcastDialogUi.Put(content,list,30,160);
+        list.Content=rows;list.Background=BroadcastDialogUi.EditorBrush;BroadcastDialogUi.ScrollStyle(list);BroadcastDialogUi.Put(content,list,30,160);
         var empty=new StackPanel { VerticalAlignment=VerticalAlignment.Center,Margin=new(30,0,30,0) };
         var hintArt=Path.Combine(OriginalSupplement.Root,"ambience","settings","dialog_public_play_hint_icon.png");
         empty.Children.Add(File.Exists(hintArt)?new Image { Width=90,Height=120,Source=new BitmapImage(new Uri(Path.GetFullPath(hintArt))),Stretch=Stretch.Fill }:
@@ -123,7 +125,7 @@ public sealed class OriginalBroadcastAddDialog
     private readonly List<LocalSong> added=[];
     private readonly ScrollViewer searchList=new() { Width=620,Height=320,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled };
     private readonly StackPanel results=new();
-    private readonly Canvas draftArea=new() { Width=620,Height=280 };
+    private readonly Canvas draftArea=new() { Width=620,Height=290 };
     private readonly StackPanel draftRows=new();
     private readonly FrameworkElement back,confirm;
     private bool closed,loading,more;
@@ -140,16 +142,18 @@ public sealed class OriginalBroadcastAddDialog
         BroadcastDialogUi.Put(content,Input,30,119);
         var placeholder=BroadcastDialogUi.Label("Vui lòng nhập tên bài hát vài tìm kiếm",540,45,18);placeholder.Foreground=new SolidColorBrush(Color.FromArgb(204,255,255,255));placeholder.IsHitTestVisible=false;BroadcastDialogUi.Put(content,placeholder,40,119);
         var inputAction=BroadcastDialogUi.Action("⌕",45,45,24,()=>Input.Clear(),"broadcast-add:clear");BroadcastDialogUi.Put(content,inputAction,605,119);
-        searchList.Content=results;searchList.Background=BroadcastDialogUi.EditorBrush;BroadcastDialogUi.Put(content,searchList,30,164);
+        searchList.Content=results;searchList.Background=BroadcastDialogUi.EditorBrush;BroadcastDialogUi.ScrollStyle(searchList);BroadcastDialogUi.Put(content,searchList,30,164);
         searchList.ScrollChanged+=(_,e)=> { if(!loading&&more&&e.ExtentHeightChange==0&&e.VerticalChange>0&&searchList.VerticalOffset+searchList.ViewportHeight>=searchList.ExtentHeight-1)LoadNext(); };
         BroadcastDialogUi.Put(content,draftArea,30,164);
         BroadcastDialogUi.Put(draftArea,BroadcastDialogUi.Label("Đã chọn",620,40,20),0,0);
-        BroadcastDialogUi.Put(draftArea,BroadcastDialogUi.Label("Tên bài hát",259,35,18),10,40);
-        BroadcastDialogUi.Put(draftArea,BroadcastDialogUi.Label("Ca sĩ",236,35,18),269,40);
-        BroadcastDialogUi.Put(draftArea,BroadcastDialogUi.Label("Hệ điều hành",95,35,18,true),505,40);
-        BroadcastDialogUi.Put(draftArea,new ScrollViewer { Width=620,Height=200,Background=BroadcastDialogUi.EditorBrush,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=draftRows },0,75);
+        BroadcastDialogUi.Put(draftArea,BroadcastDialogUi.Label("Tên bài hát",259,44,18),10,40);
+        BroadcastDialogUi.Put(draftArea,BroadcastDialogUi.Label("Ca sĩ",236,44,18),269,40);
+        var operation=BroadcastDialogUi.Label("Hệ điều hành",95,44,18,true);operation.TextWrapping=TextWrapping.Wrap;operation.TextTrimming=TextTrimming.None;operation.Padding=new(0);
+        BroadcastDialogUi.Put(draftArea,operation,505,40);
+        var draftList=new ScrollViewer { Width=620,Height=200,Background=BroadcastDialogUi.EditorBrush,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=draftRows };
+        BroadcastDialogUi.ScrollStyle(draftList);BroadcastDialogUi.Put(draftArea,draftList,0,89);
         back=BroadcastDialogUi.Action("Quay lại",140,46,24,()=>Close(false),"broadcast-add:back",true,true);
-        confirm=BroadcastDialogUi.Action("Xác nhận tạo mới",140,46,18,()=>Close(true),"broadcast-add:confirm",true);
+        confirm=BroadcastDialogUi.Action("Xác nhận tạo mới",140,46,16,()=>Close(true),"broadcast-add:confirm",true);
         BroadcastDialogUi.Put(content,back,162.5,461);BroadcastDialogUi.Put(content,confirm,377.5,461);
         Input.TextChanged+=(_,_)=> { placeholder.Visibility=Input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;if(inputAction is Border { Child:TextBlock symbol })symbol.Text=Input.Text.Length==0?"⌕":"×";Search(); };
         Input.PreviewKeyDown+=(_,e)=> { if(e.Key==Key.Enter) { Search();e.Handled=true; } };
@@ -203,6 +207,18 @@ public sealed class OriginalBroadcastAddDialog
 
 internal static class BroadcastDialogUi
 {
+    internal static void ScrollStyle(ScrollViewer viewer)
+    {
+        var template=(ControlTemplate)System.Windows.Markup.XamlReader.Parse("""
+            <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="{x:Type ScrollBar}">
+              <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" ViewportSize="{TemplateBinding ViewportSize}" Value="{Binding Value,RelativeSource={RelativeSource TemplatedParent},Mode=TwoWay}">
+                <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="{x:Type Thumb}"><Border CornerRadius="3" Background="#80FFFFFF" /></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
+              </Track>
+            </ControlTemplate>
+            """);
+        var style=new Style(typeof(ScrollBar));style.Setters.Add(new Setter(FrameworkElement.WidthProperty,8d));style.Setters.Add(new Setter(Control.TemplateProperty,template));
+        viewer.Resources[typeof(ScrollBar)]=style;
+    }
     internal static Brush EditorBrush=>new SolidColorBrush(Color.FromArgb(76,0,0,0));
     internal static Canvas Overlay()=>new() { Width=1280,Height=800,Focusable=true,Background=new SolidColorBrush(Color.FromArgb(128,0,0,0)) };
     internal static void Body(Canvas overlay,Canvas content,double x,double y)=>Put(overlay,new Border { Width=content.Width,Height=content.Height,CornerRadius=new(10),Background=new SolidColorBrush(Color.FromRgb(72,23,64)),Child=content },x,y);
