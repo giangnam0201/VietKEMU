@@ -481,3 +481,54 @@ using(var reopened=new SqliteConnection(new SqliteConnectionStringBuilder { Data
 }
 File.Delete(downPath);
 Console.WriteLine("Original download queue/store verified: restore, Top, progress/errors, public insertion, cancellation, registry order, metadata, repeat deletion and persistence.");
+
+var workerPath=Path.Combine(Path.GetTempPath(),"vietk-download-worker-"+Guid.NewGuid()+".db");
+using(var observer=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=workerPath,Pooling=false }.ToString()))
+{
+    observer.Open();var store=new DownloadListStore(observer);store.UpgradeSchema();
+    using var worker=new DownloadQueueDispatcher(workerPath);
+    await worker.Ready.WaitAsync(TimeSpan.FromSeconds(10));
+    Require(worker.Post(new(4,Item:DownItem(10))) && worker.Post(new(4,Item:DownItem(20))) &&
+        worker.Post(new(4,Item:DownItem(30))) && worker.Post(new(3,3)) && worker.Post(new(1,2)),"Download worker rejected FIFO messages");
+    await worker.FlushAsync().WaitAsync(TimeSpan.FromSeconds(10));
+    Require(store.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{10,20}),
+        "Download worker FIFO Top/delete differed or observer connection missed writes");
+    worker.Post(new(2,10));worker.Post(new(31));await worker.FlushAsync().WaitAsync(TimeSpan.FromSeconds(10));
+    Require(store.ReadStoredEntries().Single().Song.SongId==20,"Download worker delete-by-song or ignored message differs");
+    worker.Post(new(5));await worker.FlushAsync().WaitAsync(TimeSpan.FromSeconds(10));
+    Require(store.ReadStoredEntries().Count==0,"Download worker clear failed");
+    worker.Dispose();Require(!worker.Post(new(4,Item:DownItem(40))),"Stopped download worker accepted a message");
+}
+File.Delete(workerPath);
+var selectionEvents=new List<string>();
+var selectionQueue=new OriginalDownloadQueue(_=>{},()=>{},()=>{},()=>{},_=>{},_=>{});
+var selection=new OriginalDownloadSelection(selectionQueue,()=>selectionEvents.Add("changed"),
+    id=>selectionEvents.Add("url:"+id),(item,action)=>selectionEvents.Add(item.PlayType+":"+action));
+Require(selection.CurrentState==0 && !selection.IsDownloading && !selection.IsStopped,"Original downloader constructor defaults differ");
+selection.DownloadFirst();Require(!selection.IsDownloading && selectionEvents.Count==0,"Empty queue dispatched download");
+selectionQueue.Add(DownItem(10));selectionQueue.Add(DownItem(10));selectionQueue.Add(DownItem(20));
+selection.Stop();selection.DownloadFirst();Require(selectionEvents.Count==0,"Stopped downloader selected a song");
+selection.Start();
+Require(selection.IsDownloading && selection.CurrentSongId==10 && selection.CurrentState==202 &&
+    selectionEvents.SequenceEqual(new[]{"changed","url:10"}) &&
+    selectionQueue.Snapshot().Select(item=>item.DownloadState).SequenceEqual(new[]{202,202,200}),
+    "Download admission state, repeated-song marking or observer-before-URL request differs");
+selection.DownloadFirst();selection.Stop();selection.Start();
+Require(selectionEvents.Count==2 && selection.IsDownloading,"Repeated/start download restarted an active transfer");
+selection.Stop();selection.Reset();
+Require(selection.IsStopped && !selection.IsDownloading && selection.CurrentState==200 && selection.CurrentSongId==0,
+    "Reset changed stop flag or started a download");
+selectionQueue.Clear();selectionQueue.Add(DownItem(50,"youtube"));selectionEvents.Clear();selection.Start();
+Require(selection.IsDownloading && selection.CurrentSongId==0 && selection.CurrentState==200 &&
+    selectionEvents.SequenceEqual(new[]{"youtube:1"}) && selectionQueue.At(0)!.DownloadState==200,
+    "Non-Evideo dispatch invented song ID/state or order-list notification");
+foreach(var type in new[]{"normal","kmtrain","photomv","mdream"})
+{
+    selection.Reset();selectionQueue.Clear();selectionQueue.Add(DownItem(60,type));selectionEvents.Clear();selection.DownloadFirst();
+    Require(selectionEvents.SequenceEqual(new[]{"changed","url:60"}),"Original Evideo type dispatch differs: "+type);
+}
+var identityCandidate=DownItem(70,"youtube");identityCandidate.PlayUrl="same-url";
+var differentType=DownItem(80);differentType.PlayUrl="same-url";
+Require(OriginalPlaylistIdentity.Exists(new[]{differentType},identityCandidate) &&
+    !OriginalPlaylistIdentity.Exists(new[]{differentType},DownItem(70)),"Combined playlist typed identity differs");
+Console.WriteLine("Original download worker/selection verified: independent persistence, FIFO dispatch, stop/reentry, duplicate states and original media/non-Evideo routing.");

@@ -128,12 +128,7 @@ public sealed class OriginalSelectedQueue
     public bool Exists(SelectedPlaylistItem? item)
     {
         if(item is null)return false;
-        lock(items)return items.Any(entry=>item.PlayType switch
-        {
-            "youtube"=>entry.PlayUrl==item.PlayUrl,
-            "mixcloud" or "soundcloud"=>entry.CloudKey is not null && entry.CloudKey==item.CloudKey,
-            _=>entry.InfoId==item.InfoId
-        });
+        lock(items)return OriginalPlaylistIdentity.Exists(items,item);
     }
     public void ClearWithoutNext() { lock(items)items.Clear();post(new(5)); }
 }

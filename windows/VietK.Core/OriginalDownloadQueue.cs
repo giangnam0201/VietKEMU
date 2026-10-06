@@ -12,6 +12,8 @@ public sealed class OriginalDownloadQueue(Action<DownloadQueueCommand> post,Acti
     public bool ClearOnInitialize { get; set; }=true;
     public int Count { get { lock(items)return items.Count; } }
     public IReadOnlyList<SelectedPlaylistItem> Snapshot() { lock(items)return items.ToArray(); }
+    internal void WithLockedItems(Action<IReadOnlyList<SelectedPlaylistItem>> action)
+    { lock(items)action(items); }
     public SelectedPlaylistItem? At(int index) { lock(items)return index<0 || index>=items.Count?null:items[index]; }
     public bool MobileFirst { get { lock(items)return items.Count>0 && items[0].PlayType=="mobile"; } }
 

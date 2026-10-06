@@ -43,16 +43,37 @@ public static class Program
                 // a usable local subtitle. Replace with original storage port.
                 item=>item.IsSongCanScore(_=>null,File.Exists));
             queueDispatcher.Ready.GetAwaiter().GetResult();
+            using var downloadDispatcher=new DownloadQueueDispatcher(Path.Combine(stateDirectory,"song-browser-state.db"));
+            downloadDispatcher.Ready.GetAwaiter().GetResult();
             SongBrowser? queueBrowser=null;
             OriginalSelectedQueue? selectedQueue=null;
+            OriginalDownloadQueue? downloadQueue=null;
+            void QueueChanged()
+            {
+                var combined=(selectedQueue?.Snapshot()??Array.Empty<SelectedPlaylistItem>())
+                    .Concat(downloadQueue?.Snapshot()??Array.Empty<SelectedPlaylistItem>()).ToArray();
+                bottom.SetConfirmedQueueCount(combined.Length);
+                queueBrowser?.SetConfirmedQueuedSongs(combined.Select(item=>item.SongMetadata.Id).ToHashSet());
+            }
             selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
                 command=> { if(!queueDispatcher.Post(command))throw new InvalidOperationException("Playlist database worker stopped"); },
-                ()=> { bottom.SetConfirmedQueueCount(selectedQueue!.Count);
-                    queueBrowser?.SetConfirmedQueuedSongs(selectedQueue.Snapshot().Select(item=>item.SongMetadata.Id).ToHashSet()); },
+                QueueChanged,
                 ()=>System.Diagnostics.Trace.WriteLine("Original queue requests start-play; playback port pending"));
             selectedQueue.Initialize(songState.SelectedList,()=>SelectedPlaylistItem.Restore(
                 songState.SelectedList.ReadStoredEntries(),id=>songState.GetSongById(id),songState.GetMedia,_=>null));
-            bottom.SetConfirmedQueueCount(selectedQueue.Count);
+            OriginalDownloadSelection? downloadSelection=null;
+            downloadQueue=new OriginalDownloadQueue(
+                command=> { if(!downloadDispatcher.Post(command))throw new InvalidOperationException("Download database worker stopped"); },
+                QueueChanged,()=>downloadSelection!.DownloadFirst(),
+                ()=> { System.Diagnostics.Trace.WriteLine("Original cancel-transfer request; transfer port pending");downloadSelection!.Reset(); },
+                id=>System.Diagnostics.Trace.WriteLine($"Original progress-registry removal {id}; registry port pending"),
+                id=>System.Diagnostics.Trace.WriteLine($"Original song-update removal {id}; updater port pending"));
+            downloadSelection=new(downloadQueue,QueueChanged,
+                id=>System.Diagnostics.Trace.WriteLine($"Original media URL request {id}; DCDomain network port pending"),
+                (item,action)=>System.Diagnostics.Trace.WriteLine($"Original non-Evideo download request {item.PlayType}, action {action}; handler port pending"));
+            downloadQueue.Initialize(()=>songState.DownloadList.Clear(),
+                ()=>songState.DownloadList.Restore(songState.GetSongById,songState.GetMedia,_=>null),onlineNeeded:true);
+            QueueChanged();
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
             var browser = new SongBrowser(root, songContract, moreContract, songState,gridContract);
@@ -66,10 +87,11 @@ public static class Program
                 // Retain its exact resource text without substituting a dialog.
                 if(resource is not null)System.Diagnostics.Trace.WriteLine(orderDependencies.Feedback[resource]);
             }
-            var orderExecutor=new OriginalOrderExecutor(selectedQueue.Exists,selectedQueue.Add,
+            var orderExecutor=new OriginalOrderExecutor(
+                item=>OriginalPlaylistIdentity.Exists(selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()),item),selectedQueue.Add,
                 selectedQueue.Top,
-                _=>throw new NotSupportedException("Download queue backend remains pending"),
-                (_,_)=>throw new NotSupportedException("Download queue backend remains pending"),
+                downloadQueue.Add,
+                (item,exists)=>downloadQueue.Top(item,exists,false),
                 _=>System.Diagnostics.Trace.WriteLine("Original rate-sync request; rate updater pending"),
                 _=>System.Diagnostics.Trace.WriteLine("Original countAllOrderSong call; stat observer pending"),Feedback,
                 id=>songState.GetSongById(id));
@@ -77,7 +99,7 @@ public static class Program
                 // Storage/network services have not been translated. No scanned
                 // karaoke volumes are registered; don't count Windows disks as
                 // the original scanned volume list or bypass its admission gate.
-                ()=>new OrderContext(QueueCount:selectedQueue.Count),_=>null,()=>false,
+                ()=>new OrderContext(QueueCount:selectedQueue.Count+downloadQueue.Count),_=>null,()=>false,
                 text=>System.Diagnostics.Trace.WriteLine(text),
                 (action,mode)=>System.Diagnostics.Trace.WriteLine($"Original report plugin request {action}, mode {mode}; plugin execution pending"));
             browser.SongActionRequested+=(song,action)=>
@@ -217,6 +239,29 @@ public static class Program
                         restoredDownload.InfoId!="normal||101000||Mộng dưới hoa (sc)")
                         throw new InvalidDataException("Original download table creation/metadata/reconstruction differs");
                     downloads.Clear();
+                    using(var fixtureDownloadDispatcher=new DownloadQueueDispatcher(importPath))
+                    {
+                        fixtureDownloadDispatcher.Ready.GetAwaiter().GetResult();
+                        OriginalDownloadSelection? selectionFixture=null;OriginalDownloadQueue? downloadFixture=null;
+                        var requestedId=0;var notifiedCount=0;
+                        downloadFixture=new OriginalDownloadQueue(command=>
+                            { if(!fixtureDownloadDispatcher.Post(command))throw new InvalidOperationException("Download fixture dispatcher stopped"); },
+                            ()=>notifiedCount=downloadFixture!.Count,()=>selectionFixture!.DownloadFirst(),
+                            ()=>selectionFixture!.Reset(),_=>{},_=>{});
+                        selectionFixture=new(downloadFixture,()=>notifiedCount=downloadFixture.Count,
+                            id=>requestedId=id,(_,_)=>throw new InvalidDataException("Normal song reached non-Evideo downloader"));
+                        downloadFixture.Initialize(()=>downloads.Clear(),()=>downloads.Restore(imported.GetSongById,imported.GetMedia,_=>null),true);
+                        // A backend fixture, not a claim that this machine has
+                        // registered storage, server access or playable music.
+                        downloadFixture.Add(restoredItem);fixtureDownloadDispatcher.FlushAsync().GetAwaiter().GetResult();
+                        if(requestedId!=101000 || notifiedCount!=1 || downloadFixture.At(0)!.DownloadState!=202 ||
+                            downloadFixture.At(0)!.LocalFlag!=0 || downloads.ReadStoredEntries().Single().Song.SongId!=101000 ||
+                            !OriginalPlaylistIdentity.Exists(downloadFixture.Snapshot(),restoredItem))
+                            throw new InvalidDataException("Native download worker/selection/combined identity differs");
+                        downloadFixture.Clear();fixtureDownloadDispatcher.FlushAsync().GetAwaiter().GetResult();
+                        if(downloads.ReadStoredEntries().Count!=0 || selectionFixture.IsDownloading)
+                            throw new InvalidDataException("Native download clear/reset differs");
+                    }
                     var gridBottom=bottom.Create();Canvas.SetTop(gridBottom,bottomContract.Y);gridFixture.Children.Add(gridBottom);
                     gridFixture.Measure(new Size(1280,800));gridFixture.Arrange(new Rect(0,0,1280,800));gridFixture.UpdateLayout();
                     var gridImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);gridImage.Render(gridFixture);
@@ -312,6 +357,7 @@ public static class Program
                     nativeQueueWorkerObserverIntegrationVerified = true,
                     nativeOrderPluginAdmissionVerified = true,
                     originalDownloadListStorageVerified = true,
+                    nativeDownloadWorkerSelectionIntegrationVerified = true,
                     firmwareReportTableActivityCount = orderDependencies.ReportTableActivityCount,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
