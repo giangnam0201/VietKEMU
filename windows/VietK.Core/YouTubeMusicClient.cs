@@ -8,7 +8,7 @@ namespace VietK.Core;
 
 public sealed record YouTubeVideo(string Id,string Title,string Channel,string Thumbnail);
 public sealed record YouTubeTransferProgress(long Received,long Total,string State);
-public sealed class YouTubeIncompleteAudioException(string message):IOException(message);
+public sealed class YouTubeIncompleteAudioException(string message):IOException(message) { }
 
 // Arguments never pass through a shell. Authentication is optional and only
 // uses an explicitly selected cookie file or Firefox login; public-only is default.
