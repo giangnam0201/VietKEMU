@@ -163,9 +163,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     private void ApplyVolume()
     {
         AppliedVolumePercent=Muted?0:(int)Math.Clamp(mediaVolume*(unmuteFade.IsEnabled?fadeStep:OutputVolumeStep)/20*100,0,200);
-        // The native output owns a mute flag independently of its numeric
-        // volume. Reconcile both when applying this decoder's app state.
-        Native.Mute=Muted;Native.Volume=AppliedVolumePercent;
+        Native.Volume=AppliedVolumePercent;
     }
     public void Dispose()
     {
@@ -258,6 +256,7 @@ public sealed class NativePlayback : IDisposable
     private readonly bool broadcastMuted;
     public int BroadcastSessionVolume=>broadcastVolumeStep;
     public bool BroadcastSessionMuted=>broadcastMuted;
+    public string VolumeUnavailableReason=>Source==PlaybackSource.Idle&&broadcastMuted?"Chế độ hiện tại không cho phép điều chỉnh âm lượng DEMO":"";
     private OriginalSingMode? pendingTrackFeedback;
     public bool IsPlayingIdle=>playingIdle;
     public bool ConfirmedOriginalVocal=>bottom.OriginalVocal;

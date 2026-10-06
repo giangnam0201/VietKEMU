@@ -46,6 +46,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     internal OriginalQueueRemote? OriginalQueue { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
         volume=playback.Decoder.OutputVolumeStep,muted=playback.Decoder.Muted,
+        canAdjustVolume=playback.VolumeUnavailableReason.Length==0,volumeUnavailableReason=playback.VolumeUnavailableReason,
         canSwitchVocal=playback.CanSwitchVocal,originalVocal=playback.ConfirmedOriginalVocal,vocalUnavailableReason=playback.VocalUnavailableReason,
         source=playback.Source.ToString(),original=OriginalQueue?.State(),
         status=message,transfers=queueTransfers.ToDictionary(pair=>pair.Key,pair=>pair.Value) };
@@ -485,7 +486,7 @@ public sealed class YouTubeMusicScreen : IDisposable
             return true;
         }
         if((command is "volinc" or "voldec")&&playback.Source==PlaybackSource.Idle&&playback.BroadcastSessionMuted)
-        { SetStatus("Chế độ hiện tại không cho phép điều chỉnh âm lượng DEMO");return true; }
+        { SetStatus(playback.VolumeUnavailableReason);return true; }
         if(command is "order_bg" or "orderlist_imv")
         { if(OriginalQueue?.ShouldPresent==true)OriginalQueue.ShowDialog();else ShowQueue();return true; }
         return false;

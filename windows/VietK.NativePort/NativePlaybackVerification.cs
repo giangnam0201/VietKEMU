@@ -499,7 +499,7 @@ public static class NativePlaybackVerification
         if(samples.Length<4800)throw new InvalidDataException("No decoded PCM available for gain verification; "+tap.OutputState);
         return samples;
     }
-    private static async Task UntilPeak(PcmTap tap,Func<double,bool> accepted,string message)
+    internal static async Task UntilPeak(PcmTap tap,Func<double,bool> accepted,string message)
     {
         var deadline=DateTime.UtcNow.AddSeconds(5);double peak;
         try
@@ -509,7 +509,7 @@ public static class NativePlaybackVerification
         catch(InvalidDataException error) { throw new InvalidDataException(message+"; "+error.Message,error); }
         throw new InvalidDataException(message+"; measured PCM peak="+peak+"; "+tap.OutputState);
     }
-    private static async Task<double> UntilPower(PcmTap tap,int frequency,Func<double,bool> accepted,string message)
+    internal static async Task<double> UntilPower(PcmTap tap,int frequency,Func<double,bool> accepted,string message)
     {
         var deadline=DateTime.UtcNow.AddSeconds(5);double power;
         do { power=await MeasurePower(tap,frequency);if(accepted(power))return power; } while(DateTime.UtcNow<deadline);
@@ -517,7 +517,7 @@ public static class NativePlaybackVerification
     }
     // Native audio output tap enables CI without an audio device, while checking
     // the actual downmix/stream-selection result in the decoder's PCM output.
-    private sealed class PcmTap : IDisposable
+    internal sealed class PcmTap : IDisposable
     {
         private readonly object gate = new();
         private readonly List<short> samples = new();

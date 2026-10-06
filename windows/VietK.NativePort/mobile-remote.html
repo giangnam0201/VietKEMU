@@ -27,7 +27,7 @@
 <label style="display:flex;align-items:center;gap:10px;padding:8px"><input type="checkbox" id="broadcastMute" style="width:24px;height:24px;padding:0;outline:0;accent-color:#00e5ef" disabled> Tắt tiếng</label>
 <div class="actions"><button type="button" id="broadcastMinus" disabled>−</button><input type="range" id="broadcastVolume" min="0" max="20" step="1" value="15" aria-label="Âm lượng màn hình chờ" disabled><button type="button" id="broadcastPlus" disabled>+</button></div>
 <p class="status">Đang chọn: <output id="broadcastDraft">15</output>/20 · Đóng để lưu</p><button type="button" id="broadcastClose" disabled>Đóng</button></details>
-<p class="status" id="vocalHint"></p><p class="status" id="state"></p><p class="status" id="offline"></p>
+<p class="status" id="vocalHint"></p><p class="status" id="volumeHint"></p><p class="status" id="state"></p><p class="status" id="offline"></p>
 </main>
 <footer><div class="controls"><button data-command="voldec">− Giảm âm</button><button data-command="play_imv" id="pause">Dừng / Tiếp tục</button><button data-command="volinc">+ Tăng âm</button><button data-command="replay_imv">Phát lại</button><button data-command="cut_song_imv">Qua bài</button><button data-command="mute" id="mute">Tắt tiếng</button><button data-command="ori_imv" id="vocal" disabled>Ngắt lời</button><span class="status" id="volume"></span></div></footer>
 <script>
@@ -88,6 +88,8 @@ async function refresh(){
   $('connection').textContent='Đã kết nối';$('offline').textContent='';
   $('state').textContent=state.source==='LocalKaraoke'&&state.original?state.original.status:state.status;
   $('volume').textContent='Âm lượng '+state.volume+'/20';$('pause').textContent=state.paused?'Tiếp tục':'Dừng';
+  for(const button of document.querySelectorAll('[data-command="volinc"],[data-command="voldec"]'))button.disabled=state.canAdjustVolume===false;
+  $('volumeHint').textContent=state.volumeUnavailableReason||'';
   $('mute').textContent=state.muted?'Bật tiếng':'Tắt tiếng';$('mute').setAttribute('aria-pressed',String(state.muted));
   $('vocal').textContent=state.originalVocal?'Ngắt lời':'Nguyên xướng';$('vocal').disabled=!state.canSwitchVocal;
   $('vocal').title=state.vocalUnavailableReason||'';$('vocalHint').textContent=state.canSwitchVocal?'':state.vocalUnavailableReason;
