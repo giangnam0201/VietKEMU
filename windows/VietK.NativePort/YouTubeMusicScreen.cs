@@ -260,7 +260,14 @@ public sealed class YouTubeMusicScreen : IDisposable
             }
         }
         catch(OperationCanceledException) { }
-        catch(Exception ex) { if(stamp==generation && !disposed)SetStatus(ex.Message+" — bấm Thử lại hoặc chọn bài khác."); }
+        catch(Exception ex)
+        {
+            if(stamp==generation && !disposed)
+            {
+                active=false;liveTransfer?.Dispose();liveTransfer=null;playback.StartIdleDemo();
+                SetStatus(ex.Message+" — bấm Thử lại hoặc chọn bài khác.");
+            }
+        }
         finally { if(ReferenceEquals(downloading,cancellation))downloading=null;cancellation.Dispose(); }
     }
     private bool Command(string command)

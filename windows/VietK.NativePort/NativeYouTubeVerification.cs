@@ -21,9 +21,9 @@ static class NativeYouTubeVerification
                 var id=YouTubeMusicClient.VideoId(url)??throw new ArgumentException("Invalid verification video URL");
                 var client=new YouTubeMusicClient(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(output,"cache"),useFirefoxCookies:()=>useFirefoxCookies);
                 using var timeout=new CancellationTokenSource(TimeSpan.FromMinutes(4));
-                var path=await client.Download(new(id,"Public live verification video","",""),_=>{},timeout.Token);
-                downloaded=true;
-                if(!playback.PlayMedia(path,preserveStereo:true))throw new IOException("Downloaded YouTube media was rejected by decoder");
+                using var transfer=client.StartProgressive(new(id,"Public live verification video","",""),_=>{},timeout.Token);
+                await transfer.WaitUntilReady(timeout.Token);
+                if(!playback.PlayMedia(transfer.Url,preserveStereo:true))throw new IOException("Progressive YouTube media was rejected by decoder");
                 var deadline=DateTime.UtcNow.AddSeconds(30);
                 while(playback.Decoder.Position<500 && DateTime.UtcNow<deadline)await Task.Delay(100);
                 uint width=0,height=0;
@@ -34,6 +34,7 @@ static class NativeYouTubeVerification
                 deadline=DateTime.UtcNow.AddSeconds(10);
                 while(!File.Exists(snapshot) && DateTime.UtcNow<deadline)await Task.Delay(100);
                 if(!File.Exists(snapshot))throw new IOException("YouTube decoded-frame snapshot missing");
+                await transfer.Completion;downloaded=true;
                 exit=0;
             }
             catch(Exception ex) { failure=ex.Message; }

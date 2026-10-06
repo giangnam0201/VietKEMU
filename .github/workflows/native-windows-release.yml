@@ -1,0 +1,75 @@
+name: Build Windows test release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Verify original core behavior
+        run: dotnet run --project windows/VietK.CoreChecks -c Release
+      - name: Bundle official YouTube tools
+        run: |
+          New-Item -ItemType Directory -Force artifacts/native-windows | Out-Null
+          ./tools/package_youtube_tools.ps1 -PublishDirectory artifacts/native-windows
+          (Resolve-Path artifacts/native-windows/YouTubeTools).Path | Add-Content $env:GITHUB_PATH
+      - name: Retrieve original decode, fonts and APK bytes
+        run: |
+          gh run download 37386126110 -n original-apk-full-decode -D decoded
+          if ($LASTEXITCODE -ne 0) { throw 'Original decode download failed' }
+          gh run download 37417309368 -n original-firmware-ui-assets -D firmware-ui-fonts
+          if ($LASTEXITCODE -ne 0) { throw 'Original font download failed' }
+          gh run download 37324921816 -n firmware-applications -D firmware
+          if ($LASTEXITCODE -ne 0) { throw 'Original APK download failed' }
+      - name: Package original resources and inspect embedded MP4s
+        run: |
+          python tools/package_native_home.py decoded windows/VietK.NativePort/Original --firmware-ui firmware-ui-fonts --firmware firmware
+          if ($LASTEXITCODE -ne 0) { throw 'Original resource packaging failed' }
+          Get-Content windows/VietK.NativePort/Original/video-inspection/inventory.json
+          python tools/create_playback_fixtures.py artifacts/playback-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Decoder fixture generation failed' }
+      - name: Compile native Windows executable
+        run: dotnet publish windows/VietK.NativePort -c Release -r win-x64 --self-contained true -o artifacts/native-windows
+      - name: Render original UI on Windows
+        run: |
+          $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Native rendering failed: $($process.ExitCode)" }
+      - name: Verify shared frames and playback before download completion
+        run: |
+          $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-playback', 'artifacts/playback-fixtures', 'artifacts/native-verification/playback' -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(180000)) { $process.Kill(); throw 'Native playback verification timed out' }
+          if ($process.ExitCode -ne 0) { Get-Content artifacts/native-verification/playback/playback-error.txt; throw "Native playback verification failed: $($process.ExitCode)" }
+          Get-Content artifacts/native-verification/playback/playback-verification.json
+      - name: Probe public YouTube progressive transfer
+        continue-on-error: true
+        run: |
+          $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-youtube', 'https://www.youtube.com/watch?v=YE7VzlLtp-4', 'artifacts/native-verification/youtube' -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(300000)) { $process.Kill(); throw 'Live YouTube verification timed out' }
+          Get-Content artifacts/native-verification/youtube/youtube-verification.json
+          if ($process.ExitCode -ne 0) { throw 'Public YouTube fetch failed; this does not establish live server playback.' }
+      - name: Print failure diagnostics
+        if: failure()
+        run: |
+          if (Test-Path "$env:TEMP/vietk-native-startup-error.txt") { Get-Content "$env:TEMP/vietk-native-startup-error.txt" }
+          Get-ChildItem artifacts/native-verification -Filter '*error*.txt' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
+      - name: Publish private Windows test release
+        run: |
+          ./tools/package_windows_test.ps1 -PublishDirectory artifacts/native-windows -OutputDirectory artifacts/windows-test -BuildId "${{ github.run_number }}-${{ github.sha }}"
+          Compress-Archive artifacts/native-verification/* artifacts/native-verification.zip
+          Compress-Archive windows/VietK.NativePort/Original/video-inspection/* artifacts/original-mp4-inspection.zip
+          $tag = 'windows-test-${{ github.run_id }}'
+          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Windows test build ${{ github.run_number }}' --notes 'Native Windows test build with verification reports. Extract the complete Windows ZIP before opening VietK.NativePort.exe. Partial port; see included README for limitations.'
+          if ($LASTEXITCODE -ne 0) { throw 'Private release creation failed' }
+          $buildZip = (Get-ChildItem artifacts/windows-test -Filter '*.zip').FullName
+          gh release upload $tag $buildZip artifacts/native-verification.zip artifacts/original-mp4-inspection.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Private release upload failed' }
+          "Windows test download: https://github.com/${{ github.repository }}/releases/tag/$tag" | Add-Content $env:GITHUB_STEP_SUMMARY
