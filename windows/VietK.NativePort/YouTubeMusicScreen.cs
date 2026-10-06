@@ -198,6 +198,10 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Thoát bộ sưu tập VietK",()=>LogoutCollection?.Invoke());
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Tắt / Bật tiếng",()=>playback.Command("mute"));
+        Add("Âm lượng mặc định…",()=>
+        {
+            if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new OriginalDefaultVolumeDialog(panel,playback.DefaultVolumeSettings);
+        });
         Add("Chữ chạy trên TV…",EditMarquee);
         Add("Kết nối điều khiển bằng điện thoại",()=> { SetStatus(MobileConnectionInfo?.Invoke()??"Điều khiển điện thoại chưa khởi động.");OpenMobilePairing?.Invoke(); });
         Add("Ngắt điện thoại cũ / tạo QR mới",()=> { RePairMobile?.Invoke();SetStatus("Đã đổi mã kết nối. Quét lại QR trên TV."); });

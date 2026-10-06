@@ -1,0 +1,9 @@
+# Default volume
+
+`DefaultVolumeSettingDialog` stores `key_vga_room_default_volume` separately from current playback volume, defaults to 15, and stages changes between 0 and 20. Plus/minus buttons update staged volume; slider progress updates the dialog value on drag release. Confirm persists it. Cancel and outside dismissal discard edits. `GeneralView.changeDefaultVolume` refreshes its displayed value without changing current output volume.
+
+The Windows port implements this preference and dialog with the original 518×338 layout, vertical offset −65, title, hint, slider dimensions, number on the thumb, and 25ms press feedback. The menu entry “Âm lượng mặc định…” opens it. This entry is provisional until the complete original settings screen is ported. Three original bitmap resources are recovered into the owner's local supplemental archive. Public builds use fallback button/thumb drawings when those resources are unavailable; full bitmap parity is not claimed for that fallback.
+
+Startup now applies the separate configured default rather than restoring the last live volume from `playback-state.json`, following `ConfigManager.getDefaultVolume` and `BottomMenuBarView` initialization. The idle-video selection still loads from the existing state. Android broadcast-volume handling, room open/close plugin events and plugin-provided defaults are not translated by this change.
+
+Core checks cover default 15, persisted 0/20/intermediate values and rejection of invalid values. Native checks exercise staged buttons, bounds, actual slider press/release, cancel, confirm, outside dismissal, unchanged live volume and startup with conflicting legacy live-volume state. A synthetic dialog capture is produced. Verification is pending a successful Windows GitHub build.

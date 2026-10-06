@@ -262,10 +262,12 @@ public sealed class NativePlayback : IDisposable
     };
     public bool CanSwitchVocal=>VocalUnavailableReason.Length==0;
     public string? IdleVideoSource { get; private set; }
+    public OriginalDefaultVolumeSettings DefaultVolumeSettings { get; }
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
         this.bottom = bottom;
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
+        DefaultVolumeSettings=new OriginalDefaultVolumeSettings(stateDirectory);
         Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
         Television = new TelevisionWindow(Decoder.VideoSurface);
         Decoder.VideoFrameChanged+=()=> { DecodedPreviewFrames++;PreviewFrameChanged?.Invoke(Decoder.VideoSurface); };
@@ -289,8 +291,9 @@ public sealed class NativePlayback : IDisposable
         if (File.Exists(stateFile))
         {
             var settings=JsonSerializer.Deserialize<PlaybackPreferences>(File.ReadAllText(stateFile));
-            Decoder.SetOutputVolumeStep(settings?.Volume??15);idleVideoPath=settings?.IdleVideoPath??"";
+            idleVideoPath=settings?.IdleVideoPath??"";
         }
+        Decoder.SetOutputVolumeStep(DefaultVolumeSettings.Volume);
         Player.Failed+=_=>Dispatcher.CurrentDispatcher.BeginInvoke(()=>
         {
             if(!playingIdle && Player.State==OriginalVideoState.Errors)CommandOverride?.Invoke("decoder_failed");

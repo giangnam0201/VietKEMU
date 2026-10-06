@@ -710,6 +710,7 @@ CollectionProfileChecks.Run();
 SingerSongChecks.Run();
 SingerDirectoryChecks.Run();
 SearchSettingsChecks.Run();
+DefaultVolumeChecks.Run();
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();
 TransferWriteRecoveryChecks.Run().GetAwaiter().GetResult();

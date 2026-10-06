@@ -39,6 +39,8 @@ add(panel,'res/drawable-mdpi-v4/icon_favorite_for_login.png','ambience/collectio
 for name in ['preview_dialog_button_addsong','dialog_common_close_n','dialog_common_close_h']:
     add(panel,f'res/drawable-mdpi-v4/{name}.png',f'ambience/preview/{name}.png','dualkmbox.apk')
 add(panel,'res/drawable-mdpi-v4/defaultsmall.png','ambience/singer/defaultsmall.png','dualkmbox.apk')
+for name in ['volume_decrease','volume_increase','volume_seekbar_thumb']:
+    add(panel,f'res/drawable-mdpi-v4/{name}.png',f'ambience/volume/{name}.png','dualkmbox.apk')
 for name in ['dialog_category_background.9.png','dialog_category_selected.9.png','icon_pre_page.png','icon_next_page.png']:
     add(panel,f'res/drawable-mdpi-v4/{name}',f'ambience/singer/{name}','dualkmbox.apk')
 for name in ['ic_cut_song','ic_cut_song_press','ic_delete','ic_delete_press','ic_top_song','ic_top_song_press',
