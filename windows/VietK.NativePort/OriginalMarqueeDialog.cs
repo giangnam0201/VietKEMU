@@ -27,7 +27,6 @@ public sealed class OriginalMarqueeDialog
             ToolTip="Dịch vụ lời chào online của nhà sản xuất chưa khả dụng trên Windows." };
         Put(content,cloud,410,74);
         var local=new RadioButton { Content="Đầu máy",IsChecked=true,FontSize=20,FontFamily=OriginalFont.Family,Foreground=Brushes.White };
-        local.Click+=(_,_)=>Editor.Text=settings.LocalText;
         Put(content,local,530,74);
         Put(content,Label("Chỉnh sửa lời chào",420,60,20),30,120);
         Button("Xóa",564,130,80,40,Clear,"clear",true);
@@ -36,6 +35,7 @@ public sealed class OriginalMarqueeDialog
             TextWrapping=TextWrapping.Wrap,MaxLength=OriginalMarqueeSettings.MaximumLength,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,ContextMenu=null,
             Text=settings.LocalText,Tag="marquee:editor" };
         Put(content,Editor,30,180);
+        local.Click+=(_,_)=>Editor.Text=settings.LocalText;
         Counter=Label("",100,28,14);Counter.TextAlignment=TextAlignment.Right;Counter.IsHitTestVisible=false;Counter.Tag="marquee:counter";
         Put(content,Counter,514,320);Editor.TextChanged+=(_,_)=>UpdateCounter();UpdateCounter();
         Button("Hủy",159.5,387,140,46,Close,"cancel");Button("Xác nhận",374.5,387,140,46,Confirm,"confirm");

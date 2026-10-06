@@ -21,11 +21,11 @@ public sealed class TelevisionQr
         TextAlignment=TextAlignment.Center,Foreground=Brushes.White,Background=new SolidColorBrush(Color.FromArgb(224,21,21,21)) };
     private readonly TranslateTransform slide=new();
     private readonly string modeFile;
-    public TelevisionQr()
+    public TelevisionQr(string? stateDirectory=null)
     {
         Canvas.RenderTransform=slide;Canvas.Children.Add(image);Canvas.Children.Add(code);
         System.Windows.Controls.Canvas.SetTop(code,image.Height);
-        var directory=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VietKNativePort");
+        var directory=stateDirectory??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VietKNativePort");
         modeFile=Path.Combine(directory,"tv-qr-mode.json");
         try { if(File.Exists(modeFile))State.ChangeMode(JsonSerializer.Deserialize<int>(File.ReadAllText(modeFile))); }
         catch(Exception error) when(error is IOException or JsonException or ArgumentOutOfRangeException) { }

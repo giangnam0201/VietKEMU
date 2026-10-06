@@ -1,0 +1,9 @@
+# TV QR mode dialog
+
+`SettingTvQrcodeModeDialog` uses `dialog_setting_tv_qrcode_mode_view` and `SelectListAdapter` / `select_list_item_view`. It is 418×398 at center minus 45 vertically, with a 60-pixel centered title, 60-pixel close hit area, a 220-pixel list, 60-pixel rows and 2-pixel dividers. Selected rows use orange `#EE9C3F`, a right-aligned “Đã chọn” label and a 24-pixel checkmark. The port now follows these dimensions and selection visuals instead of native Windows radio buttons, and uses the original cyan confirmation gradient.
+
+Selecting a row only changes the draft. Confirming saves the mode and calls the existing QR state transition; close, outside tap and Escape discard it. The supplied APK's mode-one transition immediately hides the matrix; the delayed-hide call is separate. This change preserves that behavior rather than changing the countdown policy.
+
+The owner-local supplemental archive contains the original checkmark. It is not published. Public builds use a drawn checkmark when that archive is absent, and a close-glyph fallback if the original close image is absent. The TV QR's requested 45-pixel size and pairing panel's 60-pixel size are unchanged.
+
+The native verifier uses an isolated QR settings directory and exercises actual row, close and confirmation events, marker updates, persistence, outside dismissal and the original mode-one visibility branch. A synthetic dialog screenshot is captured. Windows build verification is pending.
