@@ -271,6 +271,12 @@ public static class NativePlaybackVerification
                     Require(playback.Television.Overlay.ExpressionVisible,"TV mask destroyed the active expression");
                     await Until(()=>!playback.Television.Overlay.ExpressionVisible,"Expression did not disappear at the original timeout");
                     Require(expressions.ActiveExpression=="" && !expressions.Sound.IsPlaying,"Expression sound continued after its TV image expired");
+                    var close=content.Children.OfType<Image>().Single();Click(close);
+                    Require(panel.Children.Count==beforeChildren,"Original ambience close button did not dismiss the dialog");
+                    expressions.ShowDialog(host,expressionRoot);
+                    Require(expressions.CurrentTab==12 && panel.Children.Count==beforeChildren+1,"Ambience dialog lost the selected TV tab on reopen");
+                    var reopened=(Canvas)((Border)((Canvas)panel.Children[panel.Children.Count-1]).Children[0]).Child;
+                    Require(reopened.Children.OfType<Canvas>().Single().Visibility==Visibility.Visible,"Reopened ambience dialog did not restore TV page visibility");
                     panel.Children.RemoveAt(panel.Children.Count-1);playback.Player.Stop();
                 }
                 var unsafeSupplement=Path.Combine(output,"unsafe-supplement-fixture.zip");

@@ -72,8 +72,15 @@ public sealed class AmbienceExpressions : IDisposable
         Put(content,heading,30,10);
         var televisionHeading=new Border { CornerRadius=new CornerRadius(30),Padding=new Thickness(15,0,15,0),
             Background=Brushes.Transparent,Child=new TextBlock { Text="TV",FontSize=22,Foreground=Brushes.White,FontFamily=OriginalFont.Family } };
-        if(television is not null)Put(content,televisionHeading,315,10);
-        var close=new Image { Width=30,Height=30,Source=LoadImage(Path.Combine(directory,"dc_overseas_popup_close.png")) };
+        // Reserve the original Lời chúc tab's width while its scheduler is
+        // being ported, rather than guessing the position of the TV tab.
+        double TabWidth(string text)
+        {
+            var label=new TextBlock { Text=text,FontSize=22,FontFamily=OriginalFont.Family };
+            label.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));return Math.Max(50,label.DesiredSize.Width+30);
+        }
+        if(television is not null)Put(content,televisionHeading,30+TabWidth("Biểu cảm")+20+TabWidth("Lời chúc")+20,10);
+        var close=new Image { Width=35,Height=35,Source=LoadImage(Path.Combine(directory,"dc_overseas_popup_close.png")) };
         close.MouseLeftButtonUp+=(_,_)=>Close();Put(content,close,730,10);
         var grid=new Canvas { Width=704,Height=340 };
         var scroll=new ScrollViewer { Width=740,Height=358,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,
@@ -87,7 +94,7 @@ public sealed class AmbienceExpressions : IDisposable
             text.Children.Add(new TextBlock { Text="Có thể tắt màn hình TV, chỉ phát nhạc",FontSize=16,
                 Foreground=new SolidColorBrush(Color.FromRgb(0x9b,0x8d,0xb0)),FontFamily=OriginalFont.Family });
             Put(tvPage,text,90,47);
-            var toggle=new Image { Width=56,Height=35,Tag="original-tv-mask-toggle" };
+            var toggle=new Image { Width=56,Height=35,Stretch=Stretch.Fill,Tag="original-tv-mask-toggle" };
             void UpdateToggle(bool value)=>toggle.Source=LoadImage(Path.Combine(directory,value?"dc_overseas_set_on.png":"dc_overseas_set_off.png"));
             UpdateToggle(television.IsScreenMasked);toggle.MouseLeftButtonUp+=(_,e)=>
             { television.SetScreenMask(!television.IsScreenMasked);e.Handled=true; };
