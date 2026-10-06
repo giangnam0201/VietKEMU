@@ -413,6 +413,20 @@ def package_player_reference(decoded, destination, firmware):
     output = destination / 'player'
     output.mkdir(exist_ok=True)
     (output / original.name).write_bytes(payload)
+    background_asset = 'assets/random_bg_default.mp4'
+    background_file = app / 'apktool' / background_asset
+    if background_file.exists():
+        background_bytes = background_file.read_bytes()
+    else:
+        with zipfile.ZipFile(next(firmware.glob('vendor/app/dualkmbox/*.apk'))) as archive:
+            background_bytes = archive.read(background_asset)
+    background_hash = hashlib.sha256(background_bytes).hexdigest()
+    if entries[background_asset]['sha256'] != background_hash:
+        raise RuntimeError('Original background video provenance differs')
+    (output / 'random_bg_default.mp4').write_bytes(background_bytes)
+    (output / 'background-provenance.json').write_text(json.dumps({
+        'asset': background_asset, 'sha256': background_hash,
+        'scope': 'Original APK background video used as idle fallback; not verified identical to HDD factory 60003950.mp4.'}, indent=2))
     # Idle broadcasts live on device/USB storage; do not substitute the scoring
     # clip if the original Demo.mp4 was not included in the firmware export.
     demos = [path for path in firmware.rglob('*') if path.is_file() and path.name.lower() == 'demo.mp4']

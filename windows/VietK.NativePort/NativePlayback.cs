@@ -246,7 +246,10 @@ public sealed class NativePlayback : IDisposable
         // idle broadcast, not the APK's grade_video.mp4 scoring animation.
         var paths=new[] { Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),
-            Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4") };
+            Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4"),
+            Path.Combine(Path.GetDirectoryName(stateFile)!,"60003950.mp4"),
+            Path.Combine(AppContext.BaseDirectory,"60003950.mp4"),
+            Path.Combine(AppContext.BaseDirectory,"Original","player","random_bg_default.mp4") };
         var demo=paths.FirstOrDefault(File.Exists);
         playingIdle=false;Player.Stop();CurrentMedia=null;ResetPreview();
         Television.Overlay.SetSong("");

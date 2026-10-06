@@ -32,8 +32,10 @@ Available to test:
 - TV video and overlays are also previewed inside the panel's black video slot.
 - Original TV play/pause/replay/volume images and scrolling current/next song.
 - An actual Demo.mp4 beside the EXE, or in the app-state folder below, plays
-  and loops while the queue is empty. The original demo clip is not included
-  in the firmware export; add your device's clip to use this idle broadcast.
+  and loops while the queue is empty. Factory 60003950.mp4 is also accepted.
+  The original APK background video is bundled as the default idle fallback.
+  Its bytes are authentic; it is not verified identical to the missing HDD
+  factory idle clip. Add your device's clip to reproduce that idle broadcast.
 - Server login/media-request transport and music file download to playback queue.
 - Pause, replay, seek, original/accompaniment and output volume controls.
 

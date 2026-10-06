@@ -26,12 +26,17 @@ original source. The VietK logo and current/next-song scrolling text appear on
 both the TV and its panel preview. Mobile connection QR and ambience effects
 remain pending.
 
-Idle playback follows the original separate `Demo.mp4` broadcast path. Place
+Idle playback prefers the original separate `Demo.mp4` broadcast path. Place
 the actual demo clip beside `VietK.NativePort.exe` or at
 `%LOCALAPPDATA%\VietKNativePort\Demo.mp4`. It loops on startup and after clearing
 or exhausting the queue, and appears in the panel preview through the same
 decoder. The original demo bytes have not yet been located in the supplied
-exports; the grading animation is not substituted for this clip. CI verifies
+exports. The APK identifies its factory idle file as `/kmbox/resource/60003950.mp4`;
+that filename is also accepted beside the EXE or in the state folder.
+Until either clip is supplied, the original APK `assets/random_bg_default.mp4`
+is bundled as an idle background fallback, with its SHA-256 checked against
+the original APK manifest. It is not proven identical to the factory idle clip;
+the grading animation is not substituted. CI verifies
 the idle decoder and loop with an explicitly identified test fixture.
 
 yt-dlp fetches video plus audio at up to 1080p. FFmpeg merges/remuxes with no
