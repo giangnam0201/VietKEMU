@@ -90,3 +90,46 @@ scheduled.Clear(); input.Clear();
 Require(input.Text == "" && scheduled.Count == 1 && scheduled[0].Delay == 50, "Clear delay differs");
 scheduled[0].Callback(); Require(searches[^1] == "", "Clear did not request initial spelling results");
 Console.WriteLine("Original Vietnamese input verified: 200ms request coalescing, space, backspace and 50ms clear.");
+
+var orderState=new OrderContext(ScannedVolumes:1,NetworkConnected:true);
+var localOrder=new OrderCandidate("normal",1,false);
+var remoteOrder=new OrderCandidate("normal",0,false);
+OrderDecision Decision(OrderCandidate? item,bool top=false,OrderContext? state=null)=>
+    OriginalOrderPolicy.Evaluate(item,top,state??orderState);
+Require(Decision(null)==OrderDecision.MissingItem &&
+    Decision(null,state:orderState with { OrderingAvoided=true })==OrderDecision.OrderingAvoided,
+    "Ordering avoidance/null precedence differs from bytecode");
+Require(Decision(localOrder)==OrderDecision.AppendLocal && Decision(localOrder,true)==OrderDecision.TopLocal &&
+    Decision(remoteOrder)==OrderDecision.AppendDownload && Decision(remoteOrder,true)==OrderDecision.TopDownload,
+    "Original local/download routing differs");
+Require(Decision(localOrder,state:orderState with { QueueCount=299 })==OrderDecision.AppendLocal &&
+    Decision(localOrder,state:orderState with { QueueCount=300 })==OrderDecision.QueueLimit &&
+    Decision(localOrder with { AlreadyQueued=true },true,orderState with { QueueCount=300 })==OrderDecision.TopLocal,
+    "Original 300-item boundary or existing Top exception differs");
+Require(Decision(localOrder with { AlreadyQueued=true })==OrderDecision.AlreadyQueued &&
+    Decision(localOrder with { AlreadyQueued=true },state:orderState with { RepeatOrderingEnabled=true })==OrderDecision.AppendLocal &&
+    Decision(localOrder with { PlayType="midi",AlreadyQueued=true },state:orderState with { RepeatOrderingEnabled=true })==OrderDecision.AlreadyQueued,
+    "Repeat ordering must apply to normal songs only");
+Require(Decision(remoteOrder,state:orderState with { ScannedVolumes=0,NetworkConnected=false })==OrderDecision.NoStorage &&
+    Decision(remoteOrder,state:orderState with { NetworkConnected=false })==OrderDecision.NoNetwork,
+    "Storage/network gate precedence differs");
+Require(Decision(remoteOrder with { PlayType="soundcloud" },state:orderState with { ScannedVolumes=0 })==OrderDecision.AppendDownload &&
+    Decision(remoteOrder with { PlayType="soudcloud" },state:orderState with { ScannedVolumes=0 })==OrderDecision.NoStorage,
+    "Original service play type spelling or disk exemption differs");
+Require(Decision(remoteOrder,state:orderState with { CloudLocked=true,VietnamRegion=false })==OrderDecision.CloudLocked &&
+    Decision(remoteOrder,state:orderState with { CloudLocked=true })==OrderDecision.AppendDownload,
+    "Original Vietnam-region cloud-lock exemption differs");
+Require(Decision(remoteOrder,state:orderState with { MicroServiceLinked=true,MicroServicePaused=true,NetworkConnected=false })==OrderDecision.MicroServicePaused &&
+    Decision(localOrder,state:orderState with { MicroServiceLinked=true,TcpConnected=false })==OrderDecision.MicroServiceDisconnected &&
+    Decision(remoteOrder,state:orderState with { MicroServiceLinked=true,TcpConnected=true,ScannedVolumes=0,CloudLocked=true,VietnamRegion=false })==OrderDecision.AppendDownload,
+    "Original linked-service gates or exemptions differ");
+Require(Decision(localOrder with { LocalFlag=-1 })==OrderDecision.AppendLocal,
+    "Original routing uses zero versus nonzero, not the grid's local-range test");
+Console.WriteLine("Original order gates verified against bytecode: capacity, duplicates, region, storage, network and linked service.");
+
+Require(LocalSong.DefaultSinger(null,"Vô danh")=="Vô danh" && LocalSong.DefaultSinger("unknow","Vô danh")=="Vô danh" &&
+    LocalSong.DefaultSinger("unknown","Vô danh")=="unknown" && LocalSong.DefaultSinger("","Vô danh")=="",
+    "Original default singer spelling/null/empty rules differ");
+using(var command=connection.CreateCommand())
+{ command.CommandText="UPDATE tblSong SET songsterName=NULL WHERE SongID=1";command.ExecuteNonQuery(); }
+Require(search.BySpell("Al",0,0,new(),offline).Single().Singer=="Vô danh", "Search omitted original default singer handling");

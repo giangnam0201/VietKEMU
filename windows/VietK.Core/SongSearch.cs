@@ -9,7 +9,7 @@ public sealed record SongPage(int Index = 0, int Size = 60);
 // SongDAO.getSongsOrderBySpellLocal/getSongsOrderByNameLocal. This requires
 // the real local-state schema (IsLocalExist); whole-catalogue metadata alone
 // must not be passed off as local-media availability or a connected server.
-public sealed class SongSearch(SqliteConnection database)
+public sealed class SongSearch(SqliteConnection database,string anonymousSinger="Vô danh")
 {
     public IReadOnlyList<CatalogueSong> BySpell(string spell, int limitLength,
         int languageType, SongPage page, SongQueryContext context) =>
@@ -77,7 +77,8 @@ public sealed class SongSearch(SqliteConnection database)
             // contain fewer than 60 results. Don't refill/reorder that page.
             if (id >= 100000000 && id <= 100999999) continue;
             songs.Add(new CatalogueSong(id, reader.GetString(1), reader.GetString(2), reader.GetInt32(3),
-                reader.GetString(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.GetString(8))
+                LocalSong.DefaultSinger(reader.IsDBNull(4)?null:reader.GetString(4),anonymousSinger),
+                reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.GetString(8))
                 { LocalState = reader.GetInt32(9) });
         }
         return songs;

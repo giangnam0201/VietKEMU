@@ -130,6 +130,15 @@ public static class Program
                         OriginalTrack:1,AccompanyTrack:0,MediaType:"MUSIC",VolumeBalance:291308162,
                         UpdateDateTime:"2019-11-05 16:49:04",VolumeUuid:"" } || imported.GetMedia(-1).Count!=0)
                         throw new InvalidDataException("Original MediaDAO fields or missing media handling differ");
+                    var localSong=imported.GetSongById(101000);
+                    if(localSong is not { Name:"Mộng dưới hoa (sc)",Spell:"MDH",Words:3,Singer:"Ái Vân,Thái Châu",
+                        PlayRate:503,CanScore:1,CanMShow:0,Album:"",ErcVersion:"1",HasRemote:1,
+                        LastUpdateTime:"2019-07-04 16:46:03",LocalFlag:0,IsPsl:0,ReportTableNumber:-1,Stage:0,
+                        SongSpecies:-999,Selected:false,Favourite:false,EnglishName:null } ||
+                        !localSong.SingerIds.SequenceEqual(new[]{4,218,-1,-1}) ||
+                        !localSong.Types.SequenceEqual(new[]{3,-1,-1,-1}) ||
+                        !localSong.Languages.SequenceEqual(new[]{8,-1,-1,-1}) || imported.GetSongById(-1) is not null)
+                        throw new InvalidDataException("Original local song lookup/model defaults differ from bytecode and database");
                     if(imported.Search.BySpell("",0,0,new(),new()).Count!=0 ||
                         imported.Search.BySpell("MDH",0,0,new(),new(true,false)).Count!=0)
                         throw new InvalidDataException("Catalogue import claimed local availability or a connected server");
@@ -180,6 +189,7 @@ public static class Program
                     originalLocalSeedUpgradeVerified = true,
                     originalRemoteCatalogueImportVerified = true,
                     originalMediaMetadataLookupVerified = true,
+                    originalLocalSongLookupVerified = true,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,

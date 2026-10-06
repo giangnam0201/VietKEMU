@@ -142,5 +142,26 @@ public sealed class LocalSongDatabase : IDisposable
         return medias;
     }
 
+    public LocalSong? GetSongById(int songId,string anonymousSinger="Vô danh")
+    {
+        using var command=connection.CreateCommand();
+        command.CommandText="""
+            SELECT SongID,SongName,SongPy,SongWord,songsterName,SongsterID1,SongsterID2,SongsterID3,SongsterID4,
+                SongTypeID1,SongTypeID2,SongTypeID3,SongTypeID4,LanguageTypeID,LanguageTypeID2,LanguageTypeID3,LanguageTypeID4,
+                PlayNum,IsGrand,IsMShow,album,ercVersion,hasRemote,LastUpdateTime,IsLocalExist,is_psl
+            FROM tblSong WHERE SongID=$song
+            """;
+        command.Parameters.AddWithValue("$song",songId);
+        using var row=command.ExecuteReader();if(!row.Read())return null;
+        string? String(int index)=>row.IsDBNull(index)?null:row.GetString(index);
+        return new(row.GetInt32(0),row.GetString(1),row.GetString(2),row.GetInt32(3),
+            LocalSong.DefaultSinger(String(4),anonymousSinger),
+            [row.GetInt32(5),row.GetInt32(6),row.GetInt32(7),row.GetInt32(8)],
+            [row.GetInt32(9),row.GetInt32(10),row.GetInt32(11),row.GetInt32(12)],
+            [row.GetInt32(13),row.GetInt32(14),row.GetInt32(15),row.GetInt32(16)],
+            row.GetInt32(17),row.GetInt32(18),row.GetInt32(19),String(20),String(21),row.GetInt32(22),
+            String(23),row.GetInt32(24),row.GetInt32(25));
+    }
+
     public void Dispose() => connection.Dispose();
 }

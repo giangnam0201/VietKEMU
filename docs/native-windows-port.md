@@ -107,6 +107,20 @@ after applying its default singer; JADX's Java output drops that return and
 appears to return null. Future ordering/lookup ports must follow the bytecode
 instead of reproducing that decompiler error.
 
+`LocalSongDatabase.GetSongById` now follows that bytecode return and reconstructs
+all 26 local fields, including the four singer/type/language IDs and the original
+`Song` defaults. Null singers and the original literal `unknow` use the
+Vietnamese anonymous-singer label; empty strings and `unknown` remain unchanged.
+Search results apply the same default-singer rule.
+
+`OriginalOrderPolicy` translates the bytecode's gates and local/download routing:
+storage, linked-service pause/connection, region/cloud lock, duplicate handling,
+normal-song repeat ordering and the 300-item capacity boundary. Existing Top
+operations remain allowed at capacity. This policy is a prerequisite for the
+queue backend; it does not itself enqueue, download or start playback. The
+decompiled Java duplicates and inverts some capacity/duplicate branches, so the
+policy follows the original smali control flow.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,
 and component capture checks. Search fixtures are synthetic and verify query
