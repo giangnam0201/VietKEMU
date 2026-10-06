@@ -40,7 +40,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     internal Action? RePairMobile { get; set; }
     internal Action? OpenMobilePairing { get; set; }
     internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
-        volume=playback.Decoder.OutputVolumeStep,status=message,transfers=queueTransfers };
+        volume=playback.Decoder.OutputVolumeStep,status=message,transfers=queueTransfers.ToDictionary(pair=>pair.Key,pair=>pair.Value) };
     internal Task<IReadOnlyList<YouTubeVideo>> RemoteSearch(string query,CancellationToken cancellation)=>client.Search(query,cancellation);
     internal void RemoteAdd(YouTubeVideo video,bool first)=>Add(video,first);
     internal void SeedRemoteFixture()

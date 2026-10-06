@@ -52,7 +52,7 @@ jobs:
           python -m playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Phone browser verification dependencies failed' }
           $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-playback', 'artifacts/playback-fixtures', 'artifacts/native-verification/playback' -WindowStyle Hidden -PassThru
-          if (!$process.WaitForExit(180000)) { $process.Kill(); throw 'Native playback verification timed out' }
+          if (!$process.WaitForExit(180000)) { $process.Kill(); Get-Content artifacts/native-verification/playback/mobile-checkpoint.txt -ErrorAction SilentlyContinue; throw 'Native playback verification timed out' }
           if ($process.ExitCode -ne 0) { Get-Content artifacts/native-verification/playback/playback-error.txt; throw "Native playback verification failed: $($process.ExitCode)" }
           Get-Content artifacts/native-verification/playback/playback-verification.json
       - name: Probe public YouTube progressive transfer

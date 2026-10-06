@@ -14,6 +14,8 @@ internal static class MobileRemoteVerification
     public static async Task Run(NativePlayback playback,BottomBar bottom,Canvas panel,string root,string output)
     {
         var directory=Path.Combine(output,"mobile-remote");Directory.CreateDirectory(directory);
+        void Checkpoint(string message)=>File.AppendAllText(Path.Combine(output,"mobile-checkpoint.txt"),message+Environment.NewLine);
+        Checkpoint("Starting native mobile test");
         using var music=new YouTubeMusicScreen(root,directory,playback,bottom);
         music.SeedRemoteFixture();
         var before=panel.Children.Count;
@@ -25,13 +27,17 @@ internal static class MobileRemoteVerification
             panel.Children.RemoveAt(panel.Children.Count-1);
         }
         finally { bottom.CommandRequested-=playback.Command; }
+        Checkpoint("Original selected-queue button opened successfully");
         using var server=new MobileRemoteServer(Dispatcher.CurrentDispatcher,music,playback,0,true);
+        Checkpoint("Native HTTP server constructed");
         server.SearchFixture=(query,ct)=>Task.FromResult<IReadOnlyList<YouTubeVideo>>([new("fixture0003","Remote search result","","")]);
         await server.StartAsync(false);
+        Checkpoint("Native HTTP server listening");
         using var client=new HttpClient { BaseAddress=new Uri($"http://127.0.0.1:{server.Port}/"),Timeout=TimeSpan.FromSeconds(10) };
         void Require(bool value,string error) { if(!value)throw new InvalidDataException(error); }
         Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Unpaired phone read queue");
         Require((await client.GetStringAsync("/")).Contains("sessionStorage.setItem"),"Mobile browser page missing");
+        Checkpoint("Unauthorized request and mobile page checked");
         client.DefaultRequestHeaders.Authorization=new("Bearer",server.TestToken);
         using(var cross=new HttpRequestMessage(HttpMethod.Post,"api/action"))
         {
@@ -46,6 +52,7 @@ internal static class MobileRemoteVerification
         }
         var results=await client.GetFromJsonAsync<YouTubeVideo[]>("api/search?q=fixture");
         Require(results is { Length:1 } && results[0].Id=="fixture0003","Remote search result lost");
+        Checkpoint("Authenticated native search checked");
         if(Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1")
         {
             var start=new System.Diagnostics.ProcessStartInfo("python") { UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };
@@ -55,10 +62,12 @@ internal static class MobileRemoteVerification
             start.Environment["VIETK_REMOTE_TEST_OUTPUT"]=Path.GetFullPath(directory);
             using var browser=System.Diagnostics.Process.Start(start)!;
             var stdout=browser.StandardOutput.ReadToEndAsync();var stderr=browser.StandardError.ReadToEndAsync();
-            await browser.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+            try { await browser.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60)); }
+            catch(TimeoutException) { browser.Kill(true);throw new InvalidDataException("Phone browser verification exceeded 60 seconds"); }
             // Failed navigation diagnostics may include the secret fragment: redact before reporting.
             var browserOutput=await stdout;var browserError=await stderr;
             Require(browser.ExitCode==0,"Phone browser verification failed: "+(browserOutput+browserError).Replace(server.TestToken,"[redacted]",StringComparison.Ordinal));
+            Checkpoint("Phone browser commands and responsive layout passed");
         }
         await Send(new { action="add",id="fixture0003" });Require((await Queue()).Length==3,"Phone add did not reach actual panel queue");
         await Send(new { action="top",id="fixture0003" });Require((await Queue())[1]=="fixture0003","Phone priority failed");
@@ -80,6 +89,7 @@ internal static class MobileRemoteVerification
         using(var invalid=await client.PostAsJsonAsync("api/action",new { action="command",id="shutdown" }))Require(invalid.StatusCode==HttpStatusCode.BadRequest,"Unknown phone command accepted");
         using(var unknown=await client.PostAsJsonAsync("api/action",new { action="add",id="unsearched1" }))Require(unknown.StatusCode==HttpStatusCode.BadRequest,"Unsearched arbitrary media accepted");
         server.RePair();Require((await client.GetAsync("api/state")).StatusCode==HttpStatusCode.Unauthorized,"Old pairing secret remained active");
+        Checkpoint("Native commands and pairing revocation passed");
         // RePair uses live adapters only to make a local QR; remove it before other tests/captures.
         playback.Television.Overlay.Qr.Configure(new());
         File.WriteAllText(Path.Combine(directory,"verification.json"),JsonSerializer.Serialize(new { realHttp=true,pairedAuthorization=true,originRejection=true,searchFixture=true,

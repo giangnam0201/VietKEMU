@@ -180,12 +180,12 @@ public sealed class MobileRemoteServer : IDisposable
         close.Click+=(_,_)=>panel.Children.Remove(dim);content.Children.Add(close);
         dim.MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource==dim)panel.Children.Remove(dim); };panel.Children.Add(dim);
     }
-    public void Dispose()
+    public void Dispose()=>Task.Run(async () =>
     {
         using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        try { web.StopAsync(timeout.Token).GetAwaiter().GetResult(); }
+        try { await web.StopAsync(timeout.Token); }
         catch(OperationCanceledException) { }
-        web.DisposeAsync().AsTask().GetAwaiter().GetResult();
-    }
+        await web.DisposeAsync();
+    }).GetAwaiter().GetResult();
     public sealed record RemoteAction(string Action="",string Id="",bool First=false,int Target=0);
 }
