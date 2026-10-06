@@ -173,6 +173,15 @@ remaining manager methods, actual playback/list observers, download-list
 integration and panel queue handlers remain pending. The runtime translation
 is not yet connected to the interactive panel.
 
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37397029606
+passed selected-item reconstruction, score polarity/ERC availability, preferred
+media selection, copy defaults, initialization semantics, append/Top/sort/delete
+messages, duplicate identity, flow IDs and notification-order fixtures. Windows
+compilation/capture also passed reconstruction of actual song 101000 and its
+101000.MPG metadata from the imported firmware catalogue. The downloaded report
+sets `originalSelectedItemReconstructionVerified` and retains playback, TV,
+servers and full fidelity as pending/unverified.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,
 and component capture checks. Search fixtures are synthetic and verify query
