@@ -23,8 +23,7 @@ public static class NativePlaybackVerification
     {
         Directory.CreateDirectory(output);
         app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        var host = new Window { Title = "VietK playback verification", Width = 1280, Height = 800,
-            Content = new Viewbox { Child = panel } };
+        var host=NativePanelWindow.Create("VietK playback verification",panel);
         app.MainWindow = host;
         using var playback = new NativePlayback(bottom, output);
         playback.PreviewFrameChanged += _ => { };

@@ -20,6 +20,7 @@ internal static class NativeCollectionVerification
         Directory.CreateDirectory(directory);var previous=host.Content;
         var previousBounds=new Rect(host.Left,host.Top,host.Width,host.Height);
         var desktop=SystemParameters.WorkArea;
+        Require(desktop.Contains(previousBounds),"Native panel initially opened beyond the desktop bounds");
         host.Left=desktop.Left+8;host.Top=desktop.Top+8;
         host.Width=Math.Min(1280,desktop.Width-16);host.Height=Math.Min(800,desktop.Height-16);
         var panel=new Canvas { Width=1280,Height=800,Background=new ImageBrush(new BitmapImage(new Uri(Path.Combine(root,"main_bg.jpg")))) };
@@ -141,8 +142,7 @@ internal static class NativeCollectionVerification
                 Show();browser.LoginButton!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                 Require(model.CurrentUser.Length==0&&browser.Rows.Count==0&&Equals(browser.LoginButton.Content,"đăng nhập"),"Collection sidebar logout did not reset rows/fields");
                 Require(Application.Current.Windows.Count==2,"Collection browsing introduced a third window");
-                File.WriteAllText(Path.Combine(output,"collection-browser-verification.json"),JsonSerializer.Serialize(new { originalMoreRoute=true,inlineLoginProgress=true,wrongPasswordResetsFields=true,activeSingleColumnRows=true,originalQueueLabels=true,originalOnlineHeadOffset=true,orderAndTopCallbacks=true,orderAnimationsAppearAndFinish=true,removeRetainsRowUntilReload=true,recollectRetainedRow=true,continuousScroll=true,originalVisibilityAndPslFilter=true,backAndLogout=true,twoWindows=true,loginArtworkAvailable=browser.LoginArtworkAvailable,manufacturerDownloadsVerified=false,previewAndSingerHandlersPorted=false },new JsonSerializerOptions { WriteIndented=true }));
-                host.Content=new Viewbox { Child=panel };
+                File.WriteAllText(Path.Combine(output,"collection-browser-verification.json"),JsonSerializer.Serialize(new { originalMoreRoute=true,inlineLoginProgress=true,wrongPasswordResetsFields=true,activeSingleColumnRows=true,originalQueueLabels=true,originalOnlineHeadOffset=true,orderAndTopCallbacks=true,orderAnimationsAppearAndFinish=true,removeRetainsRowUntilReload=true,recollectRetainedRow=true,continuousScroll=true,originalVisibilityAndPslFilter=true,backAndLogout=true,twoWindows=true,panelFitsDesktop=true,loginArtworkAvailable=browser.LoginArtworkAvailable,manufacturerDownloadsVerified=false,previewAndSingerHandlersPorted=false },new JsonSerializerOptions { WriteIndented=true }));
             }
         }
         finally

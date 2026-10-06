@@ -489,13 +489,7 @@ public static class Program
             }
             // Component host while the remaining screens and handlers are ported.
             // Pending handlers are deliberately not represented as implemented.
-            var window = new Window
-            {
-                Title = "VietK — control panel",
-                Width = 1280, Height = 800, Background = Brushes.Black,
-                FontFamily = OriginalFont.Family,
-                Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() }
-            };
+            var window=NativePanelWindow.Create("VietK — control panel",Panel());
             app.MainWindow = window;
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             using var nativePlayback = new NativePlayback(bottom, stateDirectory);
