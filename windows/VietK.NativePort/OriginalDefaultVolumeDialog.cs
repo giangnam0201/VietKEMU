@@ -25,6 +25,7 @@ public sealed class OriginalDefaultVolumeDialog
         Put(content,Label("Âm lượng mặc định",518,60,24),0,0);
         Put(content,new Border { Width=518,Height=2,Background=new SolidColorBrush(Color.FromArgb(30,255,255,255)) },0,60);
         var hint=Label("Sau khi hệ thống khởi động và đóng, phòng sẽ sử dụng mức âm lượng này,\nkhuyến nghị từ 15, tối đa là 20.",488,30,12);
+        hint.Padding=new Thickness(0);hint.LineHeight=14;hint.Tag="default-volume:hint";
         hint.Foreground=new SolidColorBrush(Color.FromArgb(204,255,255,255));Put(content,hint,15,60);
         SeekBar=new OriginalDefaultVolumeSeekBar(Pending);SeekBar.Released+=value=>Pending=value;Put(content,SeekBar,131,125.5);
         Icon("volume_decrease","−",83,()=>Change(-1));Icon("volume_increase","+",387,()=>Change(1));

@@ -21,6 +21,10 @@ internal static class NativeDefaultVolumeVerification
         try
         {
             var dialog=new OriginalDefaultVolumeDialog(panel,settings);host.UpdateLayout();
+            var hint=Descendants<TextBlock>(dialog.Overlay).Single(element=>Equals(element.Tag,"default-volume:hint"));
+            var measuredHint=new TextBlock { Text=hint.Text,FontFamily=hint.FontFamily,FontSize=hint.FontSize,LineHeight=hint.LineHeight,Padding=hint.Padding,TextWrapping=hint.TextWrapping };
+            measuredHint.Measure(new Size(hint.ActualWidth,double.PositiveInfinity));
+            Require(measuredHint.DesiredSize.Height<=hint.ActualHeight,"Original default-volume hint was clipped");
             await Click(dialog,"volume_increase");Require(dialog.Pending==16,"Default volume increase did not stage one step");
             await Click(dialog,"volume_decrease");Require(dialog.Pending==15,"Default volume decrease did not restore one step");
             dialog.Change(100);Require(dialog.Pending==20,"Default volume exceeded 20");dialog.Change(-100);Require(dialog.Pending==0,"Default volume dropped below zero");dialog.Change(15);
@@ -44,7 +48,7 @@ internal static class NativeDefaultVolumeVerification
             using(var restarted=new NativePlayback(new BottomBar(root,contract),state))
                 Require(restarted.Decoder.OutputVolumeStep==6,"Startup restored legacy live volume instead of configured default");
             File.WriteAllText(Path.Combine(output,"default-volume-verification.json"),JsonSerializer.Serialize(new {
-                originalDefault15=true,stagedButtons=true,bounds0To20=true,sliderStagesOnRelease=true,cancelPreservesDefault=true,
+                originalDefault15=true,fullHintFits=true,stagedButtons=true,bounds0To20=true,sliderStagesOnRelease=true,cancelPreservesDefault=true,
                 confirmPersistsDefault=true,outsideDismissPreservesDefault=true,liveVolumeUnaffected=true,startupUsesDefault=true,
                 originalArtworkPresent=File.Exists(Path.Combine(OriginalSupplement.Root,"ambience","volume","volume_seekbar_thumb.png")),
                 completeOriginalSettingsScreen=false,roomPluginLifecycleTested=false
