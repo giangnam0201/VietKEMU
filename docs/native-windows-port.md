@@ -26,7 +26,8 @@ original Vietnamese labels and drawables, default tile ordering, and the origina
 artifact. The original bottom bar now has its template positions, Vietnamese
 labels, original converted icon images, paired pause/vocal-state visibility and
 500 ms click guard. Playback commands remain requests without a backend;
-the host handles the Home request only. Queue count is still the initial zero.
+the host handles the Home request only. Queue count follows confirmed local and
+download queue entries; the default empty queue shows zero.
 `FragmentHistory` translates the original history and back rules, including
 clearing history on Home and disabled online-service fallback.
 
@@ -293,3 +294,33 @@ The firmware contains a song
 catalogue, not the complete song media collection. A port must report unavailable
 media and server failures truthfully. Decoding success does not establish 1:1
 fidelity or a working Windows release.
+
+The native host now uses separate `PlayListHandler` and `SongDownListHandler`
+database workers. The download list feeds the combined queue count, grid selected
+titles and original duplicate identity rules. `OriginalDownloadSelection` ports
+the APK's `LocalOnlineSongManager.downloadFirstSong` selection: stop/reentry
+guards, state 202 for every matching song ID, notification before media URL
+request, and action 1 for non-Evideo types. Stop leaves an active request intact;
+reset assigns state 200 and keeps the stop flag. Bytecode evidence is in cloud
+run 37412900457, `original-song-playlist-bytecode`, including its DEX provenance
+manifest. Media URL requests, transfer cancellation and progress/update registry
+requests currently reach explicit pending host services. This does not establish
+working music downloads. Native startup remains unlinked, with no registered
+karaoke storage or connected original server; admission gates remain in force.
+
+Successful `native-windows.yml` runs now include `VietK-Windows-test-build` for
+30 days. Extract the artifact and its contained ZIP completely, then open
+`VietK.NativePort.exe`. The package includes the x64 .NET runtime, DLLs, original
+resources and `START-HERE.txt`; the EXE depends on the sibling files. Cloud run
+37413264712 verified the initial packaging change. Latest verified build details
+should be checked on the run, rather than inferred from the branch head.
+
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37414069285
+at commit `c8a062a` passed the core checks, native Windows compilation/capture,
+and complete test ZIP packaging. Report
+`artifacts/native-verification-v19/verification.json` confirms
+`nativeDownloadWorkerSelectionIntegrationVerified`. Its backend fixture uses
+actual firmware song 101000, verifies state 202, unchanged remote flag 0,
+independent worker persistence and combined identity, then verifies clear/reset.
+It explicitly bypasses storage/server admission and does not claim a media file
+or live request succeeded. Servers, television and playback remain pending.
