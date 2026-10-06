@@ -26,21 +26,21 @@ internal static class NativeBroadcastVolumeVerification
                 using var tap=new NativePlaybackVerification.PcmTap(playback.Decoder.Native);
                 playback.SetIdleVideo(fixture);await Ready(playback,15);
                 Require(playback.Source==PlaybackSource.Idle&&playback.Decoder.OutputVolumeStep==3&&playback.Decoder.AppliedVolumePercent==15,"Idle did not use separate configured gain");
-                var idlePower=await NativePlaybackVerification.UntilPower(tap,440,value=>value>1e-12,"Configured idle gain produced no PCM");
+                var idlePower=await UntilStereoPower(tap,value=>value>1e-12,"Configured idle gain produced no PCM");
                 playback.BroadcastVolumeSettings.Save(10,true);
                 Require(playback.Decoder.OutputVolumeStep==3&&!playback.BroadcastSessionMuted,"Saved idle settings took effect before restart");
-                await NativePlaybackVerification.UntilPower(tap,440,value=>Near(value,idlePower),"Saving restart-only settings changed idle PCM");
+                await UntilStereoPower(tap,value=>Near(value,idlePower),"Saving restart-only settings changed idle PCM");
                 playback.Command("volinc");Require(playback.BroadcastSessionVolume==4&&playback.Decoder.OutputVolumeStep==4&&playback.Decoder.AppliedVolumePercent==20,"Idle increment did not affect its session gain");
-                var louderIdlePower=await NativePlaybackVerification.UntilPower(tap,440,value=>value>idlePower*1.15,"Idle increment did not increase actual PCM");
+                var louderIdlePower=await UntilStereoPower(tap,value=>value>idlePower*1.15,"Idle increment did not increase actual PCM");
                 Require(new OriginalBroadcastVolumeSettings(directory).Volume==10,"Idle increment overwrote configured gain");
                 Require(playback.PlayMedia(fixture,preserveStereo:true),"Song transition rejected fixture");await Ready(playback,35);
                 Require(playback.Decoder.OutputVolumeStep==7&&playback.Decoder.AppliedVolumePercent==35,"Idle gain leaked into next song");
-                var songPower=await NativePlaybackVerification.UntilPower(tap,440,value=>value>louderIdlePower*1.15,"Song transition did not restore actual song PCM gain");
+                var songPower=await UntilStereoPower(tap,value=>value>louderIdlePower*1.15,"Song transition did not restore actual song PCM gain");
                 playback.Command("voldec");Require(playback.Decoder.OutputVolumeStep==6,"Song volume decrement failed");
-                var quieterSongPower=await NativePlaybackVerification.UntilPower(tap,440,value=>value<songPower*.95&&value>1e-12,"Song decrement did not reduce actual PCM");
+                var quieterSongPower=await UntilStereoPower(tap,value=>value<songPower*.95&&value>1e-12,"Song decrement did not reduce actual PCM");
                 Require(playback.StartIdleDemo(),"Return to idle failed");await Ready(playback,20);
                 Require(playback.Decoder.OutputVolumeStep==4,"Idle loop lost session volume");
-                await NativePlaybackVerification.UntilPower(tap,440,value=>Near(value,louderIdlePower),"Idle return lost actual session PCM gain");
+                await UntilStereoPower(tap,value=>Near(value,louderIdlePower),"Idle return lost actual session PCM gain");
                 playback.BroadcastVolumeSettings.Save(8,false);
                 var panel=new Canvas { Width=1280,Height=800,Background=Brushes.Black };host.Content=new Viewbox { Child=panel };
                 var dialog=new OriginalBroadcastVolumeDialog(panel,playback.BroadcastVolumeSettings);host.UpdateLayout();
@@ -52,9 +52,9 @@ internal static class NativeBroadcastVolumeVerification
                 var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(frame));using(var file=File.Create(Path.Combine(output,"synthetic-broadcast-volume-dialog.png")))encoder.Save(file);
                 dialog.Overlay.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonDownEvent });
                 Require(!panel.Children.Contains(dialog.Overlay)&&playback.BroadcastVolumeSettings.Volume==9&&playback.Decoder.OutputVolumeStep==4,"Dismiss did not save draft or changed live idle audio");
-                await NativePlaybackVerification.UntilPower(tap,440,value=>Near(value,louderIdlePower),"Dialog dismissal changed idle PCM before restart");
+                await UntilStereoPower(tap,value=>Near(value,louderIdlePower),"Dialog dismissal changed idle PCM before restart");
                 Require(playback.PlayMedia(fixture,preserveStereo:true),"Song resume after idle rejected");await Ready(playback,30);Require(playback.Decoder.OutputVolumeStep==6,"Song session gain lost across idle playback");
-                await NativePlaybackVerification.UntilPower(tap,440,value=>Near(value,quieterSongPower),"Idle return lost actual song session PCM gain");
+                await UntilStereoPower(tap,value=>Near(value,quieterSongPower),"Idle return lost actual song session PCM gain");
             }
             saved.Save(10,true);
             using(var restarted=new NativePlayback(new BottomBar(root,contract),directory))
@@ -68,7 +68,7 @@ internal static class NativeBroadcastVolumeVerification
                 Require(restarted.PlayMedia(fixture,preserveStereo:true),"Muted idle song transition rejected");await Ready(restarted,35);
                 Require(restarted.Decoder.OutputVolumeStep==7&&restarted.Decoder.AppliedVolumePercent==35,"Idle mute affected next song");
                 Require(restarted.VolumeUnavailableReason.Length==0,"Song retained idle adjustment restriction");
-                await NativePlaybackVerification.UntilPower(tap,440,value=>value>1e-12,"Idle mute left next song PCM silent");
+                await UntilStereoPower(tap,value=>value>1e-12,"Idle mute left next song PCM silent");
             }
             File.WriteAllText(Path.Combine(output,"broadcast-volume-verification.json"),JsonSerializer.Serialize(new {
                 separateIdleGainApplied=true,savedSettingsWaitForRestart=true,idleSessionChangesDoNotOverwriteConfig=true,
@@ -92,6 +92,17 @@ internal static class NativeBroadcastVolumeVerification
     private static void Click(OriginalBroadcastVolumeDialog dialog,string name)=>Descendants(dialog.Overlay).Single(x=>Equals(x.Tag,"broadcast-volume:"+name)).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
     private static IEnumerable<FrameworkElement> Descendants(DependencyObject parent)
     { for(var i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++) { var child=VisualTreeHelper.GetChild(parent,i);if(child is FrameworkElement element)yield return element;foreach(var next in Descendants(child))yield return next; } }
+    private static async Task<double> UntilStereoPower(NativePlaybackVerification.PcmTap tap,Func<double,bool> accepted,string message)
+    {
+        var deadline=DateTime.UtcNow.AddSeconds(5);double power;
+        do
+        {
+            var samples=await NativePlaybackVerification.CaptureSamples(tap);
+            power=Math.Min(NativePlaybackVerification.PcmTap.Power(samples,440,0),NativePlaybackVerification.PcmTap.Power(samples,880,1));
+            if(accepted(power))return power;
+        }while(DateTime.UtcNow<deadline);
+        throw new InvalidDataException(message+"; decoded stereo power="+power);
+    }
     private static bool Near(double value,double reference)=>value>=reference*.8&&value<=reference*1.2;
     private static void Require(bool value,string message) { if(!value)throw new InvalidDataException(message); }
 }

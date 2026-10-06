@@ -487,7 +487,7 @@ public static class NativePlaybackVerification
         // It also rejects even a brief non-silent output while muted.
         return samples.Max(sample=>Math.Abs(sample/32768d));
     }
-    private static async Task<short[]> CaptureSamples(PcmTap tap)
+    internal static async Task<short[]> CaptureSamples(PcmTap tap)
     {
         tap.Reset();await Task.Delay(400);
         var samples=tap.Read();
@@ -509,7 +509,7 @@ public static class NativePlaybackVerification
         catch(InvalidDataException error) { throw new InvalidDataException(message+"; "+error.Message,error); }
         throw new InvalidDataException(message+"; measured PCM peak="+peak+"; "+tap.OutputState);
     }
-    internal static async Task<double> UntilPower(PcmTap tap,int frequency,Func<double,bool> accepted,string message)
+    private static async Task<double> UntilPower(PcmTap tap,int frequency,Func<double,bool> accepted,string message)
     {
         var deadline=DateTime.UtcNow.AddSeconds(5);double power;
         do { power=await MeasurePower(tap,frequency);if(accepted(power))return power; } while(DateTime.UtcNow<deadline);
