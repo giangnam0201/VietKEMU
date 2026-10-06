@@ -32,7 +32,12 @@ public sealed class NativeCollectionControls
     public void Collect(int id)
     {
         var result=profiles.Toggle(id);
-        if(result==CollectionToggleResult.LoginRequired) { Login(()=>Collect(id));return; }
+        if(result==CollectionToggleResult.LoginRequired)
+        {
+            // MuiltCollectListManager retries addItem after login, not another
+            // toggle. An existing favorite in that profile must remain saved.
+            Login(()=> { if(!profiles.Contains(id))Collect(id); });return;
+        }
         Feedback(result switch {
             CollectionToggleResult.Added=>"Sưu tập thành công",
             CollectionToggleResult.Removed=>"Hủy bộ sưu tập",

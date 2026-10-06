@@ -55,11 +55,13 @@ internal static class NativeCollectionVerification
             Require(((BitmapImage)Favorite().Source).UriSource.LocalPath==Path.GetFullPath(Path.Combine(root,contract.Icons["button_add_song_item_collected_normal"].File)),"Favorite icon did not reflect confirmed profile");
             Require(new OriginalCollectionProfiles(directory).Contains(1),"Native favorite was not persisted");Capture("original-collection-confirmed.png");
             Require(Descendants<Border>(panel).Count(border=>Equals(border.Tag,"collection-feedback"))==1&&controls.LastFeedback=="Sưu tập thành công","Collection feedback overlapped an earlier validation message");
+            controls.Logout();await ClickFavorite();Confirm("fixture","fixture");
+            Require(model.Contains(1)&&new OriginalCollectionProfiles(directory).Contains(1),"Pending add after login removed an existing profile favorite");
             await ClickFavorite();Require(!model.Contains(1)&&new OriginalCollectionProfiles(directory).Snapshot().Count==0,"Favorite icon did not remove persisted song");
             controls.Logout();await ClickFavorite();controls.Close();Require(!model.Contains(1),"Cancel collected a pending song");
             controls.Login();Confirm("fixture","wrong");Require(model.CurrentUser.Length==0&&controls.Username is not null&&controls.Username.Text.Length==0&&controls.Password!.Password.Length==0,"Failed login changed session or did not clear fields");
             Confirm("fixture","fixture");Require(model.CurrentUser=="fixture"&&model.Snapshot().Count==0,"Existing native profile login failed");
-            File.WriteAllText(Path.Combine(output,"collection-verification.json"),JsonSerializer.Serialize(new { actualGridIcon=true,pendingFavoriteAfterLogin=true,confirmedIcon=true,persistedAddRemove=true,cancelPreservesCollection=true,wrongPasswordClearsFields=true,singleFeedbackMessage=true,twoWindows=true,fullCollectionFragment=false },new JsonSerializerOptions { WriteIndented=true }));
+            File.WriteAllText(Path.Combine(output,"collection-verification.json"),JsonSerializer.Serialize(new { actualGridIcon=true,pendingFavoriteAfterLogin=true,pendingAddPreservesExistingFavorite=true,confirmedIcon=true,persistedAddRemove=true,cancelPreservesCollection=true,wrongPasswordClearsFields=true,singleFeedbackMessage=true,twoWindows=true,fullCollectionFragment=false },new JsonSerializerOptions { WriteIndented=true }));
             void Capture(string name)
             {
                 panel.UpdateLayout();panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));
