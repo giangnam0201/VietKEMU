@@ -208,6 +208,18 @@ The host does not insert remote entries directly into the local queue or claim a
 download occurred. An isolated Windows fixture checks admission against a real
 catalogue song and the packaged plugin inventory without starting a download.
 
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37399225198
+passed original item construction/MIDI case sensitivity, first-row NAS matching,
+local/download append/Top routing, gate precedence/effects, handled-versus-success,
+service/MIDI rate exclusions, required song lookup and report selection/launch
+checks. Packaging verified all 23 manifests and their original feedback strings.
+The Windows capture reports `nativeOrderPluginAdmissionVerified: true` and
+`firmwareReportTableActivityCount: 0`: this firmware's declaration inventory has
+no matching report-table activity. The real catalogue click therefore reaches
+the original NoStorage rejection without adding to either queue. Report:
+`artifacts/native-verification-v17/verification.json`. This verifies admission;
+it does not establish functional downloading, system-toast fidelity or playback.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37398160720
 passed the worker/FIFO/failure checks and native Windows build/capture. Its
 isolated queue fixture verifies append/delete persistence, start-play request
