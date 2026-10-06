@@ -50,7 +50,15 @@ def main():
                 raw = work / f'{partition}.raw.img'
                 subprocess.run(['simg2img', str(image), str(raw)], check=True)
                 image = raw
-            extract_ext4(image, work / partition)
+            # debugfs emits ownership warnings when run without root. Keep its
+            # diagnostics in the artifact rather than flooding the Actions log.
+            destination = work / partition
+            destination.mkdir(parents=True, exist_ok=True)
+            with (output / f'{partition}-extraction.log').open('w') as log:
+                subprocess.run(['debugfs', '-R', f'rdump / {destination}', str(image)],
+                               stdout=log, stderr=subprocess.STDOUT, check=True)
+            if not any(destination.iterdir()):
+                raise RuntimeError(f'No files extracted from {image}')
     if not partitions:
         raise RuntimeError('Unknown OTA format; inspect inventory before adapting extraction')
     applications = []
@@ -58,9 +66,10 @@ def main():
     for partition in partitions:
         for apk in sorted((work / partition).rglob('*.apk')):
             result = subprocess.run(['aapt', 'dump', 'badging', str(apk)],
-                                    capture_output=True, text=True, check=True)
+                                    capture_output=True, text=True)
             applications.append({'path': apk.relative_to(work).as_posix(),
-                                 'bytes': apk.stat().st_size, 'badging': result.stdout})
+                                 'bytes': apk.stat().st_size, 'badging': result.stdout,
+                                 'badging_exit': result.returncode, 'badging_error': result.stderr})
             if apk.parent.name.lower() in ('dcservice', 'dualkmbox') or any(
                     term in result.stdout.lower() for term in ('kmdatacenter', 'dualkmbox')):
                 selected.append(apk)

@@ -113,11 +113,13 @@ identified loopback login/media server through the cache and queues into the
 real decoder, and checks decoded frames and PCM. Those fixtures are not shipped
 as songs and do not prove access to VietK's production music library.
 
-Build run `37422777784` (commit `5243e80`) passed signed loopback login, media
+Build run `37426293698` (commit `6ef22d4`) passed signed loopback login, media
 lookup, download, cache and queue promotion through the real Windows decoder.
 It also verified decoded video pixels, left/right and multiple-stream PCM,
 pause/resume, seek, replay, volume amplitude and decoder completion. The native
-test ZIP is available under `artifacts/windows-test-v18` locally. These results
+test ZIP is published as the `VietK-Windows-test-build` GitHub Actions artifact.
+Core transfer checks also cover three write attempts after the separate length
+probe, exact recovered bytes, retry notifications and cancellation cleanup. These results
 are distinct from the unsuccessful production media lookup described above.
 
 `tools/probe_music_server.py` provides an operator-authorized live diagnostic
