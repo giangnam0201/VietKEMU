@@ -22,7 +22,8 @@ jobs:
           app = Path('decoded/dualkmbox')
           apktool = app / 'apktool'
           output = Path('bytecode-review')
-          classes = {'SongDAO', 'SongIdDAO', 'MediaDAO', 'WholeSongDAO', 'Song', 'Media',
+          classes = {'SongDAO', 'SongIdDAO', 'MediaDAO', 'WholeSongDAO', 'SelectedListDAO', 'Song', 'Media',
+                     'PlayListDAOManager',
                      'PlayListManager', 'KmPlayListItem', 'SelectedLocalListManager',
                      'SongDownListManager', 'OrderSongManger', 'ReportTableManager',
                      'MuiltCollectListManager', 'SongRecyclerGridViewAdapter', 'UpdateDbManager'}
