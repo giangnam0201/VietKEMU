@@ -65,6 +65,7 @@ public static class Program
             OriginalDownloadQueue? downloadQueue=null;
             NativePlayback? playback=null;
             OriginalQueueRemote? originalRemote=null;
+            OriginalCollectionBrowser? collectionBrowser=null;
             using var musicServer=new NativeMusicServer(app.Dispatcher,stateDirectory,id=>songState.GetSongById(id));
             IReadOnlyList<SongMedia> AvailableMedia(int id)=>musicServer.Get(id) is { } cached?
                 new[]{cached.Metadata}.Concat(songState.GetMedia(id)).ToArray():songState.GetMedia(id);
@@ -87,6 +88,7 @@ public static class Program
                 if(playback?.Source!=PlaybackSource.YouTube)bottom.SetConfirmedQueueCount(combined.Length);
                 originalRemote?.Refresh();
                 queueBrowser?.SetConfirmedQueuedSongs(combined.Select(item=>item.SongMetadata.Id).ToHashSet());
+                collectionBrowser?.RefreshMedia();
             }
             selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
                 command=> { if(!queueDispatcher.Post(command))throw new InvalidOperationException("Playlist database worker stopped"); },
@@ -169,6 +171,13 @@ public static class Program
             var collectionProfiles=new OriginalCollectionProfiles(stateDirectory);
             var collectionControls=new NativeCollectionControls(collectionProfiles,
                 ()=>app.MainWindow?.Content is Viewbox { Child:Canvas panel }?panel:null,browser.SetConfirmedCollectedSongs);
+            using var collectionScreen=new OriginalCollectionBrowser(root,collectionProfiles,songState.GetSongById,
+                ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected),
+                ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).ToArray(),collectionControls,gridContract);
+            collectionBrowser=collectionScreen;
+            collectionScreen.ActionRequested+=(song,action)=>
+            { if(action is "order" or "top")songOrder.Request(song.Id,action=="top"); };
+            musicServer.ConnectionChanged+=collectionScreen.RefreshMedia;
             browser.SongActionRequested+=(song,action)=>
             {
                 if(action is "order" or "top")songOrder.Request(song.Id,action=="top");
@@ -177,7 +186,7 @@ public static class Program
             Canvas Panel(int screen = 0)
             {
                 var panel = screen switch { 34 when youtube is not null => youtube.Create(),
-                    38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
+                    38 => more.Create(), 14 => collectionScreen.Create(), 2 => browser.Create(), _ => renderer.Create() };
                 TextElement.SetFontFamily(panel, OriginalFont.Family);
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
@@ -552,6 +561,8 @@ public static class Program
                 if (fragment is 38 or 2 or 34) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment==2?34:fragment) };
             };
             more.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
+            more.NavigationRequested+=fragment=> { if(fragment==14)window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(14) }; };
+            collectionScreen.HomeRequested+=()=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel() };
             browser.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
             return app.Run(window);
         }

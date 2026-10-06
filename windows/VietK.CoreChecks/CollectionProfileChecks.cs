@@ -13,6 +13,7 @@ internal static class CollectionProfileChecks
             Require(profile.Toggle(1)==CollectionToggleResult.LoginRequired,"Favorite bypassed collection login");
             Require(profile.Login("a","pass")==CollectionLoginResult.InvalidLength,"Short profile accepted");
             Require(profile.Login("evil\\path","pass")==CollectionLoginResult.InvalidFilename,"Windows path escape accepted");
+            Require(profile.Login("user/one","pass/one",calibrate:false)==CollectionLoginResult.InvalidFilename,"Inline collection form silently calibrated a filename");
             Require(profile.Login("user/one","pass/one")==CollectionLoginResult.Success&&profile.CurrentUser=="user_one","Original slash calibration or creation failed");
             Require(profile.Toggle(10)==CollectionToggleResult.Added&&profile.Toggle(20)==CollectionToggleResult.Added,"Favorite did not persist");
             var restored=new OriginalCollectionProfiles(root);

@@ -17,6 +17,7 @@ public sealed record MoreContract(MoreTile[] Tiles, double BackX, double BackY, 
 public sealed class MoreScreen(string root, MoreContract contract, HomeContract home)
 {
     public event Action? HomeRequested;
+    public event Action<int>? NavigationRequested;
     public Canvas Create()
     {
         var canvas = new Canvas
@@ -26,10 +27,12 @@ public sealed class MoreScreen(string root, MoreContract contract, HomeContract 
             { Stretch = Stretch.UniformToFill }
         };
         var tileFactory = new HomeScreen(root, home);
+        tileFactory.NavigationRequested+=fragment=> { if(fragment>=0)NavigationRequested?.Invoke(fragment); };
         foreach (var data in contract.Tiles)
         {
-            var tile = tileFactory.Tile(data.Image, data.Text, data.Width, -1, data.Height, data.TextBottom,
+            var tile = tileFactory.Tile(data.Image, data.Text, data.Width, data.Id=="fl_favorite"?14:-1, data.Height, data.TextBottom,
                 data.TextPadding, data.Multilingual, data.SingleLine);
+            tile.Tag=data.Id;
             Canvas.SetLeft(tile, data.X); Canvas.SetTop(tile, data.Y); canvas.Children.Add(tile);
         }
         var back = new Border

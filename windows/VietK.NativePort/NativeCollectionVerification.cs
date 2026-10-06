@@ -61,12 +61,80 @@ internal static class NativeCollectionVerification
             controls.Logout();await ClickFavorite();controls.Close();Require(!model.Contains(1),"Cancel collected a pending song");
             controls.Login();Confirm("fixture","wrong");Require(model.CurrentUser.Length==0&&controls.Username is not null&&controls.Username.Text.Length==0&&controls.Password!.Password.Length==0,"Failed login changed session or did not clear fields");
             Confirm("fixture","fixture");Require(model.CurrentUser=="fixture"&&model.Snapshot().Count==0,"Existing native profile login failed");
+            await VerifyBrowser();
             File.WriteAllText(Path.Combine(output,"collection-verification.json"),JsonSerializer.Serialize(new { actualGridIcon=true,pendingFavoriteAfterLogin=true,pendingAddPreservesExistingFavorite=true,confirmedIcon=true,persistedAddRemove=true,cancelPreservesCollection=true,wrongPasswordClearsFields=true,singleFeedbackMessage=true,twoWindows=true,fullCollectionFragment=false },new JsonSerializerOptions { WriteIndented=true }));
             void Capture(string name)
             {
                 panel.UpdateLayout();panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));
                 var bitmap=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);bitmap.Render(panel);
                 var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(Path.Combine(output,name));encoder.Save(file);
+            }
+            async Task VerifyBrowser()
+            {
+                var songs=Enumerable.Range(1,12).ToDictionary(id=>id,id=>new LocalSong(id,$"Fixture song {id}","F",2,"Fixture Singer",[],[0],[8],0,0,0,null,null,1,null,id==10?0:1,id==11?1:0));
+                for(var id=1;id<=12;id++)Require(model.Toggle(id)==CollectionToggleResult.Added,"Browser fixture favorite failed");
+                model.Logout();var connected=false;
+                var orders=new List<SelectedPlaylistItem> { new(songs[1],1,null,null),new(songs[2],2,null,null) };
+                Canvas? browserPanel=null;var browserControls=new NativeCollectionControls(model,()=>browserPanel,_=>{});
+                using var browser=new OriginalCollectionBrowser(root,model,id=>songs.GetValueOrDefault(id),()=>new(true,connected),()=>orders,browserControls,contract);
+                var actions=new List<(int Id,string Action)>();browser.ActionRequested+=(song,action)=>actions.Add((song.Id,action));
+                var home=0;browser.HomeRequested+=()=>home++;
+                void Show()
+                { browserPanel=browser.Create();host.Content=new Viewbox { Child=browserPanel };host.UpdateLayout(); }
+                async Task Click(FrameworkElement target)
+                {
+                    host.Activate();host.UpdateLayout();var point=target.PointToScreen(new Point(target.ActualWidth/2,target.ActualHeight/2));
+                    Require(SetCursorPos((int)point.X,(int)point.Y),"Could not position browser fixture pointer");await Task.Delay(70);
+                    target.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
+                }
+                async Task Login(string user,string password)
+                {
+                    browser.Username!.Text=user;browser.Password!.Password=password;
+                    browser.LoginButton!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Require(browser.LoginProgress!.Visibility==Visibility.Visible&&browser.LoginButton.Visibility==Visibility.Hidden,"Inline collection login did not display its progress state");
+                    var limit=Environment.TickCount64+3000;
+                    while(browser.LoginProgress.Visibility==Visibility.Visible&&Environment.TickCount64<limit)await Task.Delay(20);
+                    Require(browser.LoginProgress.Visibility!=Visibility.Visible,"Inline login did not finish");host.UpdateLayout();
+                }
+                void BrowserCapture(string name)
+                {
+                    host.UpdateLayout();var frame=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);frame.Render(browserPanel!);
+                    var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(frame));using var file=File.Create(Path.Combine(output,name));encoder.Save(file);
+                }
+                FrameworkElement Tagged(string tag)=>Descendants<FrameworkElement>(browserPanel!).Single(element=>Equals(element.Tag,tag));
+                Show();await Task.Delay(300);
+                Require(browser.Rows.Count==0&&Descendants<TextBlock>(browserPanel!).Any(text=>text.Text=="Danh sách rỗng"),"Logged-out collection exposed songs");
+                BrowserCapture("original-collection-browser-logged-out.png");
+                await Login("fixture","wrong");Require(model.CurrentUser.Length==0&&browser.Username!.Text.Length==0&&browser.Password!.Password.Length==0,"Inline wrong password did not reset the account panel");
+                await Login("fixture","fixture");
+                Require(browser.Rows.Select(song=>song.Id).SequenceEqual(new[]{1,2,3,4,5,6,7,8,9,12}),"Collection browser did not use local/PSL visibility in stored order");
+                Require(browser.Username!.Visibility==Visibility.Visible&&browser.Username.Parent is Border { Visibility:Visibility.Hidden }&&Equals(browser.LoginButton!.Content,"Thoát ra"),"Logged-in collection did not retain hidden field layout/logout");
+                var first=(Canvas)Tagged("collection-row:1");var second=(Canvas)Tagged("collection-row:2");
+                Require(first.Width==744&&first.Height==74&&first.TranslatePoint(new Point(),browserPanel!).X==second.TranslatePoint(new Point(),browserPanel!).X,"Collection used a grid instead of the active full-width row layout");
+                Require(Descendants<TextBlock>(first).Any(text=>text.Text=="[Đang phát]")&&Descendants<TextBlock>(second).Any(text=>text.Text=="[Đặt trước 1]"),"Original collection queue labels differ");
+                await Click(Tagged("collection-top:2"));await Click(first);
+                Require(actions.SequenceEqual(new[]{(2,"top"),(1,"order")}),"Collection action icon ordered twice or dispatched the wrong song");
+                Require(Descendants<Canvas>(browserPanel!).Count(canvas=>Equals(canvas.Tag,"collection-order-animation"))==2,"Original collection order animations did not appear");
+                await Task.Delay(600);Require(!Descendants<Canvas>(browserPanel!).Any(canvas=>Equals(canvas.Tag,"collection-order-animation")),"Completed collection order animation was not removed");
+                await Click(Tagged("collection-favorite:2"));Require(!model.Contains(2)&&browser.Rows.Any(song=>song.Id==2),"Collection removal did not preserve the original adapter row until reload");
+                host.UpdateLayout();Require(((BitmapImage)((Image)Tagged("collection-favorite:2")).Source).UriSource.LocalPath==Path.GetFullPath(Path.Combine(root,contract.Icons["button_add_song_item_collect"].File)),"Removed collection row retained the filled star");
+                await Click(Tagged("collection-favorite:2"));Require(model.Contains(2),"Retained collection row could not be collected again");
+                var scroller=(ScrollViewer)Tagged("collection-scroll");scroller.ScrollToEnd();host.UpdateLayout();await Task.Delay(50);
+                Require(scroller.VerticalOffset>200,"Continuous collection scrolling did not reach remaining songs");
+                BrowserCapture("original-collection-browser-scrolled.png");
+                scroller.ScrollToTop();host.UpdateLayout();BrowserCapture("original-collection-browser-logged-in.png");
+                connected=true;orders.Clear();orders.Add(new(songs[10],1,null,null));Show();await Task.Delay(300);
+                Require(browser.Rows.Any(song=>song.Id==10)&&Descendants<TextBlock>((Canvas)Tagged("collection-row:10")).Any(text=>text.Text=="[Đặt trước 1]"),"Connected remote visibility/online-head queue offset differs");
+                await Click((FrameworkElement)Tagged("collection-back"));Require(home==1,"Original collection back route is missing");
+                var homeContract=JsonSerializer.Deserialize<HomeContract>(File.ReadAllText(Path.Combine(root,"home.json")),new JsonSerializerOptions { PropertyNameCaseInsensitive=true })!;
+                var moreContract=JsonSerializer.Deserialize<MoreContract>(File.ReadAllText(Path.Combine(root,"more.json")),new JsonSerializerOptions { PropertyNameCaseInsensitive=true })!;
+                var more=new MoreScreen(root,moreContract,homeContract);var route=-1;more.NavigationRequested+=value=>route=value;
+                browserPanel=more.Create();host.Content=new Viewbox { Child=browserPanel };await Click(Tagged("fl_favorite"));Require(route==14,"More favorite tile did not request original fragment 14");
+                Show();browser.LoginButton!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                Require(model.CurrentUser.Length==0&&browser.Rows.Count==0&&Equals(browser.LoginButton.Content,"đăng nhập"),"Collection sidebar logout did not reset rows/fields");
+                Require(Application.Current.Windows.Count==2,"Collection browsing introduced a third window");
+                File.WriteAllText(Path.Combine(output,"collection-browser-verification.json"),JsonSerializer.Serialize(new { originalMoreRoute=true,inlineLoginProgress=true,wrongPasswordResetsFields=true,activeSingleColumnRows=true,originalQueueLabels=true,originalOnlineHeadOffset=true,orderAndTopCallbacks=true,orderAnimationsAppearAndFinish=true,removeRetainsRowUntilReload=true,recollectRetainedRow=true,continuousScroll=true,originalVisibilityAndPslFilter=true,backAndLogout=true,twoWindows=true,loginArtworkAvailable=browser.LoginArtworkAvailable,manufacturerDownloadsVerified=false,previewAndSingerHandlersPorted=false },new JsonSerializerOptions { WriteIndented=true }));
+                host.Content=new Viewbox { Child=panel };
             }
         }
         finally

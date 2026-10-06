@@ -35,6 +35,7 @@ for name in names:
 add(sdcard, 'kmbox/resource/60003950.mp4', 'player/60003950.mp4', 'dualkmbox.apk/assets/sdcard.zip')
 for name in ['dc_overseas_popup_close','dc_overseas_set_on','dc_overseas_set_off','ambience_barrage_item_line']:
     add(panel, f'res/drawable-mdpi-v4/{name}.png', f'ambience/{name}.png', 'dualkmbox.apk')
+add(panel,'res/drawable-mdpi-v4/icon_favorite_for_login.png','ambience/collection/icon_favorite_for_login.png','dualkmbox.apk')
 for name in ['ic_cut_song','ic_cut_song_press','ic_delete','ic_delete_press','ic_top_song','ic_top_song_press',
              'icon_youtube','play_list_select','play_list_select_light','selected_list_clear_all',
              'selected_list_shuffle','selected_song_playing','play_list_sung','play_list_sung_light',

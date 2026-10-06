@@ -27,12 +27,14 @@ public sealed class OriginalCollectionProfiles
     public bool Contains(int id)=>songs.Contains(id);
     public static string Calibrate(string value)=>value.Replace('/','_');
     private static bool SafePart(string value)=>!value.Contains(Separator,StringComparison.Ordinal)&&
-        !value.Any(c=>char.IsControl(c)||"\\:*?\"<>|".Contains(c))&&!value.EndsWith('.')&&!value.EndsWith(' ');
+        !value.Any(c=>char.IsControl(c)||"/\\:*?\"<>|".Contains(c))&&!value.EndsWith('.')&&!value.EndsWith(' ');
     private string? Find(string user)=>Directory.EnumerateFiles(directory).FirstOrDefault(path=>
         Path.GetFileName(path).Split(Separator,StringSplitOptions.None) is { Length:>=2 } pieces && pieces[0]==user);
-    public CollectionLoginResult Login(string user,string password)
+    public CollectionLoginResult Login(string user,string password,bool calibrate=true)
     {
-        user=Calibrate(user);password=Calibrate(password);
+        // Only CollectInputPwdView calibrates its fields. CollectFragment's
+        // inline form passes them directly to CollectFileManager.
+        if(calibrate) { user=Calibrate(user);password=Calibrate(password); }
         if(user.Length is <4 or >12 || password.Length is <4 or >12)return CollectionLoginResult.InvalidLength;
         if(!SafePart(user)||!SafePart(password))return CollectionLoginResult.InvalidFilename;
         try

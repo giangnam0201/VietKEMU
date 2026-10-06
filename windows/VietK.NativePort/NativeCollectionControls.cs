@@ -93,7 +93,7 @@ public sealed class NativeCollectionControls
     }
     internal void Close()
     { if(overlay is not null)host?.Children.Remove(overlay);overlay=null;Username=null;Password=null;Confirm=null; }
-    private void Feedback(string text)
+    internal void Feedback(string text)
     {
         feedbackTimer?.Stop();
         if(feedbackToast is not null)feedbackHost?.Children.Remove(feedbackToast);
