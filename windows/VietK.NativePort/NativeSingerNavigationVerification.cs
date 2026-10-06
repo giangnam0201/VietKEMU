@@ -119,6 +119,9 @@ internal static class NativeSingerNavigationVerification
             var firstCard=Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-card:100"));
             var secondCard=Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-card:101"));
             Require(Canvas.GetLeft(firstCard)==Canvas.GetLeft(secondCard)&&Canvas.GetTop(secondCard)>Canvas.GetTop(firstCard),"Horizontal directory grid lost its column-first order");
+            await VerifyPress(firstCard,.97);
+            await VerifyPress(Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-page:icon_next_page.png")),1.2);
+            Require(singerDirectory.CurrentPage==1&&navigation.Active is null,"Canceled press performed singer navigation or paging");
             await ClickElement(Descendants<Border>(directoryPanel).Single(element=>Equals(element.Tag,"singer-country:1")));
             Require(singerDirectory.Country==1&&singerDirectory.TypePopup?.IsOpen==true,"Country tab did not filter singers and show sex popup");
             await ClickElement(Descendants<Border>(singerDirectory.TypePopup!.Child).Single(element=>Equals(element.Tag,"singer-sex:2")));
@@ -137,7 +140,9 @@ internal static class NativeSingerNavigationVerification
             await ClickBack();Require(ReferenceEquals(host.Content,directoryView)&&singerDirectory.Input.Text=="ZZ"&&singerDirectory.Country==1&&singerDirectory.Sex==1,"Directory Back lost its filter/input state");
             singerDirectory.Input.Clear();await Task.Delay(100);singerDirectory.Input.Letter("NOMATCH");
             await Until(()=>singerDirectory.LoadedSingers.Count==0,"Directory zero-result query did not finish");
-            Require(singerDirectory.TotalPages==0,"Empty directory retained old page count");
+            Require(singerDirectory.TotalPages==0&&singerDirectory.CurrentPage==0,"Empty directory did not display the original 0/0 page state");
+            var pager=Descendants<StackPanel>(directoryPanel).Single(element=>Equals(element.Tag,"singer-directory-pager"));
+            Require(pager.Children.OfType<TextBlock>().Select(element=>element.Text).SequenceEqual(new[]{"0","/","0"}),"Rendered zero-result page labels differ");
             await ClickElement(Descendants<TextBlock>(directoryPanel).Single(element=>Equals(element.Tag,"singer-directory-home")));
             Require(directoryHome==1,"Directory title did not request Home");
             Require(Application.Current.Windows.Count==2,"Singer routing introduced an extra native window");
@@ -147,7 +152,8 @@ internal static class NativeSingerNavigationVerification
                 unknownSingerNoOp=true,restoresPreviousViewAndInput=true,restoredFooterUsesCurrentState=true,nestedSingerBack=true,collectionSingerRoute=true,
                 categoryDirectoryRequest=true,directoryScreen=true,directoryEightCards=true,directoryColumnFirst=true,
                 directoryCountrySexFilters=true,directoryBatchPrefetch=true,directoryExactIdRoute=true,directoryRetainedState=true,
-                directoryKeyboard=true,directoryZeroResults=true,twoWindows=true,manufacturerSingerPictures=false,directoryPopupArtwork=singerDirectory.OriginalPopupArtworkAvailable
+                directoryKeyboard=true,directoryZeroResults=true,directoryZeroPageLabels=true,singerPressScale=true,pagerPressScale=true,
+                pressCancellationRestoresScale=true,twoWindows=true,manufacturerSingerPictures=false,directoryPopupArtwork=singerDirectory.OriginalPopupArtworkAvailable
             },new JsonSerializerOptions { WriteIndented=true }));
             T Read<T>(string file)=>JsonSerializer.Deserialize<T>(File.ReadAllText(Path.Combine(root,file)),new JsonSerializerOptions { PropertyNameCaseInsensitive=true })!;
             void Decorate(Canvas canvas) { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);canvas.Children.Add(bar); }
@@ -163,6 +169,15 @@ internal static class NativeSingerNavigationVerification
                 var point=element.PointToScreen(new Point(element.ActualWidth/2,element.ActualHeight/2));
                 Require(SystemParameters.WorkArea.Contains(point)&&SetCursorPos((int)point.X,(int)point.Y),"Singer fixture control lay outside the desktop");await Task.Delay(70);
                 element.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount,System.Windows.Input.MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
+            }
+            async Task VerifyPress(FrameworkElement element,double expected)
+            {
+                host.UpdateLayout();var point=element.PointToScreen(new Point(element.ActualWidth/2,element.ActualHeight/2));
+                Require(SystemParameters.WorkArea.Contains(point)&&SetCursorPos((int)point.X,(int)point.Y),"Press fixture was outside the desktop");await Task.Delay(70);
+                element.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount,System.Windows.Input.MouseButton.Left) { RoutedEvent=UIElement.PreviewMouseLeftButtonDownEvent });
+                await Until(()=>element.RenderTransform is ScaleTransform scale&&Math.Abs(scale.ScaleX-expected)<.001&&Math.Abs(scale.ScaleY-expected)<.001,"Original pressed scale was not rendered");
+                element.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice,Environment.TickCount) { RoutedEvent=System.Windows.Input.Mouse.MouseLeaveEvent });
+                await Until(()=>element.RenderTransform is ScaleTransform scale&&Math.Abs(scale.ScaleX-1)<.001&&Math.Abs(scale.ScaleY-1)<.001,"Canceled press did not restore its scale");
             }
             void Capture(Canvas canvas,string file)
             {

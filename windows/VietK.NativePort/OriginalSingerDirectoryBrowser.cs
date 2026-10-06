@@ -92,6 +92,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
         batch=0;CurrentPage=1;singers.Clear();
         singers.AddRange(database.SingerDirectory.BySpell(spell,Country,Sex));
         TotalPages=(database.SingerDirectory.CountBySpell(spell,Country,Sex)+7)/8;
+        if(TotalPages==0)CurrentPage=0;
         RenderPage();
     }
     private void RenderCategories()
@@ -145,6 +146,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
             name.TextWrapping=TextWrapping.NoWrap;name.TextTrimming=TextTrimming.CharacterEllipsis;
             name.Background=Brush("#59000000");column.Children.Add(name);
             var item=new Border { Width=180,Height=212,Background=Brushes.Transparent,Child=column,Tag="singer-card:"+singer.Id };
+            OriginalPressFeedback.Bind(item,.97,true);
             // Horizontal GridLayoutManager has two spans: fill each column first.
             item.MouseLeftButtonUp+=(_,e)=> { if(drag is { } start&&Math.Abs(e.GetPosition(tiles).X-start.X)>30)return;
                 if(popup is not null)popup.IsOpen=false;SingerRequested?.Invoke(singer);e.Handled=true; };
@@ -158,6 +160,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
     {
         var path=File.Exists(SingerAsset(resource))?SingerAsset(resource):Path.Combine(root,resource);var button=new Border { Width=24,Height=30,Background=Brushes.Transparent,Tag="singer-page:"+resource,
             Child=File.Exists(path)?new Image { Source=new BitmapImage(new Uri(path)),Stretch=Stretch.None }:Label(fallback,24) };
+        OriginalPressFeedback.Bind(button,1.2);
         Click(button,action);return button;
     }
     private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,FontFamily=OriginalFont.Family,Foreground=Brushes.White,VerticalAlignment=VerticalAlignment.Center };
