@@ -70,3 +70,20 @@ jobs:
           name: native-windows-component
           path: artifacts/native-windows/
           retention-days: 7
+      - name: Package Windows test download
+        shell: pwsh
+        run: |
+          ./tools/package_windows_test.ps1 -PublishDirectory artifacts/native-windows -OutputDirectory artifacts/windows-test -BuildId "${{ github.run_number }}-${{ github.sha }}"
+          @'
+          ### Windows test build
+          Download **VietK-Windows-test-build** from this run's Artifacts section.
+          Extract the artifact, then extract the contained VietK-Windows ZIP completely and open **VietK.NativePort.exe**.
+          Windows x64; .NET is included. This is a partial native UI port; playback, downloads and TV output are still incomplete.
+          '@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VietK-Windows-test-build
+          path: artifacts/windows-test/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
