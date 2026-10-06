@@ -24,16 +24,23 @@ requested re-encode; ffprobe checks for both audio and video. Only a successful
 process result and a completed verified file create a cache marker. Cancellation
 kills the process tree and generation checks prevent an old fetch from starting
 after next/clear. Completed files are played by bundled libVLC in the independent
-TV window. No embedded player, WebView, stream URL extraction or automatic cookie
-collection is used. One queued song is fetched at a time. Next cancels the active
+TV window. No embedded player, WebView or stream URL extraction is used.
+Browser authentication is enabled only through an explicit Firefox selection.
+One queued song is fetched at a time. Next cancels the active
 fetch and advances; failures remain visible for retry/removal. Persistent queue
 restoration requires the user to press retry to start playback.
 
 The download tool may fail because of YouTube restrictions or extractor changes.
 An optional Netscape cookie file explicitly selected in the panel can supply the
-user's own YouTube login. The app records its path in `youtube-settings.json`;
-it does not automatically read browser cookies or copy credentials to GitHub.
-Public-only mode is the default, and the panel can clear the cookie setting.
+user's own YouTube login. The app records its path in `youtube-settings.json`.
+The Firefox button instead enables `--cookies-from-browser firefox` for search
+and download subprocesses. yt-dlp reads the local Firefox profile session when
+making the request; the app stores only the selected mode, not cookie values.
+No cookies or credentials are copied to GitHub. Public-only mode is the default,
+and the panel can clear either login option. Selecting a file disables Firefox
+mode; selecting Firefox clears the file selection. The verification command
+`--verify-youtube-firefox URL OUTPUT` uses Firefox only on an explicitly opted-in
+local PC; the GitHub live probe continues to use public-only mode.
 This integration does not bypass account entitlements, DRM or other access
 restrictions. It does not reuse VietK hardware IDs or tokens. No API key
 is required because this implementation uses yt-dlp search rather than the

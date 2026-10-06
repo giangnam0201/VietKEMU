@@ -42,7 +42,7 @@ public static class Program
                 ?? throw new InvalidDataException("Missing original song browser contract");
             var capturing = args.Length == 2 && args[0] == "--capture";
             var verifyingPlayback = args.Length == 3 && args[0] == "--verify-playback";
-            var verifyingYouTube = args.Length == 3 && args[0] == "--verify-youtube";
+            var verifyingYouTube = args.Length == 3 && args[0] is "--verify-youtube" or "--verify-youtube-firefox";
             var stateDirectory = capturing || verifyingPlayback || verifyingYouTube ? args[^1] : Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
             using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
@@ -178,7 +178,7 @@ public static class Program
             if (verifyingPlayback)
                 return NativePlaybackVerification.Run(app, Panel(), bottom, root, args[1], args[2]);
             if(verifyingYouTube)
-                return NativeYouTubeVerification.Run(app,Panel(),bottom,args[1],args[2]);
+                return NativeYouTubeVerification.Run(app,Panel(),bottom,args[1],args[2],args[0]=="--verify-youtube-firefox");
             if (args.Length == 2 && args[0] == "--capture")
             {
                 Directory.CreateDirectory(args[1]);

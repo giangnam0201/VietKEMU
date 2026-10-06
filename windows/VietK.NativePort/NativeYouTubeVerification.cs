@@ -8,7 +8,7 @@ namespace VietK.NativePort;
 
 static class NativeYouTubeVerification
 {
-    public static int Run(Application app,Canvas panel,BottomBar bottom,string url,string output)
+    public static int Run(Application app,Canvas panel,BottomBar bottom,string url,string output,bool useFirefoxCookies=false)
     {
         Directory.CreateDirectory(output);var window=new Window { Content=panel,Width=1280,Height=800 };
         using var playback=new NativePlayback(bottom,output);
@@ -19,7 +19,7 @@ static class NativeYouTubeVerification
             {
                 playback.ShowTelevision(window);
                 var id=YouTubeMusicClient.VideoId(url)??throw new ArgumentException("Invalid verification video URL");
-                var client=new YouTubeMusicClient(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(output,"cache"));
+                var client=new YouTubeMusicClient(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(output,"cache"),useFirefoxCookies:()=>useFirefoxCookies);
                 using var timeout=new CancellationTokenSource(TimeSpan.FromMinutes(4));
                 var path=await client.Download(new(id,"Public live verification video","",""),_=>{},timeout.Token);
                 downloaded=true;
@@ -41,6 +41,7 @@ static class NativeYouTubeVerification
             {
                 File.WriteAllText(Path.Combine(output,"youtube-verification.json"),JsonSerializer.Serialize(new {
                     realYouTubeDownload=downloaded,nativeVideoDecoded=decoded,embeddedPlayerUsed=false,
+                    firefoxLoginSelected=useFirefoxCookies,
                     error=failure,scope="One public YouTube video from this runner; no claim of universal availability or original VietK media parity."
                 },new JsonSerializerOptions { WriteIndented=true }));
                 app.Shutdown(exit);

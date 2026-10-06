@@ -15,6 +15,7 @@ public sealed class YouTubeMusicScreen : IDisposable
 {
     private readonly string root,queueFile,settingsFile;
     private string cookieFile="";
+    private bool useFirefoxCookies;
     private readonly NativePlayback playback;
     private readonly BottomBar bottom;
     private readonly YouTubeMusicClient client;
@@ -37,8 +38,12 @@ public sealed class YouTubeMusicScreen : IDisposable
         this.root=root;this.playback=playback;this.bottom=bottom;
         queueFile=Path.Combine(stateDirectory,"youtube-queue.json");
         settingsFile=Path.Combine(stateDirectory,"youtube-settings.json");
-        if(File.Exists(settingsFile))cookieFile=JsonSerializer.Deserialize<YouTubeSettings>(File.ReadAllText(settingsFile))?.CookiesFile??"";
-        client=new(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(stateDirectory,"youtube-music"),()=>cookieFile);
+        if(File.Exists(settingsFile))
+        {
+            var settings=JsonSerializer.Deserialize<YouTubeSettings>(File.ReadAllText(settingsFile));
+            cookieFile=settings?.CookiesFile??"";useFirefoxCookies=settings?.UseFirefoxCookies??false;
+        }
+        client=new(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(stateDirectory,"youtube-music"),()=>cookieFile,()=>useFirefoxCookies);
         if(File.Exists(queueFile))queue.AddRange((JsonSerializer.Deserialize<YouTubeVideo[]>(File.ReadAllText(queueFile))??[])
             .Where(video=>YouTubeMusicClient.VideoId(video.Id)==video.Id));
         playback.CommandOverride=Command;
@@ -70,8 +75,10 @@ public sealed class YouTubeMusicScreen : IDisposable
         var actions=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(actions);
         actions.Children.Add(Button("Thử lại",()=>_=PlayFirst()));actions.Children.Add(Button("Xóa hàng chờ",Clear));
         var login=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(login);
-        login.Children.Add(Button("Cookies YouTube…",ChooseCookies));
-        login.Children.Add(Button("Bỏ cookies",()=> { cookieFile="";SaveSettings();SetStatus("Chế độ công khai; không dùng phiên đăng nhập."); }));
+        login.Children.Add(Button("Firefox",()=> { cookieFile="";useFirefoxCookies=true;SaveSettings();
+            SetStatus("Đã chọn phiên YouTube từ Firefox trên máy này. Bấm Thử lại để tải bài."); }));
+        login.Children.Add(Button("File…",ChooseCookies));
+        login.Children.Add(Button("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings();SetStatus("Chế độ công khai; không dùng phiên đăng nhập."); }));
         status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=750;status.Height=52;Put(canvas,status,38,603);
         RefreshQueue();
         if(!string.IsNullOrWhiteSpace(query))_=Search();
@@ -204,11 +211,11 @@ public sealed class YouTubeMusicScreen : IDisposable
         var dialog=new Microsoft.Win32.OpenFileDialog { Title="Chọn file cookies YouTube của chính bạn (định dạng Netscape)",
             Filter="Cookie text files|*.txt|All files|*.*",CheckFileExists=true };
         if(dialog.ShowDialog()!=true)return;
-        cookieFile=dialog.FileName;SaveSettings();
+        cookieFile=dialog.FileName;useFirefoxCookies=false;SaveSettings();
         SetStatus("Đã chọn cookies của bạn. yt-dlp sẽ dùng phiên này cho yêu cầu YouTube; file ở lại trên máy này.");
     }
-    private void SaveSettings()=>File.WriteAllText(settingsFile,JsonSerializer.Serialize(new YouTubeSettings(cookieFile)));
-    private sealed record YouTubeSettings(string CookiesFile);
+    private void SaveSettings()=>File.WriteAllText(settingsFile,JsonSerializer.Serialize(new YouTubeSettings(cookieFile,useFirefoxCookies)));
+    private sealed record YouTubeSettings(string CookiesFile,bool UseFirefoxCookies=false);
     private void SetStatus(string value) { message=value;if(status is not null)status.Text=value; }
     private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,FontFamily=OriginalFont.Family,Foreground=Brushes.White,Margin=new(0,6,0,6) };
     private static Button Button(string text,Action action)

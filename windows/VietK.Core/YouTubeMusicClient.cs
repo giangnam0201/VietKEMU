@@ -9,8 +9,8 @@ public sealed record YouTubeVideo(string Id,string Title,string Channel,string T
 public sealed record YouTubeTransferProgress(long Received,long Total,string State);
 
 // Arguments never pass through a shell. Authentication is optional and only
-// uses a cookie file explicitly supplied by the user; no browser auto-discovery.
-public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirectory,Func<string?>? cookiesFile=null)
+// uses an explicitly selected cookie file or Firefox login; public-only is default.
+public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirectory,Func<string?>? cookiesFile=null,Func<bool>? useFirefoxCookies=null)
 {
     public static string? VideoId(string value)
     {
@@ -39,6 +39,8 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
             if(!File.Exists(file))throw new FileNotFoundException("The configured YouTube cookie file is missing; choose it again or clear it in the panel.");
             arguments.Add("--cookies");arguments.Add(Path.GetFullPath(file));
         }
+        else if(useFirefoxCookies?.Invoke()==true)
+        { arguments.Add("--cookies-from-browser");arguments.Add("firefox"); }
         return arguments;
     }
     public async Task<IReadOnlyList<YouTubeVideo>> Search(string query,CancellationToken cancellation)

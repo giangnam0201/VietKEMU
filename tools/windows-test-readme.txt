@@ -13,8 +13,10 @@ Main music source: YouTube (yt-dlp + native TV decoder)
 - Next, pause/play, replay and volume use the existing bottom controls.
 - yt-dlp, Deno, FFmpeg and ffprobe are bundled. No API key is needed for this mode.
 - YouTube availability varies; restricted/unavailable videos can fail to fetch.
-- If YouTube requires sign-in, Cookies YouTube can select your own exported
-  Netscape cookie file locally. Bo cookies disables it. Never share this file.
+- If YouTube requires sign-in, click Firefox to use your own local Firefox
+  YouTube session, then retry. Sign into YouTube in Firefox first if needed.
+  File... selects your own exported Netscape cookie file instead.
+  Bo dang nhap disables both options. Login stays on this PC, never in GitHub.
 - The downloaded video does not have VietK vocal/accompaniment track metadata.
   Choose a karaoke/instrumental upload for accompaniment.
 
