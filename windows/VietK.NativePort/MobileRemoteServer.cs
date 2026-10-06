@@ -189,7 +189,7 @@ public sealed class MobileRemoteServer : IDisposable
             .SelectMany(n=>n.GetIPProperties().UnicastAddresses).Select(a=>a.Address)
             .Where(a=>a.AddressFamily==AddressFamily.InterNetwork&&!IPAddress.IsLoopback(a)&&!a.ToString().StartsWith("169.254.")).Distinct().ToArray();
         foreach(var address in addresses)adapters.Items.Add(address.ToString());content.Children.Add(adapters);
-        var image=new System.Windows.Controls.Image { Width=240,Height=240,Margin=new(0,0,0,12) };content.Children.Add(image);
+        var image=new System.Windows.Controls.Image { Width=60,Height=60,Margin=new(0,0,0,12) };content.Children.Add(image);
         System.Windows.Media.RenderOptions.SetBitmapScalingMode(image,System.Windows.Media.BitmapScalingMode.NearestNeighbor);
         void Update()
         {

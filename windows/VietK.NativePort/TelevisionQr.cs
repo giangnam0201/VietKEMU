@@ -52,8 +52,7 @@ public sealed class TelevisionQr
     }
     public void ConfigureLocalRemote(string url)
     {
-        // User requested 75% smaller TV QR. The pairing panel keeps a larger
-        // scannable copy because this compact overlay can lose matrix detail.
+        // User requested 75% smaller QR codes: 45 on TV and 60 in the pairing panel.
         image.Width=image.Height=45;
         var pixels=OriginalMobileQr.Render(url,true);
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
