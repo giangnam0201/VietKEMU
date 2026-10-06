@@ -5,7 +5,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
+using Ellipse=System.Windows.Shapes.Ellipse;
+using Rectangle=System.Windows.Shapes.Rectangle;
 using VietK.Core;
 
 namespace VietK.NativePort;
@@ -138,7 +139,7 @@ public sealed class OriginalCollectionBrowser : IDisposable
         if(orders.Count>0&&orders[0].LocalFlag==0&&position>=0&&song.LocalFlag==0)position++;
         var tip=position==0?"[Đang phát]":position>0?$"[Đặt trước {position}]":"";
         var marker=Text(tip,18,double.NaN);marker.Foreground=Brush("#ffffe761");marker.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));
-        var tipWidth=new FormattedText(tip,System.Globalization.CultureInfo.GetCultureInfo("vi-VN"),FlowDirection.LeftToRight,new Typeface(OriginalFont.Family),18,Brushes.White,1).Width;
+        var tipWidth=new FormattedText(tip,System.Globalization.CultureInfo.GetCultureInfo("vi-VN"),FlowDirection.LeftToRight,new Typeface(OriginalFont.Family,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal),18,Brushes.White,1).Width;
         var title=Text(song.Name,28,double.NaN);title.MaxWidth=Math.Max(0,400-tipWidth);title.TextWrapping=TextWrapping.Wrap;title.TextTrimming=TextTrimming.CharacterEllipsis;title.MaxHeight=68;title.Foreground=tip.Length==0?Brushes.White:Brush("#ffffe761");title.Measure(new Size(title.MaxWidth,68));
         Put(row,title,15,(74-title.DesiredSize.Height)/2);Put(row,marker,15+title.DesiredSize.Width+6,27);
         var singer=Text(song.Singer.Replace(",",", "),24,100);singer.MaxHeight=68;singer.TextWrapping=TextWrapping.Wrap;singer.TextTrimming=TextTrimming.CharacterEllipsis;singer.Measure(new Size(100,68));

@@ -171,7 +171,7 @@ public static class Program
             var collectionProfiles=new OriginalCollectionProfiles(stateDirectory);
             var collectionControls=new NativeCollectionControls(collectionProfiles,
                 ()=>app.MainWindow?.Content is Viewbox { Child:Canvas panel }?panel:null,browser.SetConfirmedCollectedSongs);
-            using var collectionScreen=new OriginalCollectionBrowser(root,collectionProfiles,songState.GetSongById,
+            using var collectionScreen=new OriginalCollectionBrowser(root,collectionProfiles,id=>songState.GetSongById(id),
                 ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected),
                 ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).ToArray(),collectionControls,gridContract);
             collectionBrowser=collectionScreen;
