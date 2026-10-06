@@ -125,7 +125,7 @@ public sealed class OriginalDownloadQueue(Action<DownloadQueueCommand> post,Acti
         lock(items)
         {
             var item=items.FirstOrDefault(item=>item.SongMetadata.Id==songId);if(item is null)return;
-            item.SongName=name??"";item.SingerName=singer??"";item.PlayName=name??"";
+            item.SongName=name;item.SingerName=singer??"";item.PlayName=name??"";
             item.InfoId=item.PlayType+"||"+item.PlayId+"||"+item.PlayName;
         }
     }

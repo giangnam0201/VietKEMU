@@ -422,6 +422,8 @@ Require(!down.SetProgressBySong(20,0,99) && down.Snapshot().Where(item=>item.Son
     "Unknown maximum changed progress/result instead of only the downloading state");
 down.SetProgressBySong(20,1,2);Require(down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==100),"Download progress did not clamp above 100");
 down.SetProgressBySong(20,1,-1);Require(down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==0),"Download progress did not clamp below zero");
+down.SetProgressBySong(20,long.MaxValue,long.MaxValue);
+Require(down.Snapshot().Where(item=>item.SongMetadata.Id==20).All(item=>item.DownloadProgress==0),"Java long multiplication overflow was replaced by widened progress math");
 var flow=down.At(1)!.FlowId;
 Require(down.SetProgressByFlow(flow,45) && down.At(1)!.DownloadProgress==45 && !down.SetProgressByFlow("",45) &&
     down.FindFlowIndex(flow)==1 && down.FindFlowIndex("missing")==0 && down.SetError(20,408) &&
@@ -430,6 +432,9 @@ Require(down.SetProgressByFlow(flow,45) && down.At(1)!.DownloadProgress==45 && !
 down.SetSongInfo(20,"Updated name","Updated singer");
 Require(down.Snapshot().First(item=>item.SongMetadata.Id==20).InfoId=="normal||20||Updated name" &&
     down.Snapshot().Last(item=>item.SongMetadata.Id==20).PlayName!="Updated name","Download metadata update must affect only the first matching song");
+down.SetSongInfo(20,null,null);
+Require(down.Snapshot().First(item=>item.SongMetadata.Id==20) is { SongName:null,PlayName:"",SingerName:"",InfoId:"normal||20||" },
+    "Original raw song-name null versus normalized play-name/singer getters were conflated");
 downEffects.Clear();Require(down.DeleteByIndex(0) && downEffects.SequenceEqual(new[]{"post1","progress-remove:10","update-remove:10","changed"}),
     "Download delete changed registry/DAO/notification order");
 downEffects.Clear();var beforePublic=downMessages.Count;

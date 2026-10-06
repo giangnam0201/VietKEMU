@@ -5,7 +5,7 @@ namespace VietK.Core;
 public sealed class SelectedPlaylistItem
 {
     public LocalSong SongMetadata { get; }
-    public string SongName { get; set; }
+    public string? SongName { get; set; }
     public SongMedia? VideoMedia { get; }
     public int Sequence { get; }
     public string? CustomerId { get; set; }
