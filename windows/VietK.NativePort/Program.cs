@@ -66,6 +66,7 @@ public static class Program
             NativePlayback? playback=null;
             OriginalQueueRemote? originalRemote=null;
             OriginalCollectionBrowser? collectionBrowser=null;
+            OriginalSongPreview? songPreview=null;
             using var musicServer=new NativeMusicServer(app.Dispatcher,stateDirectory,id=>songState.GetSongById(id));
             IReadOnlyList<SongMedia> AvailableMedia(int id)=>musicServer.Get(id) is { } cached?
                 new[]{cached.Metadata}.Concat(songState.GetMedia(id)).ToArray():songState.GetMedia(id);
@@ -89,6 +90,7 @@ public static class Program
                 originalRemote?.Refresh();
                 queueBrowser?.SetConfirmedQueuedSongs(combined.Select(item=>item.SongMetadata.Id).ToHashSet());
                 collectionBrowser?.RefreshMedia();
+                songPreview?.RefreshQueue();
             }
             selectedQueue=new OriginalSelectedQueue(id=>songState.GetSongById(id),
                 command=> { if(!queueDispatcher.Post(command))throw new InvalidOperationException("Playlist database worker stopped"); },
@@ -175,13 +177,20 @@ public static class Program
                 ()=>new SongQueryContext(OnlineNamesEnabled:true,DataCenterConnected:musicServer.IsConnected),
                 ()=>selectedQueue.Snapshot().Concat(downloadQueue.Snapshot()).ToArray(),collectionControls,gridContract);
             collectionBrowser=collectionScreen;
+            using var previewScreen=new OriginalSongPreview(
+                ()=>app.MainWindow?.Content is Viewbox { Child:Canvas panel }?panel:null,
+                id=>AvailableMedia(id).Select(musicServer.LocalPath).FirstOrDefault(path=>path is not null&&File.Exists(path)),
+                id=>selectedQueue.Snapshot().Any(item=>item.SongMetadata.Id==id),
+                id=>songOrder.Request(id,false),collectionControls.Collect);
+            songPreview=previewScreen;previewScreen.Feedback+=collectionControls.Feedback;
             collectionScreen.ActionRequested+=(song,action)=>
-            { if(action is "order" or "top")songOrder.Request(song.Id,action=="top"); };
+            { if(action is "order" or "top")songOrder.Request(song.Id,action=="top");else if(action=="preview")previewScreen.Show(song); };
             musicServer.ConnectionChanged+=collectionScreen.RefreshMedia;
             browser.SongActionRequested+=(song,action)=>
             {
                 if(action is "order" or "top")songOrder.Request(song.Id,action=="top");
                 else if(action=="collect")collectionControls.Collect(song.Id);
+                else if(action=="preview"&&songState.GetSongById(song.Id) is { } localSong)previewScreen.Show(localSong);
             };
             Canvas Panel(int screen = 0)
             {

@@ -35,6 +35,7 @@ public static class NativePlaybackVerification
             {
                 playback.ShowTelevision(host);
                 await NativeCollectionVerification.Run(host,root,output);
+                await NativeSongPreviewVerification.Run(host,playback,fixtures,output);
                 Require(new WindowInteropHelper(host).Handle != IntPtr.Zero &&
                     new WindowInteropHelper(playback.Television).Handle != IntPtr.Zero &&
                     playback.Television.Owner is null, "Independent panel/TV window handles missing");
