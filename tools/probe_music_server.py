@@ -31,6 +31,7 @@ def main():
     parser.add_argument('output', type=Path)
     parser.add_argument('--song-id', type=int)
     parser.add_argument('--cloud-status', action='store_true', help='Read original cloud-library lock status; never unlock or bind')
+    parser.add_argument('--activate-cloud', action='store_true', help='Original auth_unlock_cloud request; requires explicit operator approval because server state may change')
     args = parser.parse_args()
     config = json.loads(args.identity.read_text(encoding='utf-8-sig'))
     chip, mac = config['ChipId'], config['Mac']
@@ -56,7 +57,7 @@ def main():
               'scope': 'One original login request; no fabricated identity or token. No music download claim.'}
     (args.output / 'login-result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result, ensure_ascii=False))
-    if (args.song_id is None and not args.cloud_status) or not accepted:
+    if (args.song_id is None and not args.cloud_status and not args.activate_cloud) or not accepted:
         return
     # Same approved host and original media command; the normal server token
     # returned by login supplies the signature salt.
@@ -65,6 +66,22 @@ def main():
         raise ValueError('Returned service is a different host; inspect before forwarding identity')
     headers['validcode'] = str(reply['validatecode'])
     headers['sign'] = signature(chip, str(reply['token']))
+    if args.activate_cloud:
+        body = json.dumps({'cmdid': 'auth_unlock_cloud'}, separators=(',', ':'))
+        request = urllib.request.Request(service, urllib.parse.urlencode({'body': body}).encode(), headers)
+        with urllib.request.urlopen(request, timeout=10) as response:
+            activation = json.loads(response.read())
+        (args.output / 'cloud-activation.private.json').write_text(json.dumps(activation), encoding='utf-8')
+        message = str(activation.get('errormessage', ''))
+        for secret in (chip, mac, str(reply['token']), str(reply['validatecode'])):
+            if secret:
+                message = message.replace(secret, '[redacted]')
+        activation_result = {'command': 'auth_unlock_cloud',
+                             'errorcode': activation.get('errorcode', ''),
+                             'errormessage': message,
+                             'scope': 'Original operator-approved activation request with real identity and normal session. A non-null reply is not proof of activation or music access.'}
+        (args.output / 'cloud-activation-result.json').write_text(json.dumps(activation_result, indent=2), encoding='utf-8')
+        print(json.dumps(activation_result))
     if args.cloud_status:
         body = json.dumps({'cmdid': 'os_unlock_cloud_information'}, separators=(',', ':'))
         request = urllib.request.Request(service, urllib.parse.urlencode({'body': body}).encode(), headers)
@@ -80,7 +97,7 @@ def main():
                          'errormessage': message,
                          'hasLockStatus': 'is_unlock' in status,
                          'isUnlock': status.get('is_unlock'),
-                         'scope': 'Read-only original status request. No unlock, account binding or registration performed.'}
+                         'scope': 'Read-only original status request; this status request makes no account or activation changes.'}
         (args.output / 'cloud-status-result.json').write_text(json.dumps(status_result, indent=2), encoding='utf-8')
         print(json.dumps(status_result))
     if args.song_id is None:

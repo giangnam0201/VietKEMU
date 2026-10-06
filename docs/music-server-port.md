@@ -18,10 +18,38 @@ authorization. `DataCenterConfigure` confirms the tested login URL is the
 original default outside-server route. The inspected account path
 `DCUnlockCloudLibraryCommu` uses `user_unlock_device_login` for a phone/password
 or verification-code login; it does not insert a new hardware serial into the
-server registry. No unlock, account binding or device registration was sent.
+server registry. At that point no unlock, account binding or device registration
+had been sent.
 Restoring production downloads needs an identity and music entitlement the
 service legitimately accepts, or a supported registration path from its operator.
 Changing Windows retries alone cannot supply that server-side registration.
+
+Further APK inspection found `DCCloudMusicLibCommu.requestUnlock` sends only
+`{"cmdid":"auth_unlock_cloud"}` through the ordinary signed session. This is an
+activation request, not evidence of a public hardware-registration function. Its
+Java method returns true for any non-null response, including a server error;
+that return value cannot establish activation. `CloudMusicUnlockManager`'s
+`getCloudState()` already returns false in the decoded APK, so changing a local
+cloud-lock flag does not resolve the server's missing-device response.
+The diagnostic's explicit `--activate-cloud` mode prepares the original request
+using the operator's genuine identity and normal server authentication. It must
+only be executed with approval to change activation state; results need checking
+against the status and actual media URL, not a non-null reply. No alternate
+device identities, guessed credentials or server-registry writes are supplied.
+
+The operator then explicitly approved the original activation request and
+follow-up status/song-101000 tests. `auth_unlock_cloud` returned application
+error 404 with `sn not in devices_table`. The status request returned the same
+error and no lock status. The media request again returned HTTP 200, code zero,
+no media list and no video URL. No song downloaded and activation was not
+verified. This closes the tested APK activation path as a solution for the
+currently unregistered PC; it does not prove every possible operator-supported
+registration mechanism is absent. The `6206` registration routine found in the
+APK registers push-notification user/channel IDs, not music-device entitlement.
+`KmRegisterHandle` handles local remote-control pairing; its authorization code
+does not register the PC with the production music service. The REST helpers
+inspected in `VietDataCenter` route YouTube, app-market and metadata services,
+not a second karaoke-file API replacing `sn_song_media_list`.
 
 ## Original protocol evidence
 
