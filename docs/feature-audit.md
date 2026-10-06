@@ -12,10 +12,10 @@ executed on hardware. Playback/TV is the user's first priority.
 | Home navigation | HomeNewAdapter, FragmentManagerUtil | Song name / More routes work. Singer, app manager, Mixcloud, YouTube and Soundcloud are missing. |
 | More | MoreFragment | Source tiles rendered; destination features mostly missing. |
 | Song search | SongSearchDAO and input widgets | Local metadata queries and Vietnamese input translated; thumbnails, complete pagination, filters, favourites and original dialogs incomplete. |
-| Song ordering / queue | order policy, SelectedLocalListManager, SongDownListManager | SQLite workers and ordering rules implemented. No scanned karaoke storage is registered, so original no-storage gate rejects ordering. Feedback currently only traces; visible original toast missing. Queue dialog missing. |
-| Downloads / server | DCDomain, KmDataCenterService, native sign-lib | URL decode, login state, permission/token handling and download queue translated and fixture-tested. Host still lacks live authenticated transport, device identity integration, file transfer and storage registration. No working music download claim. |
-| Playback controls | BottomMenuBarView -> KmPlayCtrlUtil -> PlayerCtrlService -> KmPlayerCtrl | Pause/play, original/accompaniment, replay, next and volume lack native backend wiring. Current buttons cannot play music. Static state methods only validated with fixtures. |
-| TV output | daulkmboxosdtv, OsdTvViewManager, KmPlayerCtrl, KmDurationPlayer | No second window or actual video renderer yet. This is the largest functional omission. Required port includes actual media paths, audio-track/channel semantics, completion/error events, lyrics and original OSD, not just a black window. |
+| Song ordering / queue | order policy, SelectedLocalListManager, SongDownListManager | SQLite workers and ordering rules implemented; a real Windows cache directory supplies the storage adapter. Completed downloads move into the selected queue and actual player. Original mounted-volume discovery, queue dialog, toasts and all progress views remain incomplete. |
+| Downloads / server | DCDomain, KmDataCenterService, native sign-lib | Original login/media protocol, HTTP form transport, signature hash, streamed transfer and completed-file cache now wired. Full test-server download-to-queue-to-decoder path exercised on Windows. Production authorization is unverified and needs accepted device identity; original retry/NAS/subtitle paths remain incomplete. See music-server-port.md. |
+| Playback controls | BottomMenuBarView -> KmPlayCtrlUtil -> PlayerCtrlService -> KmPlayerCtrl | Pause/play, original/accompaniment, replay, next and volume wired to bundled native libVLC. Actual PCM/frame verification is required before release; all original control admission, broadcast, DSP and scoring paths remain incomplete. |
+| TV output | daulkmboxosdtv, OsdTvViewManager, KmPlayerCtrl, KmDurationPlayer | Independent TV window and real decoder implemented; original APK grading frames captured on Windows. Lyrics, encryption, complete TV overlays, loading/hints/grading UI and two-screen visual parity remain unfinished. |
 | Ambience / effects / settings | corresponding dialogs, room/device services | Buttons/resources exist; workflows and hardware interfaces missing. |
 | Header services | TopMenuBarView | Language/settings/network/shutdown dialogs and server/USB/AP observers missing. Restore visuals without claiming these handlers work. |
 
@@ -41,8 +41,10 @@ in the complete interleaved track array. For one audio track, it maps index 0 to
 channel 1 and index 1 to channel 0, passing other values through. Therefore a
 single-track song needs channel switching, not selection of a nonexistent second
 audio stream. The Windows media adapter must implement both paths. Backend
-channel-number semantics still need comparison against the original native
-decoder; this research does not constitute working playback.
+channel numbers were resolved against the original native decoder: 0 duplicates
+left, 1 duplicates right, and 2 retains stereo. The Windows adapter now maps these
+operations to the native output; PCM tests check the actual result. Full player
+and TV parity remain unfinished.
 
 ## Evidence retained locally
 

@@ -45,7 +45,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
         LibVLCSharp.Shared.Core.Initialize(directory);
         library = new LibVLC("--no-video-title-show", "--no-osd");
         Native = new MediaPlayer(library) { EnableKeyInput = false, EnableMouseInput = false };
-        Native.Playing += (_, _) => Post(() => { Original?.OnStart(); ConfirmedPause?.Invoke(false); Started?.Invoke(); });
+        Native.Playing += (_, _) => Post(() => { if(firstFrame)ConfirmedPause?.Invoke(false); });
         Native.Paused += (_, _) => Post(() => ConfirmedPause?.Invoke(true));
         Native.EndReached += (_, _) => Post(() => Original?.OnComplete());
         Native.EncounteredError += (_, _) => Post(() => Original?.OnError(1)); // IEvBasePlayer.Error.UNKNOWN
@@ -64,10 +64,10 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
                 var hasVideo = Native.Size(0, ref width, ref height) && width > 0 && height > 0;
                 // Translate decoder progress/render readiness to the original
                 // event boundary; native snapshots verify actual decoded pixels.
-                // libVLC's Playing event can precede creation of its audio
-                // output. Reapply the original chosen mode once output exists.
-                if(Original is { } original)SwitchTrack(original.SingMode==OriginalSingMode.Original);
-                ApplyVolume();
+                // libVLC's Playing event precedes creation of its audio output.
+                // Raise the original start only when decoding/output is ready;
+                // its channel and gain calls then operate on a real output.
+                Original?.OnStart();ConfirmedPause?.Invoke(false);Started?.Invoke();
                 Original?.OnInfo(hasVideo ? 10003 : 10004);
                 Original?.OnAudioRenderingStart(hasVideo);
                 if (hasVideo) Original?.OnVideoRenderingStart();

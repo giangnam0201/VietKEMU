@@ -152,7 +152,8 @@ public static class NativePlaybackVerification
         {
             tap.Reset(); await Task.Delay(300);
             var samples = tap.Read();
-            signal = PcmTap.Power(samples, expected); other = PcmTap.Power(samples, unwanted);
+            signal = Math.Min(PcmTap.Power(samples, expected,0),PcmTap.Power(samples, expected,1));
+            other = Math.Max(PcmTap.Power(samples, unwanted,0),PcmTap.Power(samples, unwanted,1));
             if (samples.Length >= 4800 && signal > 0.000001 && signal > other * 25) return;
         } while (DateTime.UtcNow < stop);
         throw new InvalidDataException($"{message}; decoded power expected={signal}, unwanted={other}");
@@ -177,14 +178,14 @@ public static class NativePlaybackVerification
         }
         public void Reset() { lock (gate) samples.Clear(); }
         public short[] Read() { lock (gate) return samples.ToArray(); }
-        public static double Power(short[] data, int frequency)
+        public static double Power(short[] data, int frequency,int channel)
         {
             var count = data.Length / 2;
             if (count == 0) return 0;
             double sin = 0, cos = 0;
             for (var i = 0; i < count; i++)
             {
-                var sample = (data[i * 2] + data[i * 2 + 1]) / 65536.0;
+                var sample = data[i * 2+channel] / 32768.0;
                 var phase = 2 * Math.PI * frequency * i / 48000;
                 sin += sample * Math.Sin(phase); cos += sample * Math.Cos(phase);
             }

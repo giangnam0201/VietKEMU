@@ -25,8 +25,10 @@ original Vietnamese labels and drawables, default tile ordering, and the origina
 0.9 scale/25 ms press animation. The Windows component host is a development
 artifact. The original bottom bar now has its template positions, Vietnamese
 labels, original converted icon images, paired pause/vocal-state visibility and
-500 ms click guard. Playback commands remain requests without a backend;
-the host handles the Home request only. Queue count follows confirmed local and
+500 ms click guard. Playback commands now connect to the native Windows video
+adapter and an independent TV window; see `music-server-port.md` for the
+download/cache/queue path and remaining authorization and media limitations.
+Queue count follows confirmed local and
 download queue entries; the default empty queue shows zero.
 `FragmentHistory` translates the original history and back rules, including
 clearing history on Home and disabled online-service fallback.
