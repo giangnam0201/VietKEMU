@@ -32,8 +32,12 @@ No production song was downloaded. Encrypted karaoke playback remains unverified
   when the returned URL contains `.mp3`, and requires 524288000 bytes of free
   cache space. The Windows adapter streams bytes, checks known content length,
   removes failed temporary files and promotes completed files before playback.
-  Original three-attempt HTTP recovery, NAS handling and all error transitions
-  remain incomplete.
+  Initial HTTP opening now follows `HttpFile.open(uri, 0, 3)`: three attempts,
+  immediate stop on 404, `Range: bytes=0-`, `Accept: */*` and identity encoding.
+  Its transfer buffer is the original 32768 bytes. After failed opening, the
+  original closes its connection before reading the status, so the resulting
+  AppDownItem error is 1004 even on 404. Separate file-write retries, downloader
+  User-Agent parity, NAS handling and all error transitions remain incomplete.
 - Completed downloads update the local-song flag, move matching download entries
   to the selected queue, and start the next download. Cache metadata contains the
   returned vocal/accompaniment indexes and per-song gain. Windows paths are

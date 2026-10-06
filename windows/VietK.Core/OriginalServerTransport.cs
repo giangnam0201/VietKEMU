@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -53,6 +54,37 @@ public sealed class OriginalMusicTransfer : IDisposable
 {
     private readonly HttpClient client=new(new SocketsHttpHandler { ConnectTimeout=TimeSpan.FromSeconds(10) })
         { Timeout=Timeout.InfiniteTimeSpan };
+    // HttpFile.open(uri, 0, 3): three connection attempts, immediate stop on
+    // 404, Range and identity encoding. This covers the original opening phase;
+    // AppDownItem's separate file-write recovery remains a separate port task.
+    private async Task<HttpResponseMessage> Open(Uri uri,CancellationToken cancellation)
+    {
+        Exception? lastError=null;
+        for(var attempt=0;attempt<3;attempt++)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            using var request=new HttpRequestMessage(HttpMethod.Get,uri);
+            request.Headers.Range=new RangeHeaderValue(0,null);
+            request.Headers.Accept.ParseAdd("*/*");
+            request.Headers.AcceptEncoding.ParseAdd("identity");
+            using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
+            timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            try
+            {
+                var response=await client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+                if(response.IsSuccessStatusCode)return response;
+                var status=response.StatusCode;response.Dispose();
+                lastError=new IOException("Music server HTTP "+(int)status);
+                if(status==HttpStatusCode.NotFound)break;
+            }
+            catch(OperationCanceledException) when(!cancellation.IsCancellationRequested)
+            { lastError=new IOException("Music server connection timed out"); }
+            catch(HttpRequestException ex) { lastError=ex; }
+        }
+        // Original open closes failed connections before AppDownItem reads its
+        // status; getResponseCode consequently returns -1, including on 404.
+        throw new OriginalTransferException(1004,lastError?.Message??"Music server connection failed",lastError);
+    }
     public async Task<string> Download(int songId,string url,string directory,
         Action<long,long> progress,CancellationToken cancellation)
     {
@@ -67,15 +99,13 @@ public sealed class OriginalMusicTransfer : IDisposable
         try
         {
             using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
-            timeout.CancelAfter(TimeSpan.FromSeconds(10));
-            using var response=await client.GetAsync(uri,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
-            if(!response.IsSuccessStatusCode)throw new OriginalTransferException(1002,"Music server HTTP "+(int)response.StatusCode);
+            using var response=await Open(uri,cancellation);
             var total=response.Content.Headers.ContentLength;
             if(total is null or <=0)throw new OriginalTransferException(1003,"Music server did not provide a valid file length");
             await using var input=await response.Content.ReadAsStreamAsync(cancellation);
-            await using(var output=new FileStream(temporary,FileMode.Create,FileAccess.Write,FileShare.None,65536,true))
+            await using(var output=new FileStream(temporary,FileMode.Create,FileAccess.Write,FileShare.None,32768,true))
             {
-                var buffer=new byte[65536];long written=0;
+                var buffer=new byte[32768];long written=0;
                 var lastProgress=System.Diagnostics.Stopwatch.StartNew();
                 while(true)
                 {
