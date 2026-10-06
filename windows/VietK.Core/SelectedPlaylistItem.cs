@@ -24,6 +24,7 @@ public sealed class SelectedPlaylistItem
     public string PlayUrl { get; set; }="";
     public string CustomerContent { get; set; }="";
     public string SingerName { get; set; }
+    public string SingerIdsText { get; set; }="";
     public string PlayId { get; set; }="";
     private string flowId="";
     public string FlowId { get=>flowId;set { if(!string.IsNullOrEmpty(value))flowId=value; } }

@@ -331,3 +331,58 @@ using(var observer=new SqliteConnection(new SqliteConnectionStringBuilder { Data
 }
 File.Delete(dispatchPath);
 Console.WriteLine("Original playlist worker verified: independent connection/thread, FIFO messages, barriers, live message objects, ignored 31, shutdown rejection and fault propagation.");
+
+var orderEffects=new List<string>();var backendSuccess=true;var existsInCombinedQueue=false;
+var execution=new OriginalOrderExecutor(_=>existsInCombinedQueue,
+    _=> { orderEffects.Add("append-local");return backendSuccess; },
+    (_,exists,repeat)=> { orderEffects.Add($"top-local:{exists}:{repeat}");return backendSuccess; },
+    _=> { orderEffects.Add("append-download");return backendSuccess; },
+    (_,exists)=> { orderEffects.Add($"top-download:{exists}");return backendSuccess; },
+    _=>orderEffects.Add("rate"),_=>orderEffects.Add("count"),decision=>orderEffects.Add("reject:"+decision));
+var executionSong=new LocalSong(10,"Original name","",0,"Singer",new[]{4,218,-1,-1},new int[4],new int[4],
+    0,0,0,"","",1,"",2,0);
+SongMedia ExecutionMedia(int id,string? uuid="")=>new(id,10,"song.mid",100,1,0,"", "",0,"","","","",0,null,null,uuid);
+var executionItem=OriginalOrderExecutor.CreateSongItem(executionSong,"guest",new[]{ExecutionMedia(1)},_=>null);
+Require(executionItem.PlayType=="normal" && executionItem.Sequence==0 && executionItem.CustomerId=="guest" &&
+    executionItem.PlayId=="10" && executionItem.PlayName=="Original name" && executionItem.SingerIdsText=="4,218" &&
+    executionItem.InfoId=="", "Song item construction classified an unresolved filename as MIDI or changed original defaults");
+Require(OriginalOrderExecutor.CreateSongItem(executionSong,null,new[]{ExecutionMedia(1)},_=>"file.mid").PlayType=="midi" &&
+    OriginalOrderExecutor.CreateSongItem(executionSong,null,new[]{ExecutionMedia(1)},_=>"file.MID").PlayType=="normal",
+    "Original resolved video path MIDI test lost case sensitivity");
+Require(OriginalOrderExecutor.IsNasSong(new[]{ExecutionMedia(1,"storage-nas-volume")}) &&
+    !OriginalOrderExecutor.IsNasSong(new[]{ExecutionMedia(1,"NAS")}) &&
+    !OriginalOrderExecutor.IsNasSong(new[]{ExecutionMedia(1),ExecutionMedia(2,"nas")}),"NAS gate changed original first-row substring test");
+var executionState=new OrderContext(ScannedVolumes:1,NetworkConnected:true);
+var executed=execution.Execute(executionItem,false,executionState);
+Require(executed==new OrderExecution(OrderDecision.AppendLocal,true,true) &&
+    orderEffects.SequenceEqual(new[]{"append-local","rate","count"}) && executionItem.InfoId=="normal||10||Original name",
+    "Original local append effects or identity construction differs");
+orderEffects.Clear();backendSuccess=false;
+executed=execution.Execute(executionItem,true,executionState);
+Require(executed.Handled && !executed.BackendSucceeded && orderEffects.SequenceEqual(new[]{"top-local:False:False","count"}),
+    "Original handled result was conflated with backend success, or failed Top synchronized demand rate");
+orderEffects.Clear();existsInCombinedQueue=true;executionItem.LocalFlag=0;
+executed=execution.Execute(executionItem,false,executionState with { NetworkConnected=false });
+Require(executed.Decision==OrderDecision.AlreadyQueued && !executed.Handled &&
+    orderEffects.SequenceEqual(new[]{"reject:AlreadyQueued"}),"Duplicate precedence changed or a rejected request reached the backend");
+orderEffects.Clear();existsInCombinedQueue=false;backendSuccess=true;
+executed=execution.Execute(executionItem,true,executionState);
+Require(executed.Decision==OrderDecision.TopDownload && orderEffects.SequenceEqual(new[]{"top-download:False","rate","count"}),
+    "Remote Top was routed into the local queue");
+foreach(var type in new[]{"youtube","midi","mixcloud","soundcloud"})
+{
+    orderEffects.Clear();executionItem.PlayType=type;execution.Execute(executionItem,false,executionState);
+    Require(orderEffects.SequenceEqual(new[]{"append-download","count"}),"Bytecode service/MIDI rate-sync exclusion differs: "+type);
+}
+orderEffects.Clear();executionItem.PlayType="normal";executionItem.InfoId="unchanged";
+executed=execution.Execute(executionItem,false,new());
+Require(executed.Decision==OrderDecision.NoStorage && executionItem.InfoId=="unchanged" &&
+    orderEffects.SequenceEqual(new[]{"reject:NoStorage"}),"Early storage gate mutated identity or invoked a backend");
+Require(OriginalOrderExecutor.FeedbackResource(OrderDecision.NoStorage)=="order_song_no_disk_tip" &&
+    OriginalOrderExecutor.FeedbackResource(OrderDecision.AlreadyQueued) is null,"Original feedback resources were replaced or invented");
+var reportRoute=new OriginalReportTableRoute();var launches=new List<string>();
+void LaunchReport(string action,int mode)=>launches.Add(action+":"+mode);
+Require(!reportRoute.Check(executionSong,true,true,0,LaunchReport) && !reportRoute.Check(executionSong,true,false,1,LaunchReport) &&
+    reportRoute.Check(executionSong,true,true,1,LaunchReport) && reportRoute.SelectedSong==executionSong && reportRoute.Top &&
+    launches.SequenceEqual(new[]{"com.evideo.kmbox.plugin.REPORTTABLE:2"}),"Report-table availability, saved selection or launch mode differs");
+Console.WriteLine("Original order execution verified: item construction, NAS, gate effects, local/download routing, handled-versus-success, rate exclusions and report plugin routing.");

@@ -183,11 +183,30 @@ The Windows capture has an explicitly isolated backend fixture that adds/removes
 an actual catalogue entry directly, bypassing admission to check persistence and
 panel observers. It does not establish order-click admission or available music.
 
-Linked-service initialization, remaining manager methods, actual playback
-observers, download-list integration, report-table routing and panel order/Top
-handlers remain pending. Original clicks must pass those dependencies before
-remote entries are routed to the downloader; the host does not skip them by
-adding songs directly to its local queue.
+`OriginalOrderExecutor` now translates gate effects and backend routing, preserving
+handled-versus-backend-success results. It constructs normal/MIDI items from the
+resolved media path (case-sensitive .mid), applies positive singer IDs, builds
+InfoId after early gates, dispatches local/download append or Top, and requests
+rate synchronization only on successful eligible types. Order statistics are
+requested even when an admitted backend operation returns false. These effects
+follow DEX control flow rather than duplicated JADX branches.
+
+The packager now inventories activity/service intent actions from all 23 original
+APK manifests, with decoded and original manifest hashes, and preserves original
+Vietnamese order feedback strings. Native grid order/Top requests now go through
+report-table plugin routing, the original first-media NAS UUID check and the
+order executor. Plugin selection retains the selected song/Top flag and launch
+mode 2. The declaration inventory is firmware-default evidence; runtime plugin
+installation/enabling and execution remain separate unfinished dependencies.
+
+No karaoke volumes are registered until original storage discovery is ported,
+so normal clicks fail the original storage gate. Feedback currently retains the
+original text as diagnostic events: Android system-toast styling and order
+animation still need translation. Report plugin execution, linked-service state,
+download backend, demand-rate updater/stat observers and playback remain pending.
+The host does not insert remote entries directly into the local queue or claim a
+download occurred. An isolated Windows fixture checks admission against a real
+catalogue song and the packaged plugin inventory without starting a download.
 
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37398160720
 passed the worker/FIFO/failure checks and native Windows build/capture. Its

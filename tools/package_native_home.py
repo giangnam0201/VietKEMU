@@ -84,6 +84,7 @@ def package(decoded, destination):
     package_more(app, destination, entries, strings, values)
     package_song_browser(app, destination, entries, strings, values)
     package_song_grid(app, destination, entries)
+    package_order_dependencies(decoded, destination, strings)
     seed = app / 'apktool/assets/kmbox.jpg'
     seed_digest = hashlib.sha256(seed.read_bytes()).hexdigest()
     if entries['assets/kmbox.jpg']['sha256'] != seed_digest:
@@ -98,6 +99,36 @@ def package(decoded, destination):
         'upgrade_source': 'SongManager.addColumn; DAOHelper.addColumn',
         'media_availability': 'flags are preserved; actual media files still require verification'
     }, indent=2))
+
+
+def package_order_dependencies(decoded, destination, strings):
+    android = '{http://schemas.android.com/apk/res/android}'
+    manifests = []
+    actions = []
+    for manifest in sorted(decoded.glob('*/apktool/AndroidManifest.xml')):
+        app = manifest.parent.parent
+        root = ET.parse(manifest).getroot()
+        entries = {entry['path']: entry for entry in json.loads((app/'original-entries.json').read_text())}
+        manifests.append({'app': app.name, 'package': root.get('package'),
+            'originalManifestSha256': entries['AndroidManifest.xml']['sha256'],
+            'decodedManifestSha256': hashlib.sha256(manifest.read_bytes()).hexdigest()})
+        application = root.find('application')
+        if application is None: continue
+        for component in list(application):
+            if component.tag not in ('activity', 'activity-alias', 'service'): continue
+            enabled = application.get(android+'enabled', 'true') == 'true' and component.get(android+'enabled', 'true') == 'true'
+            for intent in component.findall('intent-filter'):
+                for action in intent.findall('action'):
+                    actions.append({'package': root.get('package'), 'component': component.get(android+'name'),
+                        'kind': component.tag, 'enabledByManifest': enabled,
+                        'action': action.get(android+'name'), 'hasData': bool(intent.findall('data'))})
+    if len(manifests) != 23:
+        raise RuntimeError(f'Expected all 23 decoded firmware APK manifests, found {len(manifests)}')
+    names = ['try_to_connect_incognito', 'try_to_connect_incognito_error', 'order_song_no_disk_tip',
+        'order_song_num_max_tip', 'order_song_no_net_tip', 'add_song_from_nas_error']
+    contract = {'manifests': manifests, 'actions': actions, 'feedback': {name: strings[name] for name in names},
+        'scope': 'Firmware manifest declarations; runtime installed/enabled state and plugin execution are separate.'}
+    (destination/'order-dependencies.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
 
 
 def package_song_grid(app, destination, entries):

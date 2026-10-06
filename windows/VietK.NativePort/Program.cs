@@ -57,6 +57,30 @@ public static class Program
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
             var browser = new SongBrowser(root, songContract, moreContract, songState,gridContract);
             queueBrowser=browser;
+            var orderDependencies=JsonSerializer.Deserialize<OrderDependencies>(File.ReadAllText(Path.Combine(root,"order-dependencies.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original order dependencies");
+            void Feedback(OrderDecision decision)
+            {
+                var resource=OriginalOrderExecutor.FeedbackResource(decision);
+                // Original Android system-toast styling still needs translation.
+                // Retain its exact resource text without substituting a dialog.
+                if(resource is not null)System.Diagnostics.Trace.WriteLine(orderDependencies.Feedback[resource]);
+            }
+            var orderExecutor=new OriginalOrderExecutor(selectedQueue.Exists,selectedQueue.Add,
+                selectedQueue.Top,
+                _=>throw new NotSupportedException("Download queue backend remains pending"),
+                (_,_)=>throw new NotSupportedException("Download queue backend remains pending"),
+                _=>System.Diagnostics.Trace.WriteLine("Original rate-sync request; rate updater pending"),
+                _=>System.Diagnostics.Trace.WriteLine("Original order-stat request; stat observer pending"),Feedback);
+            var songOrder=new NativeSongOrder(songState,orderDependencies,orderExecutor,
+                // Storage/network services have not been translated. No scanned
+                // karaoke volumes are registered; don't count Windows disks as
+                // the original scanned volume list or bypass its admission gate.
+                ()=>new OrderContext(QueueCount:selectedQueue.Count),_=>null,()=>false,
+                text=>System.Diagnostics.Trace.WriteLine(text),
+                (action,mode)=>System.Diagnostics.Trace.WriteLine($"Original report plugin request {action}, mode {mode}; plugin execution pending"));
+            browser.SongActionRequested+=(song,action)=>
+            { if(action is "order" or "top")songOrder.Request(song.Id,action=="top"); };
             Canvas Panel(int screen = 0)
             {
                 var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
@@ -202,6 +226,22 @@ public static class Program
                             ()=>playRequests++);
                         fixtureQueue.Initialize(selected,()=>SelectedPlaylistItem.Restore(selected.ReadStoredEntries(),
                             id=>imported.GetSongById(id),imported.GetMedia,_=>null));
+                        var feedbackText="";var reportRequests=0;
+                        var fixtureExecutor=new OriginalOrderExecutor(fixtureQueue.Exists,fixtureQueue.Add,fixtureQueue.Top,
+                            _=>throw new InvalidDataException("Rejected native click reached download backend"),
+                            (_,_)=>throw new InvalidDataException("Rejected native click reached download backend"),
+                            _=>{},_=>{},decision=>
+                            { var key=OriginalOrderExecutor.FeedbackResource(decision);if(key is not null)feedbackText=orderDependencies.Feedback[key]; });
+                        var fixtureOrder=new NativeSongOrder(imported,orderDependencies,fixtureExecutor,()=>new(),_=>null,()=>false,
+                            text=>feedbackText=text,(action,mode)=>
+                            { if(action!=OriginalReportTableRoute.PluginAction || mode!=2)throw new InvalidDataException("Original plugin launch changed");reportRequests++; });
+                        var clickHandled=fixtureOrder.Request(101000,true);
+                        if(orderDependencies.Manifests.Length!=23 || selected.Count!=0 || fixtureQueue.Count!=0 ||
+                            (orderDependencies.ReportTableActivityCount==0
+                                ?clickHandled || fixtureOrder.LastExecution?.Decision!=OrderDecision.NoStorage ||
+                                    feedbackText!=orderDependencies.Feedback["order_song_no_disk_tip"]
+                                :!clickHandled || reportRequests!=1 || fixtureOrder.LastExecution is not null))
+                            throw new InvalidDataException("Original native click/plugin/admission flow differs or fabricated queue success");
                         fixtureQueue.Add(restoredItem);fixtureDispatcher.FlushAsync().GetAwaiter().GetResult();
                         if(bottom.QueueCount!=1 || fixtureQueue.Count!=1 || playRequests!=1 ||
                             selected.ReadStoredEntries().Single().Song.SongId!=101000 ||
@@ -259,6 +299,8 @@ public static class Program
                     originalSelectedListStorageVerified = true,
                     originalSelectedItemReconstructionVerified = true,
                     nativeQueueWorkerObserverIntegrationVerified = true,
+                    nativeOrderPluginAdmissionVerified = true,
+                    firmwareReportTableActivityCount = orderDependencies.ReportTableActivityCount,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,
