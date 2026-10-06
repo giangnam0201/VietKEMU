@@ -28,13 +28,13 @@ public static class OriginalMobileQr
     }
     public static string TelevisionPayload(MobileQrBinding binding)=>
         binding.BindingPrefix+(binding.RandomCode??"")+"&sn="+binding.Serial+"&from=603";
-    public static PixelData Render(string payload,bool television,int size=400)
+    public static PixelData Render(string payload,bool television,int size=400,int margin=1)
     {
         if(string.IsNullOrEmpty(payload))throw new ArgumentException("Empty QR payload",nameof(payload));
         return new BarcodeWriterPixelData
         {
             Format=BarcodeFormat.QR_CODE,
-            Options=new QrCodeEncodingOptions { Width=size,Height=size,Margin=1,CharacterSet="UTF-8",
+            Options=new QrCodeEncodingOptions { Width=size,Height=size,Margin=margin,CharacterSet="UTF-8",
                 ErrorCorrection=television?ErrorCorrectionLevel.M:ErrorCorrectionLevel.L }
         }.Write(payload);
     }
@@ -42,7 +42,8 @@ public static class OriginalMobileQr
     {
         // Two pixels per module is the scan-tested floor, including the quiet
         // margin. A long LAN pairing token needs more modules than a short URL.
-        var minimum=Render(payload,television,1).Width*2;
-        return Render(payload,television,Math.Max(requestedSize,minimum));
+        // A four-module quiet zone stays visible in the half-size TV preview.
+        var minimum=Render(payload,television,1,margin:4).Width*2;
+        return Render(payload,television,Math.Max(requestedSize,minimum),margin:4);
     }
 }
