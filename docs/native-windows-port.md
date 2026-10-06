@@ -346,3 +346,28 @@ not a successful live server login or music download. Supporting original helper
 bytecode was collected in run 37414835354 and retained locally as
 `artifacts/original-bytecode-v5`. The next production dependency is the separate
 `KmDataCenterService` APK's login, permissions, tokens, signing and HTTP transport.
+
+`OriginalDataCenterClient` now translates the normal data-center login/request
+state and common base behavior: login commands and identity fields, URI-scoped
+token map, command permission filter, validation/request headers, signing-header
+selection, server URL registry, configuration/country/IP notifications, validation
+denial and original response truncation. Required signer and HTTP-post callbacks
+remain explicit dependencies. Synthetic fixtures check side-effect order, token
+reuse, blocked/offline requests, partial login failure state, stale error fields,
+KTV/pm signing routes and malformed truncated replies. This is not wired to live
+servers in the native host yet. The .NET JSON and regex implementations still
+need broader compatibility validation against Android for unusual inputs.
+
+Cloud run https://github.com/giangnam0201/VietKEMU/actions/runs/37415688242,
+commit `e6ff16c`, passed the login/request fixtures, Windows build/capture and
+test ZIP packaging. Native signing research run 37415691460 passed and located
+`vendor/lib/libsign-lib.so` in the original firmware (outside the APK), SHA-256
+`3f03280fd93461aa970e3043e64157eee2aa706c9ea961064f3479cd7f75bd0a`.
+Evidence is in `artifacts/original-native-signing-v1`: original ARM ELF,
+provenance, symbol table, strings and disassembly. The JNI entry at 0x91dc first
+checks the package certificate through `get_signature` (0x9260), comparing the
+first signature's `toCharsString` against `RELEASE_SIGN`. The internal `sign`
+function at 0x9484 formats `%s:%s` in a 64-byte buffer and passes the truncated
+C string to `CMd5.MDString`; it returns lowercase hexadecimal via `%02x`.
+Native signing still needs a Windows translation and comparison against original
+function results, preserving the certificate gate and JNI string encoding.
