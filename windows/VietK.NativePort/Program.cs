@@ -30,9 +30,18 @@ public static class Program
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Missing original More screen contract");
             var more = new MoreScreen(root, moreContract, contract);
+            var songContract = JsonSerializer.Deserialize<SongBrowserContract>(File.ReadAllText(Path.Combine(root, "song-browser.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidDataException("Missing original song browser contract");
+            var capturing = args.Length == 2 && args[0] == "--capture";
+            var stateDirectory = capturing ? args[1] : Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort");
+            using var songState = new LocalSongDatabase(Path.Combine(root,"local-seed.db"),
+                Path.Combine(stateDirectory,"song-browser-state.db"));
+            var browser = new SongBrowser(root, songContract, moreContract, songState);
             Canvas Panel(int screen = 0)
             {
-                var panel = screen == 38 ? more.Create() : renderer.Create();
+                var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
                 return panel;
@@ -55,6 +64,13 @@ public static class Program
                 moreImage.Render(moreCanvas);
                 var moreEncoder = new PngBitmapEncoder(); moreEncoder.Frames.Add(BitmapFrame.Create(moreImage));
                 using (var file = File.Create(Path.Combine(args[1], "native-more.png"))) moreEncoder.Save(file);
+                var songCanvas=Panel(2);
+                songCanvas.Measure(new Size(1280,800));songCanvas.Arrange(new Rect(0,0,1280,800));songCanvas.UpdateLayout();
+                var songImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);songImage.Render(songCanvas);
+                var songEncoder=new PngBitmapEncoder();songEncoder.Frames.Add(BitmapFrame.Create(songImage));
+                using(var file=File.Create(Path.Combine(args[1],"native-song-browser.png")))songEncoder.Save(file);
+                if(browser.Results.Count!=0 || browser.Input?.Text!="" || !browser.Alphabetic)
+                    throw new InvalidDataException("Original initial song browser state differs");
                 // The contract was extracted from HomeNewFragment, not guessed.
                 var expected = new[] { "singer", "app", "mixcloud", "youtube", "soudcloud", "more" };
                 if (!contract.Tiles.Select(t => t.Tag).SequenceEqual(expected))
@@ -117,6 +133,9 @@ public static class Program
                     originalNavigationHistoryVerified = true,
                     originalClickGuardVerified = true,
                     moreScreenNativeRendering = true,
+                    songBrowserEmptyStateNativeRendering = true,
+                    vietnameseKeyboard = "default layout/input translated; Thai and handwriting pending",
+                    songGrid = "nonempty tiles/actions and media-index import pending",
                     homeResourcePort = "implemented; visual fidelity requires comparison",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"
@@ -140,9 +159,10 @@ public static class Program
             };
             renderer.NavigationRequested += fragment =>
             {
-                if (fragment == 38) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(38) };
+                if (fragment is 38 or 2) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment) };
             };
             more.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
+            browser.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
             return app.Run(window);
         }
         catch (Exception error)

@@ -71,3 +71,20 @@ try { LocalSongDatabase.UpgradeSongColumns(wrongSchema); }
 catch (InvalidDataException) { rejected = true; }
 Require(rejected, "Whole catalogue was accepted as a local-media database");
 Console.WriteLine("Original local schema upgrade verified: defaults, repeat startup, preserved local flags and catalogue rejection.");
+
+var scheduled = new List<(int Delay, Action Callback)>();
+var input = new VietnameseSearchInput((delay, callback) => scheduled.Add((delay, callback)));
+var searches = new List<string>();
+input.SpellRequested += searches.Add;
+input.Space(); Require(input.Text == "" && searches.Count == 0, "Leading space changed original input");
+input.Letter("A"); input.Letter("B");
+Require(input.Text == "AB" && scheduled.All(item => item.Delay == 200) && searches.Count == 0,
+    "Letter input did not defer its original query");
+scheduled[0].Callback(); Require(searches.Count == 0, "Rapid letters were not coalesced");
+scheduled[1].Callback(); Require(searches.SequenceEqual(new[]{"AB"}), "Coalesced query lost current input");
+input.Space(); input.Space(); Require(input.Text == "AB " && searches.Count == 2, "Repeated space was accepted");
+input.Back(); Require(input.Text == "AB" && searches[^1] == "AB", "Backspace query differs");
+scheduled.Clear(); input.Clear();
+Require(input.Text == "" && scheduled.Count == 1 && scheduled[0].Delay == 50, "Clear delay differs");
+scheduled[0].Callback(); Require(searches[^1] == "", "Clear did not request initial spelling results");
+Console.WriteLine("Original Vietnamese input verified: 200ms request coalescing, space, backspace and 50ms clear.");

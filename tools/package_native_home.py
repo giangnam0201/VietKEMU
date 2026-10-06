@@ -81,6 +81,7 @@ def package(decoded, destination):
     }, indent=2))
     package_bottom(app, destination, entries, strings)
     package_more(app, destination, entries, strings, values)
+    package_song_browser(app, destination, entries, strings, values)
     seed = app / 'apktool/assets/kmbox.jpg'
     seed_digest = hashlib.sha256(seed.read_bytes()).hexdigest()
     if entries['assets/kmbox.jpg']['sha256'] != seed_digest:
@@ -95,6 +96,53 @@ def package(decoded, destination):
         'upgrade_source': 'SongManager.addColumn; DAOHelper.addColumn',
         'media_availability': 'flags are preserved; actual media files still require verification'
     }, indent=2))
+
+
+def package_song_browser(app, destination, entries, strings, values):
+    def dim(name):
+        return float(re.fullmatch(r'([0-9.]+)(?:dip|dp|sp|px)', values[name])[1])
+    java = app / 'java/sources'
+    config = (java / 'com/evideo/kmbox/KmConfig.java').read_text()
+    if 'KEY_SEARCH_PANEL_SUPPORT_ALL_ID = "5,10,2"' not in config:
+        raise RuntimeError('Original default keyboard modes changed')
+    # JADX prints named library constants for the phantom dimensions. Resolve
+    # their definitions from the same decode rather than guessing their values.
+    main = (java / 'com/evideo/kmbox/activity/MainActivity.java').read_text()
+    def constant(class_name, field):
+        imported = re.search(r'import ([\w.]+\.' + class_name + r');', main)[1]
+        source = (java / (imported.replace('.', '/') + '.java')).read_text()
+        return int(re.search(r'\b' + field + r'\s*=\s*(\d+)\s*;', source)[1])
+    phantom_width = constant('NNTPReply', 'POSTING_NOT_ALLOWED')
+    phantom_height = constant('TelnetCommand', 'GA')
+    icons = ['search_keyboard_back.png', 'icon_pen.png', 'keyboard_earth.png']
+    provenance = []
+    for name in icons:
+        resource = app / 'apktool/res/drawable-mdpi' / name
+        digest = hashlib.sha256(resource.read_bytes()).hexdigest()
+        matches = [entry for entry in entries.values()
+                   if Path(entry['path']).name == name and entry['sha256'] == digest]
+        if len(matches) != 1: raise RuntimeError('Original keyboard icon mapping differs: ' + name)
+        shutil.copy2(resource, destination / name)
+        provenance.append({'resource': matches[0]['path'], 'sha256': digest})
+    contract = {
+        'title': strings['home_middle_songname'], 'emptyMessage': strings['song_to_youtube_tip'],
+        'youtubeText': strings['to_youtube'], 'hint': strings['spell_hint_input'],
+        'clearText': strings['spell_input_clear'],
+        'containerX': dim('song_name_grid_view_margin_left'), 'containerY': dim('song_name_grid_view_margin_top'),
+        'containerWidth': dim('song_name_grid_view_width'), 'containerHeight': dim('song_name_grid_view_height'),
+        'categoryHeight': dim('categort_view_item_height'),
+        'backX': dim('view_song_recycle_back_btn_margin_right'), 'backY': dim('song_name_btn_back_margin_top'),
+        'keyboardWidth': dim('search_input_panel_view_width'), 'keyboardY': dim('search_spell_view_margintop'),
+        'phantomWidth': phantom_width, 'phantomHeight': phantom_height,
+        'keyboardHeight': dim('search_input_panel_view_height'),
+        'keyRowHeight': dim('spell_keyboard_item_height'), 'keyGap': dim('spell_keyboard_item_spacing'),
+        'keyTextSize': dim('spell_letter_text_size'),
+        'provenance': 'SongNameFragment; BaseSongForGridViewFragment; CategoryHomeView; activity_main.xml; '
+                      'view_song_name_vertical_scroll.xml; SearchInputKeyboardView; YueNanFirstSpellPanel; '
+                      'AllKeyboardWithSoftPanel; PanelUtils'
+    }
+    (destination / 'song-browser.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
+    (destination / 'song-browser-provenance.json').write_text(json.dumps(provenance, indent=2))
 
 
 def package_more(app, destination, entries, strings, values):

@@ -40,6 +40,16 @@ remain pending; their presence is not a claim that those features work.
 The host does not yet include the top bar, complete screen navigation,
 Phantom video, television UI, activation, playback or server operations.
 
+Home's song-name tile now opens the native `SongNameFragment` empty-state path
+and returns through Back or its category title. The browser uses a separate
+persistent local database, not the whole catalogue as available songs. Its
+Vietnamese keyboard translates the original four rows, symbol-page toggle,
+pressed outline, space/backspace/clear behavior and delayed spelling queries.
+The original empty-message and YouTube button are present; YouTube navigation,
+Thai/handwriting mode actions, nonempty song tiles/actions and media-index
+import remain pending. Phantom remains an empty original-sized video region.
+This is still a development component, not a working karaoke release.
+
 `WholeCatalogue` translates read-only `WholeSongDAO` count, existence, ID lookup
 and remote-metadata checks. It reads the unchanged original database. An online
 metadata flag does not establish a live server or available song file.
