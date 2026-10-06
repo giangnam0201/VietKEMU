@@ -91,7 +91,7 @@ internal sealed class OriginalDefaultVolumeSeekBar : FrameworkElement
         if(thumb is not null)drawing.DrawImage(thumb,new Rect(center-29.5,0,59,59));
         else drawing.DrawEllipse(new SolidColorBrush(Color.FromRgb(105,45,123)),null,new Point(center,29.5),29.5,29.5);
         var text=new FormattedText(Progress.ToString(CultureInfo.InvariantCulture),CultureInfo.InvariantCulture,FlowDirection.LeftToRight,
-            new Typeface(OriginalFont.Family),18,Brushes.White,VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            new Typeface(OriginalFont.Family,FontStyles.Normal,FontWeights.Normal,FontStretches.Normal),18,Brushes.White,VisualTreeHelper.GetDpi(this).PixelsPerDip);
         drawing.DrawText(text,new Point(center-text.Width/2,ActualHeight/2+7-text.Baseline));
     }
 }
