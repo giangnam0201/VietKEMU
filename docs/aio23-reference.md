@@ -28,8 +28,12 @@ A second supplied photograph shows a physical label reading "Đầu máy HD Plus
 model as the supplied KTV-Plus firmware or that its printed serial is the login
 chip ID. The official VietKTV update page calls its HD Plus family VK082 and
 lists HP2.32; the directly linked `download/phanmem/HP2.32/2.32.rar` returned HTTP
-404 in a HEAD check. No serial from this second photograph has been submitted
-to a server.
+404 in a HEAD check. At the operator's explicit request, the printed serial
+was subsequently tested at `viet.duochang.cc` with the previously approved
+Windows PC MAC. Login returned authentication; read-only cloud status returned
+404, `sn not in devices_table`, without a lock status. This mixed-identity
+request does not establish whether the actual HD Plus has entitlement. No
+activation, binding or media download was attempted with that serial.
 
 The first yt-dlp Windows build succeeded, but its public Blender video probe
 failed with YouTube's sign-in/bot-check response. This is not successful live

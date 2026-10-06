@@ -51,7 +51,8 @@ public sealed class YouTubeMusicScreen : IDisposable
         Put(canvas,new Image { Width=43,Height=30,Source=new BitmapImage(new Uri(Path.Combine(root,"icon_youtube.png"))) },40,98);
         Put(canvas,Label("YouTube",28),95,88);
         var back=Button("‹ Trang chính",()=>HomeRequested?.Invoke());Put(canvas,back,1035,86);
-        results=new WrapPanel { Width=740,Height=440,ClipToBounds=true };
+        // PGLayoutManager(2,3,HORIZONTAL) fills each column top to bottom.
+        results=new WrapPanel { Width=740,Height=440,Orientation=Orientation.Vertical,ClipToBounds=true };
         Put(canvas,results,25,148);
         var pages=new StackPanel { Orientation=Orientation.Horizontal };
         pages.Children.Add(Button("‹",()=>ChangePage(-1)));
