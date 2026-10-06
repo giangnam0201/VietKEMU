@@ -129,6 +129,22 @@ download queue and UI handlers still need translation. Original
 and moves eligible items to index one (next song); it does not insert ahead of
 the current song.
 
+`SelectedListStore` translates the selected-list schema additions and database
+append, Top, sort, delete, identity/count and clear operations. It keeps the
+legacy numeric `playType` separate from text `type`, saves all queue metadata,
+normalizes a null customer ID to empty, and preserves the original count-based
+sequence numbering. Delete-by-song-ID removes repeats and shifts once, as the
+original SQL does; the store does not silently repair resulting gaps. Core
+checks exercise file reopen, metadata with Vietnamese/apostrophes, ordering,
+repeat deletion and failed-insert results. The Windows capture exercises the
+actual seed schema in an isolated verification database.
+
+This is the storage layer. Runtime item reconstruction, manager initialization,
+notification/playback dispatch, download-list integration and panel queue
+handlers remain pending. The manager's default clear-on-start policy must be
+translated separately; the store never clears the user's data merely by opening
+the database.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,
 and component capture checks. Search fixtures are synthetic and verify query

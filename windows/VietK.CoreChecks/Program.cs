@@ -133,3 +133,64 @@ Require(LocalSong.DefaultSinger(null,"Vô danh")=="Vô danh" && LocalSong.Defaul
 using(var command=connection.CreateCommand())
 { command.CommandText="UPDATE tblSong SET songsterName=NULL WHERE SongID=1";command.ExecuteNonQuery(); }
 Require(search.BySpell("Al",0,0,new(),offline).Single().Singer=="Vô danh", "Search omitted original default singer handling");
+
+var selectedPath=Path.Combine(Path.GetTempPath(),"vietk-selected-check-"+Guid.NewGuid()+".db");
+using(var selectedConnection=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=selectedPath,Pooling=false }.ToString()))
+{
+    selectedConnection.Open();
+    using(var schema=selectedConnection.CreateCommand())
+    {
+        schema.CommandText="""
+            CREATE TABLE tblSelectedList(id INTEGER NOT NULL PRIMARY KEY,songid INT,canscore INT,sequence INT,
+                customerId NVARCHAR,tableid INT,stage INTEGER,playType INT,name TEXT,url TEXT,customerContent TEXT);
+            INSERT INTO tblSelectedList VALUES(7,100,1,1,NULL,-1,0,17,'Legacy',NULL,NULL);
+            """;
+        schema.ExecuteNonQuery();
+    }
+    var selected=new SelectedListStore(selectedConnection);
+    var legacy=selected.ReadStoredEntries().Single();
+    Require(legacy.LegacyPlayType==17 && legacy.Song.Type is null && legacy.Song.CustomerId is null && legacy.Id==7,
+        "Selected-list migration conflated the legacy numeric playType with the text type");
+    _=new SelectedListStore(selectedConnection);
+    Require(selected.Count==1,"Repeat selected schema upgrade changed existing rows");
+    selected.Clear();
+    SelectedSong Entry(int id)=>new(id,true,null,5,2,"normal","Mộng 'dưới hoa'","","Ái Vân","id-"+id,"flow-"+id,"guest");
+    var first=Entry(10);var firstId=selected.AddSong(first);
+    var secondId=selected.AddSong(Entry(20));selected.AddSong(Entry(30));selected.AddSong(Entry(40));
+    Require(firstId>0 && selected.IsExist(firstId) && first.CustomerId=="" &&
+        selected.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,2,3,4}),
+        "Selected append/customer normalization/sequence numbering differs");
+    var restored=selected.ReadStoredEntries()[0];
+    Require(restored.Song==first && restored.LegacyPlayType is null,"Selected metadata did not round-trip exactly");
+    Require(selected.TopSong(4) && selected.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{10,40,20,30}),
+        "Top replaced the playing song instead of the next slot");
+    selected.SortLocalSong(2,4);
+    Require(selected.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{10,20,30,40}),"Forward queue sort differs");
+    selected.SortLocalSong(4,2);selected.DeleteSong(3);
+    Require(selected.ReadStoredEntries().Select(row=>row.Song.SongId).SequenceEqual(new[]{10,40,30}) &&
+        selected.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,2,3}) &&
+        selected.GetSequenceNumber(20)==-1 && !selected.IsExist(secondId),"Delete/renumber/identity lookup differs");
+    Require(!selected.DeleteSong(0) && selected.DeleteSong(99) && selected.Count==3,
+        "Original absent-positive-sequence delete result was changed");
+    selected.Clear();selected.AddSong(Entry(10));selected.AddSong(Entry(20));selected.AddSong(Entry(10));selected.AddSong(Entry(40));
+    Require(selected.DeleteSongBySongId(10) && selected.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,3}),
+        "Repeated song deletion must preserve the original single-shift behavior");
+    selected.AddSong(Entry(50));
+    Require(selected.ReadStoredEntries().Select(row=>row.Sequence).SequenceEqual(new[]{1,3,3}),
+        "Append used max sequence instead of the original count plus one");
+    Require(!selected.DeleteSongBySongId(999),"Absent song deletion reported success");
+    using(var trigger=selectedConnection.CreateCommand())
+    {
+        trigger.CommandText="CREATE TRIGGER reject_fixture BEFORE INSERT ON tblSelectedList WHEN NEW.songid=999 BEGIN SELECT RAISE(ABORT,'fixture'); END";
+        trigger.ExecuteNonQuery();
+    }
+    Require(selected.AddSong(Entry(999))==-1 && selected.Count==3,"Failed selected insert fabricated success or a row");
+}
+using(var reopened=new SqliteConnection(new SqliteConnectionStringBuilder { DataSource=selectedPath,Mode=SqliteOpenMode.ReadWrite,Pooling=false }.ToString()))
+{
+    reopened.Open();var persisted=new SelectedListStore(reopened);
+    Require(persisted.Count==3 && persisted.ReadStoredEntries().All(row=>row.Song.Name=="Mộng 'dưới hoa'"),
+        "Selected metadata was lost or rewritten across database reopen");
+}
+File.Delete(selectedPath);
+Console.WriteLine("Original selected store verified: migration, round-trip, Top/sort/delete, repeats, persistence and failed insert.");

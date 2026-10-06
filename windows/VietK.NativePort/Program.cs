@@ -147,6 +147,18 @@ public static class Program
                     var fixtureSongs=imported.Search.BySpell("",0,0,new(),new(true,true));
                     if(fixtureSongs.Any(song=>song.LocalState!=0))
                         throw new InvalidDataException("Remote import fabricated a local-media flag");
+                    var selected=imported.SelectedList;
+                    // Separate capture database: these are persistence fixtures,
+                    // not interactive selections or claims of playback success.
+                    selected.Clear();
+                    var storedInput=new SelectedSong(localSong.Id,localSong.CanScore==1,null,localSong.ReportTableNumber,
+                        localSong.Stage,"normal",localSong.Name,"",localSong.Singer,localSong.Id.ToString(),"fixture-flow","");
+                    var selectedId=selected.AddSong(storedInput);
+                    var storedOutput=selected.ReadStoredEntries().Single();
+                    if(selectedId<=0 || storedOutput.Sequence!=1 || storedOutput.LegacyPlayType is not null ||
+                        storedOutput.Song!=storedInput || !selected.IsExist(selectedId))
+                        throw new InvalidDataException("Original seed selected-list schema/storage round-trip differs");
+                    selected.Clear();
                     var gridFixture=browser.CreateVerificationFixture(fixtureSongs);
                     var gridBottom=bottom.Create();Canvas.SetTop(gridBottom,bottomContract.Y);gridFixture.Children.Add(gridBottom);
                     gridFixture.Measure(new Size(1280,800));gridFixture.Arrange(new Rect(0,0,1280,800));gridFixture.UpdateLayout();
@@ -190,6 +202,7 @@ public static class Program
                     originalRemoteCatalogueImportVerified = true,
                     originalMediaMetadataLookupVerified = true,
                     originalLocalSongLookupVerified = true,
+                    originalSelectedListStorageVerified = true,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,
