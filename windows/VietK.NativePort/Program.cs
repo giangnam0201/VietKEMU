@@ -71,7 +71,8 @@ public static class Program
                 _=>throw new NotSupportedException("Download queue backend remains pending"),
                 (_,_)=>throw new NotSupportedException("Download queue backend remains pending"),
                 _=>System.Diagnostics.Trace.WriteLine("Original rate-sync request; rate updater pending"),
-                _=>System.Diagnostics.Trace.WriteLine("Original order-stat request; stat observer pending"),Feedback);
+                _=>System.Diagnostics.Trace.WriteLine("Original countAllOrderSong call; stat observer pending"),Feedback,
+                id=>songState.GetSongById(id));
             var songOrder=new NativeSongOrder(songState,orderDependencies,orderExecutor,
                 // Storage/network services have not been translated. No scanned
                 // karaoke volumes are registered; don't count Windows disks as
@@ -231,7 +232,8 @@ public static class Program
                             _=>throw new InvalidDataException("Rejected native click reached download backend"),
                             (_,_)=>throw new InvalidDataException("Rejected native click reached download backend"),
                             _=>{},_=>{},decision=>
-                            { var key=OriginalOrderExecutor.FeedbackResource(decision);if(key is not null)feedbackText=orderDependencies.Feedback[key]; });
+                            { var key=OriginalOrderExecutor.FeedbackResource(decision);if(key is not null)feedbackText=orderDependencies.Feedback[key]; },
+                            id=>imported.GetSongById(id));
                         var fixtureOrder=new NativeSongOrder(imported,orderDependencies,fixtureExecutor,()=>new(),_=>null,()=>false,
                             text=>feedbackText=text,(action,mode)=>
                             { if(action!=OriginalReportTableRoute.PluginAction || mode!=2)throw new InvalidDataException("Original plugin launch changed");reportRequests++; });

@@ -12,7 +12,8 @@ public sealed class OriginalOrderExecutor(
     Func<SelectedPlaylistItem,bool,bool> topDownload,
     Action<SelectedPlaylistItem> synchronizeRate,
     Action<SelectedPlaylistItem> countOrder,
-    Action<OrderDecision> rejected)
+    Action<OrderDecision> rejected,
+    Func<int,LocalSong?> songLookup)
 {
     public OrderExecution Execute(SelectedPlaylistItem? item,bool top,OrderContext context)
     {
@@ -33,7 +34,8 @@ public sealed class OriginalOrderExecutor(
             case OrderDecision.TopDownload:success=topDownload(item,alreadyQueued);break;
             default:rejected(decision);return new(decision,false,false);
         }
-        if(success && item.PlayType is not ("youtube" or "midi" or "mixcloud" or "soundcloud"))synchronizeRate(item);
+        if(success && item.PlayType is not ("youtube" or "midi" or "mixcloud" or "soundcloud") &&
+            songLookup(item.SongMetadata.Id) is not null)synchronizeRate(item);
         countOrder(item);return new(decision,true,success);
     }
 
