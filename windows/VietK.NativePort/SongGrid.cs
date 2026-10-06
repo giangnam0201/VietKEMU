@@ -19,6 +19,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
 {
     public event Action<CatalogueSong,string>? ActionRequested;
     public event Action<string>? SingerRequested;
+    public Canvas? OrderAnimationHost { get; set; }
     private long lastPreviewClick;
 
     public ScrollViewer Create(IReadOnlyList<CatalogueSong> songs,
@@ -29,8 +30,8 @@ public sealed class SongGrid(string root,SongGridContract contract)
         {
             var song=songs[index];
             if(song.LocalState is null)throw new InvalidDataException("Song grid requires original local-state flags");
-            var cell=new Canvas { Width=246,Height=147,ClipToBounds=true };
-            var tile=new Canvas { Width=248,Height=142,ClipToBounds=true };
+            var cell=new Canvas { Width=246,Height=147,ClipToBounds=true,Tag="song-cell:"+song.Id };
+            var tile=new Canvas { Width=248,Height=142,ClipToBounds=true,Tag="song-tile:"+song.Id };
             Put(cell,tile,5,0);Put(body,cell,index%3*246,index/3*147);
             var defaultImage=contract.Icons["icon_song_default"];
             Put(tile,new Image { Source=Bitmap(defaultImage.File),Width=248,Height=146,Stretch=Stretch.UniformToFill },0,0);
@@ -64,7 +65,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
                         var now=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                         if(now-lastPreviewClick>500) { ActionRequested?.Invoke(song,action);lastPreviewClick=now; }
                     }
-                    else if(inside)ActionRequested?.Invoke(song,action);
+                    else if(inside) { if(action=="top")AnimateOrder(cell,song,queued,collected);ActionRequested?.Invoke(song,action); }
                     e.Handled=true; };
                 image.LostMouseCapture+=(_,_)=> { Scale(1);image.Source=Bitmap(data.File); };
             }
@@ -77,7 +78,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
             var singer=OriginalSingerText.Create(song.Singer,16,name=>SingerRequested?.Invoke(name),"song-singers:"+song.Id);
             singer.TextWrapping=TextWrapping.NoWrap;singer.Margin=new(10,0,actionWidth,0);
             bar.Children.Add(singer);bar.Children.Add(actions);
-            tile.MouseLeftButtonUp+=(_,e)=> { ActionRequested?.Invoke(song,"order");e.Handled=true; };
+            tile.MouseLeftButtonUp+=(_,e)=> { AnimateOrder(cell,song,queued,collected);ActionRequested?.Invoke(song,"order");e.Handled=true; };
         }
         return new ScrollViewer { Width=738,Height=440,Content=body,VerticalScrollBarVisibility=ScrollBarVisibility.Hidden,
             HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled,CanContentScroll=false,ClipToBounds=true,
@@ -85,6 +86,16 @@ public sealed class SongGrid(string root,SongGridContract contract)
     }
 
     private BitmapImage Bitmap(string file)=>new(new Uri(Path.Combine(root,file)));
+    private void AnimateOrder(Canvas source,CatalogueSong song,IReadOnlySet<int>? queued,IReadOnlySet<int>? collected)
+    {
+        if(OrderAnimationHost is not { } host||!source.IsLoaded)return;
+        var position=source.TranslatePoint(new Point(),host);
+        // Inflate a separate grid item, as the APK does, instead of moving the
+        // source row or treating an animation as confirmed queue membership.
+        var preview=new SongGrid(root,contract).Create(new[]{song},queued,collected);
+        var body=(Canvas)preview.Content;var copy=(Canvas)body.Children[0];body.Children.Remove(copy);
+        OriginalSongOrderAnimation.Play(host,copy,position,"song-grid-order-animation:"+song.Id);
+    }
     private static SolidColorBrush Brush(string hex)=>new((Color)ColorConverter.ConvertFromString(hex));
     private static void Put(Canvas canvas,UIElement child,double x,double y)
     { Canvas.SetLeft(child,x);Canvas.SetTop(child,y);canvas.Children.Add(child); }
@@ -94,6 +105,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
 // wrapping and a one-pixel font reduction until the 109px height fits.
 public sealed class OutlinedSongName(string name,bool queued) : FrameworkElement
 {
+    internal bool IsConfirmedQueued=>queued;
     protected override void OnRender(DrawingContext drawing)
     {
         var size=32d;

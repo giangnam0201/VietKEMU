@@ -50,6 +50,7 @@ public static class NativePlaybackVerification
                     "Bundled original idle background did not decode into the panel preview");
                 await NativeSongPreviewVerification.Run(host,playback,fixtures,output);
                 await NativeSingerNavigationVerification.Run(host,playback,root,output);
+                await NativeSongGridAnimationVerification.Run(host,root,output);
                 Require(!string.IsNullOrWhiteSpace(playback.Television.Overlay.MarqueeText),"Idle marquee missing");
                 var marquee=playback.Television.Overlay;var scrollBefore=marquee.MarqueeOffset;
                 await Task.Delay(300);

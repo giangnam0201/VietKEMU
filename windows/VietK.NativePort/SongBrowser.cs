@@ -93,7 +93,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
         var youtube=new Border { Background=Gradient("#ffc037d0","#ff7437e9"), CornerRadius=new(30),
             HorizontalAlignment=HorizontalAlignment.Center,Margin=new(0,15,0,0),Child=youtubeText };
         Click(youtube,()=>YoutubeRequested?.Invoke(Input?.Text ?? "")); empty.Children.Add(youtube); area.Children.Add(empty);
-        var gridFactory=new SongGrid(root,gridContract);
+        var gridFactory=new SongGrid(root,gridContract) { OrderAnimationHost=canvas };
         gridFactory.ActionRequested+=(song,action)=>SongActionRequested?.Invoke(song,action);
         gridFactory.SingerRequested+=name=>SingerRequested?.Invoke(name);
         var currentPage=0;var lastTotalSize=0;
