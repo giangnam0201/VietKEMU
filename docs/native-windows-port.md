@@ -242,6 +242,18 @@ engine and server protocol remain pending. The native capture exercises actual
 seed table creation and catalogue metadata round-trip only; it does not start a
 download or claim any music file exists.
 
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37412309586
+passed download restoration/Top/effect ordering, repeated-song progress/errors,
+unknown totals, clamp/Java overflow, raw-null metadata, public insertion,
+registry cleanup/cancellation, schema idempotence, round-trip/reopen, repeat
+deletion/count numbering, failed insertion and transactional Top rollback.
+Windows compilation/capture verified the actual seed's missing download table
+creation and song 101000 metadata restoration with local flag 0, empty customer
+ID and unavailable scoring. The downloaded
+`artifacts/native-verification-v18/verification.json` reports
+`originalDownloadListStorageVerified: true` while retaining servers, playback,
+TV and full fidelity as pending/unverified.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37398160720
 passed the worker/FIFO/failure checks and native Windows build/capture. Its
 isolated queue fixture verifies append/delete persistence, start-play request
