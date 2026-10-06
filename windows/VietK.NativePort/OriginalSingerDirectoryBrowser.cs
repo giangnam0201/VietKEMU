@@ -38,14 +38,15 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
         Country=Sex=0;CurrentPage=1;spell="";
         keyboard=new SongBrowser(root,contract,more,database,grid) { Playback=Playback };
         var canvas=keyboard.CreateSearchShell();canvas.Tag="original-singer-directory";
-        var area=new Canvas { Width=780,Height=500,Tag="singer-directory-area" };
-        area.Children.Add(new Border { Width=780,Height=500,CornerRadius=new(5),BorderThickness=new(2),BorderBrush=Brush("#195375be"),
+        var area=new Canvas { Width=765,Height=500,Tag="singer-directory-area" };
+        area.Children.Add(new Border { Width=765,Height=500,CornerRadius=new(5),BorderThickness=new(2),BorderBrush=Brush("#195375be"),
             Background=new LinearGradientBrush(new GradientStopCollection { new(Brush("#33fb00cb").Color,0),new(Brush("#33490ba6").Color,.5),new(Brush("#33c01be2").Color,1) },new Point(0,1),new Point(1,0)),IsHitTestVisible=false });
         Put(canvas,area,32,21);
         categories=new StackPanel { Orientation=Orientation.Horizontal,Height=30 };
         Put(area,categories,15,10);
         tiles=new Canvas { Width=760,Height=460,ClipToBounds=true,Tag="singer-directory-tiles" };
-        Put(area,tiles,5,55);
+        var viewport=new Canvas { Width=760,Height=460,ClipToBounds=true };
+        Put(area,viewport,5,40);Put(viewport,tiles,0,15);
         empty=Label("Không có kết quả phù hợp",28);empty.Width=760;empty.TextAlignment=TextAlignment.Center;
         Put(area,empty,5,250);
         var pager=new StackPanel { Width=114,Orientation=Orientation.Horizontal,Tag="singer-directory-pager" };
