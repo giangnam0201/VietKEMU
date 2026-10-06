@@ -27,7 +27,7 @@ public sealed class YouTubeMusicScreen : IDisposable
     private readonly Dictionary<string,TextBlock> visibleTitles=[];
     private TextBlock? pageLabel;
     private int page;
-    private StackPanel? queueView;
+    private SelectedQueueDialog? queueDialog;
     private TextBlock? status;
     private TextBox? input;
     private string category="Karaoke";
@@ -164,12 +164,10 @@ public sealed class YouTubeMusicScreen : IDisposable
         active?queue.Skip(1).FirstOrDefault()?.Title??"":"");
     private void ShowQueue()
     {
-        queueView=new StackPanel();var content=new StackPanel { Margin=new(20) };content.Children.Add(Label("Đã chọn",26));
-        content.Children.Add(new ScrollViewer { Content=queueView,Height=340 });
-        content.Children.Add(Button("Thử lại",()=>_=PlayFirst()));content.Children.Add(Button("Xóa hàng chờ",Clear));
-        var dialog=new Window { Title="VietK — Đã chọn",Width=560,Height=520,Content=content,Owner=Application.Current.MainWindow,
-            Background=new ImageBrush(new BitmapImage(new Uri(Path.Combine(root,"main_bg.jpg")))) };
-        RefreshQueue();dialog.ShowDialog();queueView=null;
+        if(Application.Current.MainWindow?.Content is not Viewbox { Child:Canvas panel })return;
+        queueDialog?.Close();
+        queueDialog=new SelectedQueueDialog(panel,Remove,TopNext,Clear,Shuffle,()=>_=PlayFirst());
+        RefreshQueue();
     }
     private void ChangePage(int delta)
     {
@@ -187,6 +185,38 @@ public sealed class YouTubeMusicScreen : IDisposable
         if(page!=1)throw new InvalidDataException("YouTube advanced past last page");
         ChangePage(-5);
         if(page!=0 || results.Children.Count!=6)throw new InvalidDataException("YouTube first page boundary differs");
+    }
+    internal void VerifyQueueControls(Canvas panel,string captureDirectory)
+    {
+        var saved=queue.ToArray();var wasActive=active;var stamp=generation;
+        queue.Clear();queue.AddRange(Enumerable.Range(0,4).Select(i=>new YouTubeVideo("queue-fixture-"+i,"Queue fixture "+i,"","")));
+        active=true;
+        queueDialog=new SelectedQueueDialog(panel,Remove,TopNext,Clear,Shuffle,()=>_=PlayFirst());RefreshQueue();
+        void Require(bool condition,string message) { if(!condition)throw new InvalidDataException(message); }
+        void Click(UIElement element)=>element.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,0,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
+        Border IconAt(int row,string name)=>((Canvas)queueDialog.Rows.Children[row]).Children.OfType<Border>().Single(b=>Equals(b.Tag,name));
+        try
+        {
+            panel.Measure(new Size(1280,800));panel.Arrange(new Rect(0,0,1280,800));panel.UpdateLayout();
+            Require(((Canvas)queueDialog.Rows.Children[0]).Height==65 && panel.Children.Contains(queueDialog.Overlay),"Selected queue layout differs");
+            var image=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);image.Render(panel);
+            var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(image));
+            using(var file=File.Create(Path.Combine(captureDirectory,"native-selected-queue.png")))encoder.Save(file);
+            Click(IconAt(3,"ic_top_song"));Require(queue.Select(v=>v.Id).SequenceEqual(new[]{"queue-fixture-0","queue-fixture-3","queue-fixture-1","queue-fixture-2"}),"Queue top callback differs");
+            Click(IconAt(2,"ic_delete"));Require(queue.Count==3 && queue.All(v=>v.Id!="queue-fixture-1"),"Pending-song delete callback failed");
+            var toolbar=((Canvas)((Border)queueDialog.Overlay.Children[0]).Child).Children.OfType<Grid>().Single();
+            Click(toolbar.Children[1]);Require(queue[0].Id=="queue-fixture-0" && queue.Count==3,"Shuffle restarted or lost the playing song");
+            StackPanel ConfirmationButtons()=>((StackPanel)((Border)((Canvas)panel.Children[panel.Children.Count-1]).Children[0]).Child).Children.OfType<StackPanel>().Single();
+            Click(toolbar.Children[0]);Click(ConfirmationButtons().Children[0]);
+            Require(queue.Count==3 && panel.Children[panel.Children.Count-1]==queueDialog.Overlay,"Cancel cleared the queue or left confirmation open");
+            Click(toolbar.Children[0]);Click(ConfirmationButtons().Children[1]);
+            Require(queue.Count==1 && queue[0].Id=="queue-fixture-0" && active && generation==stamp,"Clear interrupted current playback");
+            Require(JsonSerializer.Deserialize<List<YouTubeVideo>>(File.ReadAllText(queueFile))?.Count==1,"Queue changes were not saved");
+        }
+        finally
+        {
+            queueDialog.Close();queueDialog=null;queue.Clear();queue.AddRange(saved);active=wasActive;Save();RefreshQueue();
+        }
     }
     private void RenderPage(WrapPanel target)
     {
@@ -219,17 +249,10 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private void RefreshQueue()
     {
-        bottom.SetConfirmedQueueCount(queue.Count);queueView?.Children.Clear();
+        bottom.SetConfirmedQueueCount(queue.Count);queueDialog?.Refresh(queue,active);
         UpdateMarquee();
         foreach(var (id,title) in visibleTitles)
             title.Foreground=queue.Any(item=>item.Id==id)?new SolidColorBrush(Color.FromRgb(255,231,97)):Brushes.White;
-        for(var index=0;index<queue.Count;index++)
-        {
-            var video=queue[index];var row=new DockPanel { Margin=new(0,3,0,3) };
-            var remove=Button("×",()=>Remove(video));remove.Width=38;DockPanel.SetDock(remove,Dock.Right);row.Children.Add(remove);
-            var text=Label((index+1)+". "+video.Title,17);text.TextTrimming=TextTrimming.CharacterEllipsis;
-            row.Children.Add(text);queueView?.Children.Add(row);
-        }
     }
     private void Remove(YouTubeVideo video)
     {
@@ -330,7 +353,19 @@ public sealed class YouTubeMusicScreen : IDisposable
     private void Next()
     { downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;++generation;active=false;playback.Player.Stop();if(queue.Count>0)queue.RemoveAt(0);Save();RefreshQueue();_=PlayFirst(); }
     private void Clear()
-    { downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;++generation;active=false;queue.Clear();Save();RefreshQueue();playback.StartIdleDemo();SetStatus("Hàng chờ trống."); }
+    {
+        if(active && queue.Count>0)
+        {
+            OriginalQueueOrder.ClearExceptPlaying(queue,idle:false);Save();RefreshQueue();
+            SetStatus("Đã xóa các bài đang chờ.");return;
+        }
+        downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;++generation;active=false;
+        OriginalQueueOrder.ClearExceptPlaying(queue,idle:true);Save();RefreshQueue();playback.StartIdleDemo();SetStatus("Hàng chờ trống.");
+    }
+    private void TopNext(YouTubeVideo video)
+    { if(OriginalQueueOrder.Top(queue,queue.FindIndex(item=>item.Id==video.Id))) { Save();RefreshQueue(); } }
+    private void Shuffle()
+    { if(OriginalQueueOrder.Shuffle(queue,Random.Shared.Next)) { Save();RefreshQueue(); } }
     private void Save()
     { File.WriteAllText(queueFile+".tmp",JsonSerializer.Serialize(queue));File.Move(queueFile+".tmp",queueFile,true); }
     private void ChooseCookies()

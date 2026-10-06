@@ -63,6 +63,10 @@ Available to test:
 - Firefox menu > Chon video cho selects a local MP4 as the saved idle video.
   Replay keeps idle looping; changing volume preserves your selected video.
 - Decoder failures return to idle and keep the selected YouTube song for retry.
+- Selected queue: original panel layout, cut/delete, move to next, shuffle waiting
+  songs and confirmed clear-all. Clearing while playing keeps the current song.
+  Queue icons use the local original-resource supplement. History and dragging
+  are not yet ported.
 - Server login/media-request transport and music file download to playback queue.
 - Pause, replay, seek, original/accompaniment and output volume controls.
 

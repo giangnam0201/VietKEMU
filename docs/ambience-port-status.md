@@ -60,3 +60,12 @@ line-height model, rather than merging duplicates or drawing overflow.
 Still pending: complete Android barrage font/layout equivalence, room-state reset
 integration, peripheral lighting, and complete original dialog
 navigation. The expression page is a partial port, not proof of full fidelity.
+
+The selected-song overlay now uses the original 563 by 596 right-aligned panel,
+65px rows, playing-song highlight, two-digit waiting numbers, cut/delete/top
+controls, and the original clear confirmation text and gradients. Clearing while
+playing preserves the head; shuffle affects only the tail; top inserts at index
+one. Changes persist without restarting the decoder. Windows capture checks click
+top/delete/shuffle and both confirmation choices. Queue PNGs are imported from
+the owner's local original-resource supplement, not published in the release.
+History, drag ordering and original download-progress decorations remain pending.

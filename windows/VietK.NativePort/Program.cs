@@ -424,6 +424,7 @@ public static class Program
                     youtubeCapture.SetVerificationResults(Enumerable.Range(0,8).Select(index=>
                         new YouTubeVideo("fixture000"+index,"Verification fixture "+(index+1)+" — kiểm tra bố cục hai hàng", "", "")).ToArray());
                     youtubeCapture.VerifyPagination();
+                    youtubeCapture.VerifyQueueControls(youtubeCanvas,args[1]);
                     youtubeCanvas.UpdateLayout();
                     var pageImage=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);pageImage.Render(youtubeCanvas);
                     var pageEncoder=new PngBitmapEncoder();pageEncoder.Frames.Add(BitmapFrame.Create(pageImage));
@@ -434,6 +435,7 @@ public static class Program
                     nativeWindowsRendering = true,
                     youtubeMainPanelNativeRendering = true,
                     youtubeSixCardPaginationAndBoundsVerified = true,
+                    selectedQueueTopDeleteShuffleAndPreservePlayingVerified = true,
                     androidRuntimeUsed = false,
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,
