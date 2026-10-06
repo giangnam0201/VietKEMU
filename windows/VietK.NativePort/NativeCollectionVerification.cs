@@ -18,6 +18,10 @@ internal static class NativeCollectionVerification
         static void Require(bool condition,string message) { if(!condition)throw new InvalidDataException(message); }
         var directory=Path.GetFullPath(Path.Combine(Path.GetTempPath(),"vietk-native-collection-"+Guid.NewGuid().ToString("N")));
         Directory.CreateDirectory(directory);var previous=host.Content;
+        var previousBounds=new Rect(host.Left,host.Top,host.Width,host.Height);
+        var desktop=SystemParameters.WorkArea;
+        host.Left=desktop.Left+8;host.Top=desktop.Top+8;
+        host.Width=Math.Min(1280,desktop.Width-16);host.Height=Math.Min(800,desktop.Height-16);
         var panel=new Canvas { Width=1280,Height=800,Background=new ImageBrush(new BitmapImage(new Uri(Path.Combine(root,"main_bg.jpg")))) };
         host.Content=new Viewbox { Child=panel };
         try
@@ -85,7 +89,8 @@ internal static class NativeCollectionVerification
                 {
                     host.Activate();host.UpdateLayout();var point=target.PointToScreen(new Point(target.ActualWidth/2,target.ActualHeight/2));
                     Require(SetCursorPos((int)point.X,(int)point.Y),"Could not position browser fixture pointer");await Task.Delay(70);
-                    Require(new Rect(0,0,target.ActualWidth,target.ActualHeight).Contains(Mouse.GetPosition(target)),"Browser fixture pointer is outside "+target.Tag);
+                    Require(new Rect(0,0,target.ActualWidth,target.ActualHeight).Contains(Mouse.GetPosition(target)),
+                        $"Browser pointer outside {target.Tag}: requested={point}, actual={Mouse.GetPosition(target)}, size={target.ActualWidth}×{target.ActualHeight}, desktop={desktop}");
                     target.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonUpEvent });
                 }
                 async Task Login(string user,string password)
@@ -143,6 +148,7 @@ internal static class NativeCollectionVerification
         finally
         {
             host.Content=previous;
+            host.Left=previousBounds.Left;host.Top=previousBounds.Top;host.Width=previousBounds.Width;host.Height=previousBounds.Height;
             var temp=Path.GetFullPath(Path.GetTempPath()).TrimEnd(Path.DirectorySeparatorChar)+Path.DirectorySeparatorChar;
             if(!directory.StartsWith(temp,StringComparison.OrdinalIgnoreCase)||!Path.GetFileName(directory).StartsWith("vietk-native-collection-",StringComparison.Ordinal))throw new InvalidOperationException("Unexpected fixture cleanup path");
             Directory.Delete(directory,true);
