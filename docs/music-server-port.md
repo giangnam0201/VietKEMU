@@ -42,6 +42,12 @@ No production song was downloaded. Encrypted karaoke playback remains unverified
   to the selected queue, and start the next download. Cache metadata contains the
   returned vocal/accompaniment indexes and per-song gain. Windows paths are
   registered after actual completion, never inferred from catalogue filenames.
+- Download failures mark every matching queue row and notify observers before
+  recovery. Non-interrupting errors retain the active song/state for the original
+  one-second delay, then reset and advance one queue index. Storage error 1016
+  resets without advancing; network error 1015 stops selection. Song failures no
+  longer block the worker behind a Windows modal dialog. The original queue
+  screen and its inline error text still need a full UI port.
 
 ## Configuration and testing
 

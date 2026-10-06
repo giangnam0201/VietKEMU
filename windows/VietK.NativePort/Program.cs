@@ -121,11 +121,16 @@ public static class Program
             };
             musicServer.Failed+=async (id,code,detail)=>
             {
-                if(id>0) { downloadQueue.SetError(id,code);downloadSelection.Reset(); }
                 if(code==1015)downloadSelection.Stop();
-                QueueChanged();
-                MessageBox.Show($"Song {id}: download error {code}\n\n{detail}","VietK music server",MessageBoxButton.OK,MessageBoxImage.Error);
-                if(id>0 && code!=1016) { await Task.Delay(1000);downloadSelection.DownloadNext(); }
+                if(id>0)
+                {
+                    downloadSelection.RecordError(code,code==1016);
+                    System.Diagnostics.Trace.WriteLine($"Song {id}: download error {code}: {detail}");
+                    // Original errors update the queue rather than block its
+                    // worker behind a Windows modal dialog.
+                    if(code!=1016) { await Task.Delay(1000);downloadSelection.AdvanceAfterError(); }
+                }
+                else MessageBox.Show(detail,"VietK music server",MessageBoxButton.OK,MessageBoxImage.Error);
             };
             QueueChanged();
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),

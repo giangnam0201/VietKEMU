@@ -32,6 +32,18 @@ public sealed class OriginalDownloadSelection(OriginalDownloadQueue queue,Action
     }
     public void Stop()=>queue.WithLockedItems(_=>IsStopped=true);
     public void Start() { queue.WithLockedItems(_=>IsStopped=false);DownloadFirst(); }
+    // Non-interrupting errors retain the active selection until the original
+    // 1000 ms recovery delay. Notify after marking every matching song row.
+    public void RecordError(int errorCode,bool interrupt)
+    {
+        queue.WithLockedItems(items=>
+        {
+            foreach(var item in items.Where(item=>item.SongMetadata.Id==CurrentSongId))item.DownloadState=errorCode;
+            CurrentState=errorCode;changed();
+            if(interrupt)Reset();
+        });
+    }
+    public void AdvanceAfterError() { Reset();DownloadNext(); }
     // Selection portion of resetState; transfer fields are owned by the future
     // downloader port. Reset does not start the next song or clear stop state.
     public void Reset()=>queue.WithLockedItems(_=> { IsDownloading=false;CurrentSongId=0;CurrentState=200; });

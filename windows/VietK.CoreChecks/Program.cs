@@ -515,6 +515,21 @@ Require(selection.IsDownloading && selection.CurrentSongId==10 && selection.Curr
     "Download admission state, repeated-song marking or observer-before-URL request differs");
 selection.DownloadFirst();selection.Stop();selection.Start();
 Require(selectionEvents.Count==2 && selection.IsDownloading,"Repeated/start download restarted an active transfer");
+selectionEvents.Clear();selection.RecordError(1013,false);
+Require(selection.IsDownloading && selection.CurrentSongId==10 && selection.CurrentState==1013 &&
+    selectionQueue.Snapshot().Select(item=>item.DownloadState).SequenceEqual(new[]{1013,1013,200}) &&
+    selectionEvents.SequenceEqual(new[]{"changed"}),"Error did not retain active selection and mark duplicate song rows before notification");
+selection.DownloadFirst();Require(selectionEvents.Count==1,"Failed selection restarted before its one-second recovery delay");
+selection.AdvanceAfterError();
+Require(selection.CurrentSongId==10 && selection.CurrentState==202 && selection.IsDownloading &&
+    selectionEvents.SequenceEqual(new[]{"changed","changed","url:10"}),"Error advancement skipped the next original queue index");
+selection.RecordError(1016,true);
+Require(!selection.IsDownloading && selection.CurrentSongId==0 && selection.CurrentState==200 &&
+    selectionQueue.Snapshot().Select(item=>item.DownloadState).SequenceEqual(new[]{1016,1016,200}),
+    "Storage-interrupted error failed to reset selection while preserving row failures");
+selection.Start();selection.Stop();selection.RecordError(1015,false);selection.AdvanceAfterError();
+Require(selection.IsStopped && !selection.IsDownloading && selection.CurrentState==200,
+    "Network-stopped error advancement started another transfer");
 selection.Stop();selection.Reset();
 Require(selection.IsStopped && !selection.IsDownloading && selection.CurrentState==200 && selection.CurrentSongId==0,
     "Reset changed stop flag or started a download");
