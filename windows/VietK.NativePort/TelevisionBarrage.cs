@@ -27,7 +27,7 @@ public sealed class TelevisionBarrage : IDisposable
     public bool Send(string text,string? resourceRoot=null)
     {
         if(string.IsNullOrEmpty(text))return false;
-        var root=Path.Combine(resourceRoot??OriginalSupplement.Root,"ambience");
+        var root=Path.GetFullPath(Path.Combine(resourceRoot??OriginalSupplement.Root,"ambience"));
         var ellipse=Path.Combine(root,"barrage_ellipse.png");var rocket=Path.Combine(root,"barrage_rocket.png");
         if(!File.Exists(ellipse) || !File.Exists(rocket))return false;
         var formatted=new FormattedText(text,CultureInfo.InvariantCulture,FlowDirection.LeftToRight,
