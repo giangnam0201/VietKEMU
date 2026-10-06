@@ -120,7 +120,10 @@ The newer-client test therefore does not resolve production music access.
   before each single-attempt write connection. Read failures/timeouts use 1007,
   delete the partial file and permit up to three write attempts with notification
   1018. Cache write failures use 1009 and accept a full-size file or restart.
-  Downloader User-Agent parity, NAS handling, screen-off behavior and all error
+  The downloader User-Agent uses the same model/system/protocol fields as login,
+  followed by the original controlling APK version `Vietnam_V1.0` and the supplied
+  device serial. Its probe, write and opening retries carry that same header.
+  NAS handling, screen-off behavior and all error
   transitions remain incomplete. The original's premature-EOF loop is not
   reproduced: the Windows adapter rejects incomplete files instead of spinning.
 - Completed downloads update the local-song flag, move matching download entries
@@ -137,7 +140,11 @@ The newer-client test therefore does not resolve production music access.
 ## Configuration and testing
 
 After first launch, `%LOCALAPPDATA%\VietKNativePort\music-server.json` contains
-`LoginUrl`, `ChipId`, `Mac`, `UserAgent` and optional `MusicDirectory`. Supply
+`LoginUrl`, `ChipId`, `Mac`, `UserAgent`, optional `MusicDirectory` and optional
+`DownloadUserAgent`. The latter overrides the original download header; otherwise
+it is derived from a five-part login User-Agent and the configured ChipId. A
+custom login header with another format requires an explicit download override.
+Supply
 device information the original server accepts and restart. Missing identity
 prevents login; rejected requests display the real failure. The catalogue is
 metadata, and online search visibility requires a successful original login.

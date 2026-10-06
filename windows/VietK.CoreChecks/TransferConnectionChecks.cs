@@ -12,6 +12,11 @@ static class TransferConnectionChecks
         var directory=Path.Combine(Path.GetTempPath(),"vietk-recovery-"+Guid.NewGuid());
         var payload=Enumerable.Range(0,70001).Select(i=>(byte)(i*17)).ToArray();
         var requests=new List<string>();
+        var userAgent=OriginalMusicTransfer.UserAgentFromDataCenter(
+            "KTV-Plus/1.2.b57/1.9.1/android/1.0.0","Vietnam_V1.0","fixture-serial");
+        if(userAgent!="KTV-Plus/1.2.b57/1.9.1/android/Vietnam_V1.0/fixture-serial" ||
+            OriginalMusicTransfer.UserAgentFromDataCenter("custom-agent","Vietnam_V1.0","fixture-serial")!="")
+            throw new InvalidDataException("Downloader header confused the service version with the controlling APK version");
         try
         {
             var serving=Task.Run(async()=>
@@ -28,7 +33,8 @@ static class TransferConnectionChecks
                     { var colon=line.IndexOf(':');headers[line[..colon]]=line[(colon+1)..].Trim(); }
                     if(headers.GetValueOrDefault("Range")!="bytes=0-" ||
                         headers.GetValueOrDefault("Accept-Encoding")!="identity" ||
-                        headers.GetValueOrDefault("Accept")!="*/*")
+                        headers.GetValueOrDefault("Accept")!="*/*" ||
+                        headers.GetValueOrDefault("User-Agent")!=userAgent)
                         throw new InvalidDataException("Original media HTTP headers differ");
                     var status=index is 2 or 3?"200 OK":index==7?"404 Not Found":"503 Service Unavailable";
                     var length=index is 2 or 3?payload.Length:0;
@@ -36,7 +42,7 @@ static class TransferConnectionChecks
                     if(index==3)await stream.WriteAsync(payload);
                 }
             });
-            using var transfer=new OriginalMusicTransfer();
+            using var transfer=new OriginalMusicTransfer(userAgent);
             var file=await transfer.Download(31,address+"/recovery",directory,(_,_)=>{},CancellationToken.None);
             if(!File.ReadAllBytes(file).SequenceEqual(payload))throw new InvalidDataException("Third-attempt media recovery changed bytes");
             foreach(var item in new[]{(32,"/exhausted"),(33,"/missing")})
@@ -63,7 +69,7 @@ static class TransferConnectionChecks
             }
             catch(OperationCanceledException) when(cancelled.IsCancellationRequested) { }
             if(listener.Pending())throw new InvalidDataException("Cancelled transfer opened a connection");
-            Console.WriteLine("Original media Range/identity headers, third-attempt recovery, retry exhaustion, 404 stop and pre-connect cancellation verified.");
+            Console.WriteLine("Original media APK-version/serial User-Agent, Range/identity headers, third-attempt recovery, retry exhaustion, 404 stop and pre-connect cancellation verified.");
         }
         finally { listener.Stop();if(Directory.Exists(directory))Directory.Delete(directory,true); }
     }

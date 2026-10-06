@@ -23,7 +23,7 @@ static class NativeMusicPipelineVerification
         var directory=Path.Combine(output,"server-pipeline");Directory.CreateDirectory(directory);
         File.WriteAllText(Path.Combine(directory,"music-server.json"),JsonSerializer.Serialize(
             new MusicServerConfiguration(address+"login","loopback-fixture-device","00:00:00:00:00:01",
-                "VietK-loopback-verification",Path.GetFullPath(Path.Combine(directory,"music")))));
+                "VietK-loopback-verification",Path.GetFullPath(Path.Combine(directory,"music")),"VietK-loopback-downloader")));
         try
         {
             var serving=Task.Run(async()=>
@@ -68,6 +68,8 @@ static class NativeMusicPipelineVerification
                     else
                     {
                         if(first?.StartsWith("GET /video ")!=true)throw new InvalidDataException("Returned media URL was not downloaded");
+                        if(headers.GetValueOrDefault("User-Agent")!="VietK-loopback-downloader")
+                            throw new InvalidDataException("Configured downloader User-Agent did not reach the media server");
                         await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: "+new FileInfo(source).Length+"\r\nConnection: close\r\n\r\n"));
                         if(index==3) { await using var file=File.OpenRead(source);await file.CopyToAsync(stream); }
                     }

@@ -50,8 +50,15 @@ public sealed class OriginalTransferException(int code,string message,Exception?
 
 // Windows file/HTTP adapter for LocalOnlineSongManager.downloadVideo. No media
 // becomes playable until EOF, known Content-Length and completed-file checks.
-public sealed class OriginalMusicTransfer : IDisposable
+public sealed class OriginalMusicTransfer(string userAgent="") : IDisposable
 {
+    // HttpFile uses the controlling APK's version and Build.SERIAL, while the
+    // data-center header uses its service APK's version without the serial.
+    public static string UserAgentFromDataCenter(string dataCenterUserAgent,string appVersion,string serial)
+    {
+        var parts=dataCenterUserAgent.Split('/');
+        return parts.Length==5?string.Join('/',parts.Take(4))+"/"+appVersion+"/"+serial:"";
+    }
     private readonly HttpClient client=new(new SocketsHttpHandler { ConnectTimeout=TimeSpan.FromSeconds(10) })
         { Timeout=Timeout.InfiniteTimeSpan };
     // HttpFile.open(uri, 0, 3): three connection attempts, immediate stop on
@@ -67,6 +74,7 @@ public sealed class OriginalMusicTransfer : IDisposable
             request.Headers.Range=new RangeHeaderValue(0,null);
             request.Headers.Accept.ParseAdd("*/*");
             request.Headers.AcceptEncoding.ParseAdd("identity");
+            if(!string.IsNullOrEmpty(userAgent))request.Headers.TryAddWithoutValidation("User-Agent",userAgent);
             using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             timeout.CancelAfter(TimeSpan.FromSeconds(10));
             try
