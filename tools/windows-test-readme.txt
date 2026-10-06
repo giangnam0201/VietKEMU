@@ -45,9 +45,11 @@ Available to test:
   scrolling text can be edited using Firefox menu > Chu chay tren TV.
 - An actual Demo.mp4 beside the EXE, or in the app-state folder below, plays
   and loops while the queue is empty. Factory 60003950.mp4 is also accepted.
-  The original APK background video is bundled as the default idle fallback.
-  Its bytes are authentic; it is not verified identical to the missing HDD
-  factory idle clip. Add your device's clip to reproduce that idle broadcast.
+  The original factory dice video was recovered from assets/sdcard.zip inside
+  the supplied APK. Supplemental original media remains local: the app finds
+  original-ambience-idle.zip beside the EXE, in the app-state folder, or in the
+  development workspace's .reference/recovered-original folder and imports it.
+  The APK random background remains the fallback when that bundle is absent.
 - Firefox menu > Chon video cho selects a local MP4 as the saved idle video.
   Replay keeps idle looping; changing volume preserves your selected video.
 - Decoder failures return to idle and keep the selected YouTube song for retry.

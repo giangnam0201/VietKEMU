@@ -18,6 +18,7 @@ public static class Program
         try
         {
             var root = Path.Combine(AppContext.BaseDirectory, "Original");
+            OriginalSupplement.Initialize();
             OriginalFont.Initialize(root);
             var contract = JsonSerializer.Deserialize<HomeContract>(File.ReadAllText(Path.Combine(root, "home.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })

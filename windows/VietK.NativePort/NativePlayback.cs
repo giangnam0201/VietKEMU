@@ -211,6 +211,7 @@ public sealed class NativePlayback : IDisposable
     private string idleVideoPath="";
     private OriginalSingMode? pendingTrackFeedback;
     public bool IsPlayingIdle=>playingIdle;
+    public string? IdleVideoSource { get; private set; }
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
         this.bottom = bottom;
@@ -262,9 +263,10 @@ public sealed class NativePlayback : IDisposable
             Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4"),
             Path.Combine(Path.GetDirectoryName(stateFile)!,"60003950.mp4"),
             Path.Combine(AppContext.BaseDirectory,"60003950.mp4"),
+            Path.Combine(OriginalSupplement.Root,"player","60003950.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Original","player","random_bg_default.mp4") };
         var demo=paths.FirstOrDefault(File.Exists);
-        playingIdle=false;Player.Stop();CurrentMedia=null;ResetPreview();
+        playingIdle=false;Player.Stop();CurrentMedia=null;IdleVideoSource=demo;ResetPreview();
         Television.Overlay.SetSong("");
         if(demo is null)return false;
         demo=Path.GetFullPath(demo);

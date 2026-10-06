@@ -1,5 +1,6 @@
 using System.IO;
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -214,6 +215,24 @@ public static class NativePlaybackVerification
                     Require(preferences.RootElement.GetProperty("IdleVideoPath").GetString()==Path.GetFullPath(multi),
                         "Volume save lost custom idle-video selection");
                 playback.Player.Stop();File.Delete(Path.Combine(output,"Demo.mp4"));
+                // This package uses a known decoder fixture. The owner's real
+                // factory clip stays local and is never uploaded by CI.
+                var supplement=Path.Combine(output,"supplement-fixture.zip");
+                using(var bundle=ZipFile.Open(supplement,ZipArchiveMode.Create))
+                    bundle.CreateEntryFromFile(clip,"player/60003950.mp4");
+                Environment.SetEnvironmentVariable("VIETK_ORIGINAL_RESOURCES",supplement);OriginalSupplement.Initialize();
+                Require(File.Exists(Path.Combine(OriginalSupplement.Root,"player","60003950.mp4")),"Local original resource import lost the idle clip");
+                idleStarts=played;Require(playback.StartIdleDemo(),"Imported idle clip did not start");
+                Require(playback.IdleVideoSource==Path.Combine(OriginalSupplement.Root,"player","60003950.mp4"),
+                    "Imported factory idle lost precedence over the random background");
+                await Until(()=>played>idleStarts,"Imported idle clip did not decode");playback.Player.Stop();
+                var unsafeSupplement=Path.Combine(output,"unsafe-supplement-fixture.zip");
+                using(var bundle=ZipFile.Open(unsafeSupplement,ZipArchiveMode.Create))
+                { using var writer=new StreamWriter(bundle.CreateEntry("ambience/../../escape.png").Open());writer.Write("fixture"); }
+                Environment.SetEnvironmentVariable("VIETK_ORIGINAL_RESOURCES",unsafeSupplement);var rejected=false;
+                try { OriginalSupplement.Initialize(); } catch(InvalidDataException) { rejected=true; }
+                Require(rejected,"Supplement importer admitted a path outside its local directory");
+                Environment.SetEnvironmentVariable("VIETK_ORIGINAL_RESOURCES",null);
                 File.WriteAllText(Path.Combine(output, "playback-verification.json"), JsonSerializer.Serialize(new
                 {
                     nativeWindowsDecoder = "bundled libVLC", androidRuntimeUsed = false,
@@ -223,6 +242,7 @@ public static class NativePlaybackVerification
                     audioEndingAt45PercentRejected=true,fullMkvAndTsAudioCoverageVerified=true,
                     continuousMarqueeMovementAndRefreshVerified=true,
                     configuredIdleDemoDecoderAndLoopVerified=true,
+                    localSupplementImportIdlePrecedenceAndTraversalRejectionVerified=true,
                     idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
                     playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,
