@@ -9,7 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
-using System.Windows.Media;
+using PixelFormats = System.Windows.Media.PixelFormats;
 using LibVLCSharp.Shared;
 using VietK.Core;
 
