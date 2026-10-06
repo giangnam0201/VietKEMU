@@ -189,6 +189,16 @@ handlers remain pending. Original clicks must pass those dependencies before
 remote entries are routed to the downloader; the host does not skip them by
 adding songs directly to its local queue.
 
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37398160720
+passed the worker/FIFO/failure checks and native Windows build/capture. Its
+isolated queue fixture verifies append/delete persistence, start-play request
+counts and badge changes. The rendered MDH page includes song 101000 and visually
+shows its orange selected title with badge 1; deletion verifies badge/store 0.
+LocalFlag remains zero and scoring remains unavailable, so the fixture does not
+claim downloaded media or successful playback. Report:
+`artifacts/native-verification-v16/verification.json`; capture:
+`artifacts/native-verification-v16/native-queue-observer-fixture.png`.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37397029606
 passed selected-item reconstruction, score polarity/ERC availability, preferred
 media selection, copy defaults, initialization semantics, append/Top/sort/delete
