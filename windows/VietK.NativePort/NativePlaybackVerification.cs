@@ -302,11 +302,12 @@ public static class NativePlaybackVerification
                     Require(center[2]>240 && center[0]<10 && center[1]<10,"Panel preview omitted the TV expression pixels");
                     await Task.Delay(1600);await Tone(expressionTap,1600,880,"Expression sound did not loop beyond its first second");
                     Require(expressions.Show("memeda",expressionRoot),"Expression could not restart for mute verification");
-                    var expressionPower=await MeasurePower(expressionTap,1600);
+                    await Tone(expressionTap,1600,880,"Restarted expression sound missing before mute");
+                    var expressionPower=await MeasureEnergy(expressionTap);
                     playback.SetMuted(true);
-                    await UntilPower(expressionTap,1600,power=>power<expressionPower*.001,"Mute left expression WAV audible");
+                    await UntilEnergy(expressionTap,power=>power<expressionPower*.001,"Mute left expression WAV audible");
                     playback.SetMuted(false);
-                    await UntilPower(expressionTap,1600,power=>power>=expressionPower*.8,"Expression audio did not recover after unmute");
+                    await UntilEnergy(expressionTap,power=>power>=expressionPower*.8&&power<=expressionPower*1.2,"Expression audio did not recover its original level after unmute");
                     Require(playback.Decoder.Position>before+1000 && playback.Decoder.PreserveStereo,"Expression replaced or interrupted karaoke playback");
                     var dialog=(Canvas)panel.Children[panel.Children.Count-1];var content=(Canvas)((Border)dialog.Children[0]).Child;
                     var tvHeading=content.Children.OfType<Border>().Single(child=>child.Child is TextBlock { Text:"TV" });
@@ -460,6 +461,18 @@ public static class NativePlaybackVerification
     }
     private static async Task<double> MeasurePower(PcmTap tap,int frequency)
     {
+        var samples=await CaptureSamples(tap);
+        return Math.Min(PcmTap.Power(samples,frequency,0),PcmTap.Power(samples,frequency,1));
+    }
+    private static async Task<double> MeasureEnergy(PcmTap tap)
+    {
+        var samples=await CaptureSamples(tap);
+        // Repeating audio can reset its phase between inputs. Mean square
+        // measures actual gain without requiring phase-continuous loop edges.
+        return samples.Average(sample=>(sample/32768d)*(sample/32768d));
+    }
+    private static async Task<short[]> CaptureSamples(PcmTap tap)
+    {
         tap.Reset();await Task.Delay(400);
         var samples=tap.Read();
         // Repeating one-second expression media can be between decoder inputs.
@@ -468,7 +481,13 @@ public static class NativePlaybackVerification
         while(samples.Length<4800&&DateTime.UtcNow<deadline)
         { await Task.Delay(100);samples=tap.Read(); }
         if(samples.Length<4800)throw new InvalidDataException("No decoded PCM available for gain verification");
-        return Math.Min(PcmTap.Power(samples,frequency,0),PcmTap.Power(samples,frequency,1));
+        return samples;
+    }
+    private static async Task UntilEnergy(PcmTap tap,Func<double,bool> accepted,string message)
+    {
+        var deadline=DateTime.UtcNow.AddSeconds(5);double energy;
+        do { energy=await MeasureEnergy(tap);if(accepted(energy))return; }while(DateTime.UtcNow<deadline);
+        throw new InvalidDataException(message+"; measured PCM mean-square="+energy);
     }
     private static async Task<double> UntilPower(PcmTap tap,int frequency,Func<double,bool> accepted,string message)
     {
