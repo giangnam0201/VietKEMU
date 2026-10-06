@@ -16,6 +16,9 @@ public sealed class NativeCollectionControls
     private readonly Func<Canvas?> panel;
     private readonly Action<IReadOnlySet<int>> refresh;
     private Canvas? host,overlay;
+    private Canvas? feedbackHost;
+    private Border? feedbackToast;
+    private DispatcherTimer? feedbackTimer;
     internal TextBox? Username { get; private set; }
     internal PasswordBox? Password { get; private set; }
     internal Button? Confirm { get; private set; }
@@ -87,9 +90,13 @@ public sealed class NativeCollectionControls
     { if(overlay is not null)host?.Children.Remove(overlay);overlay=null;Username=null;Password=null;Confirm=null; }
     private void Feedback(string text)
     {
+        feedbackTimer?.Stop();
+        if(feedbackToast is not null)feedbackHost?.Children.Remove(feedbackToast);
+        feedbackToast=null;feedbackHost=null;
         LastFeedback=text;var target=panel();if(target is null)return;
-        var toast=new Border { Background=Brush("#dd222222"),CornerRadius=new(8),Padding=new(15),Child=Text(text,18,460,TextAlignment.Center),IsHitTestVisible=false };
+        var toast=new Border { Tag="collection-feedback",Background=Brush("#dd222222"),CornerRadius=new(8),Padding=new(15),Child=Text(text,18,460,TextAlignment.Center),IsHitTestVisible=false };
         Put(target,toast,395,640);var timer=new DispatcherTimer { Interval=TimeSpan.FromSeconds(2) };
+        feedbackHost=target;feedbackToast=toast;feedbackTimer=timer;
         timer.Tick+=(_,_)=> { timer.Stop();target.Children.Remove(toast); };timer.Start();
     }
     private static TextBlock Text(string value,double size,double width,TextAlignment alignment=TextAlignment.Left)=>new()
