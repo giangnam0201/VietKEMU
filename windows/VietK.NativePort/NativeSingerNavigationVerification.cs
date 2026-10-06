@@ -21,6 +21,7 @@ internal static class NativeSingerNavigationVerification
         try
         {
             await NativeSingerArtworkVerification.Run(directory,output);
+            await NativeSearchOptionsVerification.Run(host,playback,root,directory,output);
             var state=Path.Combine(directory,"local.db");var whole=Path.Combine(directory,"whole.db");
             using var database=new LocalSongDatabase(Path.Combine(root,"local-seed.db"),state);
             using(var catalogue=new LocalSongDatabase(Path.Combine(root,"local-seed.db"),whole)) { }

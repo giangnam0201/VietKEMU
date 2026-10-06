@@ -8,7 +8,7 @@ namespace VietK.NativePort;
 // Singer spans -> fragment 28; Back restores the actual previous view/state.
 public sealed class OriginalSingerNavigation(string root,SongBrowserContract contract,MoreContract more,LocalSongDatabase database,
     SongGridContract grid,Func<Window?> host,Action<Canvas> decorate,Func<SongQueryContext> context,
-    Func<NativePlayback?> playback,Func<IReadOnlySet<int>> queued,Func<IReadOnlySet<int>> collected,NativeSingerPictures? pictures=null)
+    Func<NativePlayback?> playback,Func<IReadOnlySet<int>> queued,Func<IReadOnlySet<int>> collected,NativeSingerPictures? pictures=null,NativeSearchOptions? searchOptions=null)
 {
     private readonly Stack<(object Content,SongBrowser? Browser)> history=new();
     public SongBrowser? Active { get; private set; }
@@ -24,7 +24,7 @@ public sealed class OriginalSingerNavigation(string root,SongBrowserContract con
     {
         var window=host();
         if(window?.Content is not Viewbox)return false;
-        var browser=new SongBrowser(root,contract,more,database,grid,context,singer) { Playback=playback(),Pictures=pictures };
+        var browser=new SongBrowser(root,contract,more,database,grid,context,singer) { Playback=playback(),Pictures=pictures,SearchOptions=searchOptions };
         browser.SetConfirmedQueuedSongs(queued());browser.SetConfirmedCollectedSongs(collected());
         browser.SingerRequested+=next=>Open(next);
         browser.BackRequested+=Back;browser.HomeRequested+=()=>FragmentRequested?.Invoke(1);

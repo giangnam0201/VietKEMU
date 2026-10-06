@@ -26,6 +26,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     public event Action<string>? SingerRequested;
     public NativePlayback? Playback { get; set; }
     public NativeSingerPictures? Pictures { get; set; }
+    public NativeSearchOptions? SearchOptions { get; set; }
     public event Action<string>? YoutubeRequested;
     public event Action<int>? InputModeRequested;
     public event Action<CatalogueSong,string>? SongActionRequested;
@@ -94,7 +95,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             HorizontalAlignment=HorizontalAlignment.Center,Margin=new(0,15,0,0),Child=youtubeText };
         Click(youtube,()=>YoutubeRequested?.Invoke(Input?.Text ?? "")); empty.Children.Add(youtube); area.Children.Add(empty);
         var gridFactory=new SongGrid(root,gridContract) { OrderAnimationHost=canvas };
-        gridFactory.ActionRequested+=(song,action)=>SongActionRequested?.Invoke(song,action);
+        gridFactory.ActionRequested+=(song,action)=> { if(action is "order" or "top")SearchOptions?.Ordered();SongActionRequested?.Invoke(song,action); };
         gridFactory.SingerRequested+=name=>SingerRequested?.Invoke(name);
         var currentPage=0;var lastTotalSize=0;
         var lastSpell="";
@@ -146,6 +147,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             timer.Tick+=(_,_)=> { timer.Stop();timers.Remove(timer);callback(); };timers.Add(timer);timer.Start();
         });
         Input=input;
+        SearchOptions?.Register(canvas,()=>input.Text,input.Clear);
         input.TextChanged+=()=> { display.Text=input.Text.Length==0?contract.Hint:input.Text;
             display.Foreground=input.Text.Length==0?Brush("#33ffffff"):Brushes.White; };
         input.SpellRequested+=spell=>

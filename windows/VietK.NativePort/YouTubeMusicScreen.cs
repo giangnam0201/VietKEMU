@@ -36,6 +36,8 @@ public sealed class YouTubeMusicScreen : IDisposable
     private bool active,disposed;
     private string message="Tìm bài hát hoặc dán liên kết YouTube. Bấm bài để thêm vào hàng chờ.";
     public event Action? HomeRequested;
+    public NativeSearchOptions? SearchOptions { get; set; }
+    internal Func<string,CancellationToken,Task<IReadOnlyList<YouTubeVideo>>>? SearchFixture { get; set; }
     internal Func<string>? MobileConnectionInfo { get; set; }
     internal Action? RePairMobile { get; set; }
     internal Action? OpenMobilePairing { get; set; }
@@ -118,6 +120,8 @@ public sealed class YouTubeMusicScreen : IDisposable
         pages.Children.Add(Button("›",()=>ChangePage(1)));Put(canvas,pages,280,550);
         Put(canvas,new Border { Width=440,Height=249,Background=Brushes.Black,Child=playback.CreatePanelPreview() },820,95);
         CreateKeyboard(canvas,query??"");
+        var searchInput=input!;
+        SearchOptions?.Register(canvas,()=>searchInput.Text,()=> { searchInput.Clear();if(ReferenceEquals(input,searchInput))_=Search(); });
         status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=750;status.Height=52;Put(canvas,status,38,603);
         RefreshQueue();
         if(loadDefault || !string.IsNullOrWhiteSpace(query))_=Search();
@@ -132,7 +136,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         SetStatus("Đang tìm trên YouTube…");
         try
         {
-            var found=await client.Search(query,cancellation.Token);
+            var found=await (SearchFixture?.Invoke(query,cancellation.Token)??client.Search(query,cancellation.Token));
             if(!ReferenceEquals(searching,cancellation))return;
             videos=found;page=0;RenderPage(target);
             SetStatus(found.Count==0?"Không tìm thấy video.":"Bấm bài để thêm vào hàng chờ. Bấm chuột phải để hát ngay.");
@@ -185,6 +189,11 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Dùng phiên YouTube từ Firefox",()=> { cookieFile="";useFirefoxCookies=true;SaveSettings();_=Search(); });
         Add("Chọn file cookies…",ChooseCookies);
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
+        if(SearchOptions is { } options)
+        {
+            var clear=new MenuItem { Header="Khi phát bài hát, tự động xóa điều kiện tìm kiếm",IsCheckable=true,IsChecked=options.ClearAfterOrder,Tag=OriginalSearchSettings.ClearKey };
+            clear.Click+=(_,_)=>options.SetClearAfterOrder(clear.IsChecked);menu.Items.Add(clear);
+        }
         Add("Đăng nhập bộ sưu tập VietK",()=>OpenCollectionLogin?.Invoke());
         Add("Thoát bộ sưu tập VietK",()=>LogoutCollection?.Invoke());
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
@@ -347,6 +356,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         if(first) { queue.RemoveAll(item=>item.Id==video.Id);queue.Insert(0,video); }
         else if(queue.All(item=>item.Id!=video.Id))queue.Add(video);
         Save();RefreshQueue();
+        SearchOptions?.Ordered();
         if(first || (wasEmpty&&playback.Source!=PlaybackSource.LocalKaraoke))_=PlayFirst();
     }
     private void RefreshQueue()

@@ -15,6 +15,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
 {
     public NativePlayback? Playback { get; set; }
     public NativeSingerPictures? Pictures { get; set; }
+    public NativeSearchOptions? SearchOptions { get; set; }
     internal bool OriginalPopupArtworkAvailable=>File.Exists(SingerAsset("dialog_category_background.9.png"))&&File.Exists(SingerAsset("dialog_category_selected.9.png"));
     public event Action? HomeRequested;
     public event Action<OriginalSinger>? SingerRequested;
@@ -39,7 +40,7 @@ public sealed class OriginalSingerDirectoryBrowser(string root,SongBrowserContra
     public Canvas Create()
     {
         Country=Sex=0;CurrentPage=1;spell="";
-        keyboard=new SongBrowser(root,contract,more,database,grid) { Playback=Playback };
+        keyboard=new SongBrowser(root,contract,more,database,grid) { Playback=Playback,SearchOptions=SearchOptions };
         var canvas=keyboard.CreateSearchShell();canvas.Tag="original-singer-directory";
         var area=new Canvas { Width=765,Height=500,Tag="singer-directory-area" };
         area.Children.Add(new Border { Width=765,Height=500,CornerRadius=new(5),BorderThickness=new(2),BorderBrush=Brush("#195375be"),
