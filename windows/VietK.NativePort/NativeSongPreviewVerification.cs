@@ -39,7 +39,7 @@ internal static class NativeSongPreviewVerification
             using(var file=File.Create(Path.Combine(output,"original-song-preview.png")))encoder.Save(file);
             // End the real media to exercise the independent loop, not a mocked callback.
             preview.Decoder.Native.Time=preview.Decoder.Native.Length-500;
-            await Until(()=>preview.Decoder.Position<5000,"Song preview did not loop from its beginning");
+            await Until(()=>preview.LoopCount>0&&preview.Decoder.Position<5000,"Song preview did not loop from its beginning");
             Require(preview.Decoder.Native.Mute,"Loop restarted preview with audible output");
             Descendants<Button>(panel).Single(button=>Equals(button.Tag,"preview-close")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Require(!preview.IsOpen&&preview.Decoder is null&&panel.Children.Count==0,"Preview close did not remove and release its decoder");

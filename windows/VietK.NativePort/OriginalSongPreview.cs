@@ -23,6 +23,7 @@ public sealed class OriginalSongPreview : IDisposable
     private Border? cover;
     private int songId,generation;
     internal int Frames { get; private set; }
+    internal int LoopCount { get; private set; }
     internal bool IsOpen=>overlay is not null;
     internal bool VideoVisible=>cover?.Visibility==Visibility.Collapsed;
     internal WindowsVideoDecoder? Decoder=>decoder;
@@ -32,7 +33,7 @@ public sealed class OriginalSongPreview : IDisposable
     public void Show(LocalSong song)
     {
         Close();host=panel();if(host is null)return;
-        songId=song.Id;Frames=0;var current=++generation;
+        songId=song.Id;Frames=0;LoopCount=0;var current=++generation;
         overlay=new Canvas { Width=1280,Height=800,Background=Brushes.Transparent,Focusable=true,Tag="song-preview" };
         var content=new Canvas { Width=650,Height=530 };
         Put(overlay,new Border { Width=650,Height=530,CornerRadius=new(10),Background=Brush("#ff481740"),Child=content },315,135);
@@ -70,7 +71,7 @@ public sealed class OriginalSongPreview : IDisposable
                 reveal.Start();
             };
             player.Native.EndReached+=(_,_)=>host?.Dispatcher.BeginInvoke(new Action(()=>
-            { if(current==generation&&decoder==player) { player.SetSource(path);player.PrepareAsync(); } }));
+            { if(current==generation&&decoder==player) { LoopCount++;player.SetSource(path);player.PrepareAsync(); } }));
             player.Native.EncounteredError+=(_,_)=>host?.Dispatcher.BeginInvoke(new Action(()=>
             { if(current==generation&&tip is not null&&cover is not null) { reveal?.Stop();cover.Visibility=Visibility.Visible;tip.Text="Tải video không thành công"; } }));
             player.SetSource(path);player.PrepareAsync();
