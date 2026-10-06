@@ -94,6 +94,18 @@ the original seekbar, subsequent page loading, thumbnail URL/cache loading,
 singer spans and item action backends remain pending. A verification-only
 connected query renders real imported metadata in `native-song-grid-fixture.png`;
 it does not set the interactive app's connection or availability state.
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37394096536
+passed core checks, original grid image packaging, Windows compilation,
+catalogue/media import verification and the native grid capture. The original
+catalogue remains byte-identical after the import checks.
+
+`native-smali.yml` collects selected song/playlist bytecode with the SHA-256 of
+its original DEX and the decoded smali. Run
+https://github.com/giangnam0201/VietKEMU/actions/runs/37394384859 succeeded.
+The bytecode confirms that `SongDAO.getSongById` returns the constructed song
+after applying its default singer; JADX's Java output drops that return and
+appears to return null. Future ordering/lookup ports must follow the bytecode
+instead of reproducing that decompiler error.
 
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,
