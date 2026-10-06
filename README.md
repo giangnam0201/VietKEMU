@@ -9,13 +9,19 @@ See [native port approach](docs/native-windows-port.md). `native-decode.yml` dec
 the original APKs on GitHub for a screen-by-screen and feature-by-feature rewrite.
 The Android runtime experiments below are historical research.
 
-**Status: native home component and catalogue lookups build and verify on Windows;
-no complete karaoke release.** All 23 vendor APKs have decoded resources and
-smali. Java reconstruction has unresolved methods recorded in the decode reports.
-The native build uses original home drawables/labels and reads the unchanged
-72,355-song catalogue. Main controls, navigation, TV, playback and servers remain
-pending. Run `native-windows.yml` for the development component and verification
-artifacts. These checks do not establish 1:1 fidelity.
+**Status: partial native Windows port; 1:1 fidelity remains unverified.** The port
+uses original UI resources and the 72,355-song catalogue. YouTube is the primary
+music source through yt-dlp and a native decoder, with separate panel/TV windows,
+shared video frames, queue controls, and playback while downloading. Growing-file
+playback and decoded video/audio controls have passed Windows verification.
+Live YouTube requests can encounter bot checks; your Firefox session stays local.
+Original VietK login alone has not provided working music access.
+
+Run `native-windows-release.yml` (or `native-windows.yml`) for a Windows test ZIP
+and verification reports in [Releases](https://github.com/giangnam0201/VietKEMU/releases).
+No Android emulator is required. See the included `START-HERE.txt` for controls
+and limitations. Microphone DSP, scoring, mobile control, ambience and remaining
+original screens still need porting.
 
 No device boot or
 1:1 compatibility has been demonstrated. An interface replica would not establish
@@ -37,9 +43,15 @@ stack, catalogue inventory and the vendor interfaces that must be reproduced.
 
 ## Remote analysis
 
-Large extraction runs in the private repository's GitHub Actions, not on the
-Windows host. The original ZIP is stored as a private release asset; it is not
-committed to Git or publicly redistributed.
+The repository is public. The original firmware ZIP, raw APK analysis uploads,
+old Actions logs and artifacts were removed before publication. Local firmware
+and decoded references remain available to the developer but are ignored by Git.
+Current Windows builds retrieve a prepared UI resource bundle from a release;
+they do not upload browser cookies, device identities or local session files.
+
+The commands below describe historical extraction work. Its private input
+release is no longer available, so those workflows need separately supplied
+authorized firmware before reuse.
 
 ```powershell
 gh workflow run firmware.yml --repo giangnam0201/VietKEMU
@@ -49,8 +61,7 @@ gh run download RUN_ID --repo giangnam0201/VietKEMU -n firmware-report -D artifa
 
 The workflow reconstructs the system filesystem, extracts system/vendor files,
 inventories applications and native libraries, decodes karaoke resources and
-records hardware dependencies. Extracted proprietary files remain in private
-artifacts with limited retention.
+records hardware dependencies. The old raw extraction artifacts were deleted.
 
 `runtime-research.yml` inspects the original VDK Java APIs and native dependencies
 on GitHub. `compatibility.yml` tests installation and launch on a stock Android
