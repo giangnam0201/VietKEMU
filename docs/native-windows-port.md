@@ -44,6 +44,24 @@ Phantom video, television UI, activation, playback or server operations.
 and remote-metadata checks. It reads the unchanged original database. An online
 metadata flag does not establish a live server or available song file.
 
+`SongSearch` translates `SongDAO.getSongsOrderBySpellLocal` and
+`getSongsOrderByNameLocal`: spelling/name matching, word-length and language
+filters, PSL exclusion, local/connected visibility, prefix and language ranking,
+and SQL pagination followed by the original MIDI exclusion. It requires the
+local-state database with `IsLocalExist`; it is not yet connected to the panel's
+song screen. The firmware's seed local database needs its original schema
+upgrade and media-index import before it can supply that state. The schema
+upgrade is now translated by `LocalSongDatabase`: it copies the original
+`kmbox.jpg` to separate writable state once, adds the original missing columns
+and preserves that state on later starts. The supplied seed has zero songs;
+media-index import and the panel connection remain pending. The original seed
+is packaged with its APK hash and never upgraded in place.
+
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
+passed the search fixture checks, original resource packaging, Windows build,
+and component capture checks. Search fixtures are synthetic and verify query
+rules, not the availability of music or a working server.
+
 `native-windows.yml` checks original image hashes, compiles on Windows and renders
 the native home body to PNG. It also checks an actual Vietnamese catalogue entry
 and that missing entries are not fabricated. These checks do not establish full

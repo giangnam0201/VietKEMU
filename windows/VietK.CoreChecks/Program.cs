@@ -18,7 +18,7 @@ using (var command = connection.CreateCommand())
             (5,'Other language','OA',2,'Singer',1,9999,1,'Other language',0,1),
             (6,'PSL','PA',2,'Singer',8,99999,1,'PSL',1,1),
             (7,'Long','ABCDEFGHI',9,'Singer',8,1,1,'Long',0,1),
-            (8,'No spell','',0,'Singer',8,1,1,'No spell',0,1),
+            (8,'No spell','',0,'Singer',8,0,1,'No spell',0,1),
             (90000001,'Private','PV',2,'Singer',8,9000,1,'Private',0,0),
             (100000000,'MIDI','MI',2,'Singer',8,999999,1,'MIDI',0,1);
         """;
@@ -45,3 +45,29 @@ Require(search.BySpell("",0,0,new(0,1),offline).Count == 0, "MIDI was filtered b
 Require(Ids(search.BySpell("",0,0,new(1,1),offline)).SequenceEqual(new[]{2}), "Page offset did not include original filtered MIDI row");
 Require(search.ByName("' OR 1=1 --",0,new(),offline).Count == 0, "Search input changed SQL structure");
 Console.WriteLine("Original SongDAO search rules verified: local/remote state, spelling/name, ordering, length, language, PSL/MIDI and pagination.");
+
+using var oldSchema = new SqliteConnection("Data Source=:memory:");
+oldSchema.Open();
+using (var command = oldSchema.CreateCommand())
+{
+    command.CommandText = "CREATE TABLE tblSong(SongID INTEGER,IsLocalExist INTEGER); INSERT INTO tblSong VALUES(42,2)";
+    command.ExecuteNonQuery();
+}
+LocalSongDatabase.UpgradeSongColumns(oldSchema);
+LocalSongDatabase.UpgradeSongColumns(oldSchema);
+using (var command = oldSchema.CreateCommand())
+{
+    command.CommandText = "SELECT SongID,IsLocalExist,is_psl,song_name_en FROM tblSong";
+    using var row = command.ExecuteReader();
+    Require(row.Read() && row.GetInt32(0)==42 && row.GetInt32(1)==2 && row.GetInt32(2)==0 && row.GetString(3)=="",
+        "Original column upgrade changed local state or omitted original defaults");
+}
+using var wrongSchema = new SqliteConnection("Data Source=:memory:");
+wrongSchema.Open();
+using (var command = wrongSchema.CreateCommand())
+{ command.CommandText = "CREATE TABLE tblSong(SongID INTEGER)"; command.ExecuteNonQuery(); }
+var rejected = false;
+try { LocalSongDatabase.UpgradeSongColumns(wrongSchema); }
+catch (InvalidDataException) { rejected = true; }
+Require(rejected, "Whole catalogue was accepted as a local-media database");
+Console.WriteLine("Original local schema upgrade verified: defaults, repeat startup, preserved local flags and catalogue rejection.");

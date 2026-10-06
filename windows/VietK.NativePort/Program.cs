@@ -1,4 +1,5 @@
 using System.IO;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -64,6 +65,22 @@ public static class Program
                     throw new InvalidDataException("Native catalogue lookup differs from supplied firmware");
                 if (catalogue.GetSongById(-1) is not null || catalogue.IsOnline(-1))
                     throw new InvalidDataException("Native catalogue fabricated a missing song");
+                var seedPath = Path.Combine(root, "local-seed.db");
+                var originalSeedHash = SHA256.HashData(File.ReadAllBytes(seedPath));
+                var localPath = Path.Combine(args[1], "local-state-check.db");
+                using (var local = new LocalSongDatabase(seedPath, localPath))
+                {
+                    // Supplied firmware has an empty local seed: catalogue
+                    // metadata must not become locally playable song results.
+                    if (local.Search.BySpell("", 0, 0, new(), new()).Count != 0)
+                        throw new InvalidDataException("Original empty local seed exposed available songs");
+                }
+                var upgradedHash = SHA256.HashData(File.ReadAllBytes(localPath));
+                using (var reopened = new LocalSongDatabase(seedPath, localPath))
+                    reopened.Search.ByName("", 0, new(), new());
+                if (!SHA256.HashData(File.ReadAllBytes(localPath)).SequenceEqual(upgradedHash) ||
+                    !SHA256.HashData(File.ReadAllBytes(seedPath)).SequenceEqual(originalSeedHash))
+                    throw new InvalidDataException("Repeat startup changed local state or modified original seed");
                 if (!bottom.IsVisible("pause_imv") || bottom.IsVisible("play_imv") ||
                     !bottom.IsVisible("ori_imv") || bottom.IsVisible("accp_imv"))
                     throw new InvalidDataException("Original default paired control state differs");
@@ -94,6 +111,7 @@ public static class Program
                     originalDefaultTileOrderVerified = true,
                     originalAssetsVerifiedDuringPackaging = true,
                     nativeCatalogueLookupVerified = true,
+                    originalLocalSeedUpgradeVerified = true,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,

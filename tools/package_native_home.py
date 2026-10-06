@@ -81,6 +81,20 @@ def package(decoded, destination):
     }, indent=2))
     package_bottom(app, destination, entries, strings)
     package_more(app, destination, entries, strings, values)
+    seed = app / 'apktool/assets/kmbox.jpg'
+    seed_digest = hashlib.sha256(seed.read_bytes()).hexdigest()
+    if entries['assets/kmbox.jpg']['sha256'] != seed_digest:
+        raise RuntimeError('Original local database seed bytes changed')
+    shutil.copy2(seed, destination / 'local-seed.db')
+    with sqlite3.connect(f'file:{seed}?mode=ro', uri=True) as database:
+        seed_count, local_count = database.execute(
+            'SELECT count(*), count(CASE WHEN IsLocalExist BETWEEN 1 AND 2 THEN 1 END) FROM tblSong').fetchone()
+    (destination / 'local-seed-provenance.json').write_text(json.dumps({
+        'original_asset': 'assets/kmbox.jpg', 'sha256': seed_digest,
+        'songs': seed_count, 'local_flags': local_count,
+        'upgrade_source': 'SongManager.addColumn; DAOHelper.addColumn',
+        'media_availability': 'flags are preserved; actual media files still require verification'
+    }, indent=2))
 
 
 def package_more(app, destination, entries, strings, values):
