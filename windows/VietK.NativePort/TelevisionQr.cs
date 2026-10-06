@@ -52,9 +52,9 @@ public sealed class TelevisionQr
     }
     public void ConfigureLocalRemote(string url)
     {
-        // The LAN pairing token is longer than the original binding code.
-        // Use a larger matrix so it remains readable on a scaled Windows TV.
-        image.Width=image.Height=180;
+        // User requested 75% smaller TV QR. The pairing panel keeps a larger
+        // scannable copy because this compact overlay can lose matrix detail.
+        image.Width=image.Height=45;
         var pixels=OriginalMobileQr.Render(url,true);
         image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
         RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
