@@ -15,3 +15,7 @@ subprocess.run(['ffmpeg', '-v', 'error', '-y', *video,
     '-f', 'lavfi', '-i', 'sine=frequency=1200:sample_rate=48000:duration=20',
     '-map', '0:v', '-map', '1:a', '-map', '2:a', '-c:v', 'mpeg2video', '-q:v', '5',
     '-c:a', 'mp2', '-b:a', '128k', str(output / 'multiple.ts')], check=True)
+subprocess.run(['ffmpeg', '-v', 'error', '-y', *video,
+    '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=9',
+    '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24',
+    '-c:a', 'aac', str(output / 'audio-ends-early.ts')], check=True)

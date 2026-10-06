@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -37,6 +38,9 @@ public static class NativePlaybackVerification
                     new WindowInteropHelper(playback.Television).Handle != IntPtr.Zero &&
                     playback.Television.Owner is null, "Independent panel/TV window handles missing");
                 var played = 0; playback.Player.Played += () => played++;
+                await VerifyAudioFile(Path.Combine(fixtures,"stereo.mkv"),true);
+                await VerifyAudioFile(Path.Combine(fixtures,"multiple.ts"),true);
+                await VerifyAudioFile(Path.Combine(fixtures,"audio-ends-early.ts"),false);
                 await NativeMusicPipelineVerification.Run(playback,root,fixtures,output);
                 played=0;
                 var idlePreviewBefore=playback.DecodedPreviewFrames;
@@ -44,6 +48,11 @@ public static class NativePlaybackVerification
                 await Until(()=>played>0 && playback.DecodedPreviewFrames>idlePreviewBefore,
                     "Bundled original idle background did not decode into the panel preview");
                 Require(!string.IsNullOrWhiteSpace(playback.Television.Overlay.MarqueeText),"Idle marquee missing");
+                var marquee=playback.Television.Overlay;var scrollBefore=marquee.MarqueeOffset;
+                await Task.Delay(300);
+                Require(marquee.MarqueeOffset<scrollBefore-8 && marquee.MarqueeCopyCount>=2,"TV marquee did not move as a repeating text train");
+                scrollBefore=marquee.MarqueeOffset;marquee.SetSong("");
+                Require(Math.Abs(marquee.MarqueeOffset-scrollBefore)<2,"Unchanged idle message restarted the marquee");
                 var idleEncoder=new PngBitmapEncoder();idleEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
                 using(var idleFile=File.Create(Path.Combine(output,"bundled-idle-preview.png")))idleEncoder.Save(idleFile);
                 played=0;
@@ -99,9 +108,18 @@ public static class NativePlaybackVerification
                 playback.Command("ori_imv");
                 await Tone(tap, 440, 880, "Accompaniment channel should duplicate the left channel");
                 await Until(() => !bottom.OriginalVocal, "Panel track icon did not observe the decoder");
+                Require(playback.Television.Overlay.LastControl=="accompany" && playback.Television.Overlay.ControlVisible,
+                    "Confirmed accompaniment switch did not show original TV image");
                 playback.Command("pause_imv");
                 await Until(() => bottom.Paused && playback.Decoder.Native.State == VLCState.Paused, "Pause button did not pause decoder");
                 Require(playback.Television.Overlay.Paused,"TV pause indicator missing");
+                Require(playback.Television.Overlay.PauseVisible,"Pause cycle did not begin visibly");
+                await Until(()=>!playback.Television.Overlay.PauseVisible,"Original pause cycle never hid its image");
+                Require(playback.Television.Overlay.Paused,"Pause cycle changed decoder pause state");
+                await Until(()=>playback.Television.Overlay.PauseVisible,"Original pause cycle never restored its image");
+                playback.Television.Overlay.ShowControl("play_ctrl_audio_bg",playback.Decoder.OutputVolumeStep);
+                Require(!playback.Television.Overlay.PauseVisible && playback.Television.Overlay.Paused,
+                    "Volume feedback failed to hide pause image while preserving paused state");
                 var pausedAt = playback.Decoder.Position;
                 await Task.Delay(350);
                 Require(Math.Abs(playback.Decoder.Position - pausedAt) < 100, "Paused decoder clock kept running");
@@ -201,6 +219,9 @@ public static class NativePlaybackVerification
                     nativeWindowsDecoder = "bundled libVLC", androidRuntimeUsed = false,
                     independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
                     decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,
+                    originalPauseRepeatAndConfirmedTrackFeedbackVerified=true,
+                    audioEndingAt45PercentRejected=true,fullMkvAndTsAudioCoverageVerified=true,
+                    continuousMarqueeMovementAndRefreshVerified=true,
                     configuredIdleDemoDecoderAndLoopVerified=true,
                     idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
@@ -226,6 +247,18 @@ public static class NativePlaybackVerification
     }
     private static SongMedia Metadata(string path, int original, int accompaniment) =>
         new(1, 101000, path, 100, original, accompaniment, "0", "0", 1, "", "", "", "", 0, null, null, "decoder-fixture");
+    private static async Task VerifyAudioFile(string path,bool expected)
+    {
+        var start=new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory,"YouTubeTools","ffprobe.exe")) {
+            UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };
+        foreach(var argument in new[]{"-v","error","-show_entries","stream=codec_type,start_time,duration:stream_tags=DURATION","-of","json",path})start.ArgumentList.Add(argument);
+        using var process=Process.Start(start)!;var output=process.StandardOutput.ReadToEndAsync();var errors=process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();Require(process.ExitCode==0,"Audio fixture probe failed: "+await errors);
+        var accepted=true;
+        try { YouTubeMusicClient.ValidateAudioCoverage(await output); }
+        catch(YouTubeIncompleteAudioException) { accepted=false; }
+        Require(accepted==expected,"Audio coverage check disagreed with independently generated fixture: "+Path.GetFileName(path));
+    }
     private static void Require(bool value, string message) { if (!value) throw new InvalidDataException(message); }
     private static async Task Until(Func<bool> condition, string message)
     {

@@ -252,7 +252,16 @@ public sealed class YouTubeMusicScreen : IDisposable
                 if(stamp==generation)SetStatus("Đang tải: "+video.Title+" — "+(progress.Total>0?
                     (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
             }),cancellation.Token);
-            await liveTransfer.WaitUntilReady(cancellation.Token);file=liveTransfer.Url;
+            try { await liveTransfer.WaitUntilReady(cancellation.Token);file=liveTransfer.Url; }
+            catch(YouTubeIncompleteAudioException)
+            {
+                liveTransfer.Dispose();liveTransfer=null;
+                SetStatus("Âm thanh tải chưa đủ — đang tải lại bài bằng chế độ đầy đủ…");
+                file=await client.Download(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
+                {
+                    if(stamp==generation)SetStatus("Đang tải lại: "+video.Title+" — "+(progress.Received/1048576)+" MiB");
+                }),cancellation.Token);
+            }
             }
             if(stamp!=generation || disposed)return;
             if(!playback.PlayMedia(file,preserveStereo:true))throw new IOException("Không phát được video đã tải.");
@@ -260,7 +269,27 @@ public sealed class YouTubeMusicScreen : IDisposable
             playback.Television.Overlay.SetSong(video.Title,queue.Skip(1).FirstOrDefault()?.Title??"");
             if(liveTransfer is not null)
             {
-                await liveTransfer.Completion;
+                try { await liveTransfer.Completion; }
+                catch(YouTubeIncompleteAudioException)
+                {
+                    if(stamp!=generation || disposed)return;
+                    var resumeAt=playback.Decoder.Position;
+                    active=false;liveTransfer.Dispose();liveTransfer=null;playback.Player.Stop();
+                    SetStatus("Âm thanh tải chưa đủ — đang tải lại bài bằng chế độ đầy đủ…");
+                    var repaired=await client.Download(video,progress=>Application.Current.Dispatcher.BeginInvoke(()=>
+                    {
+                        if(stamp==generation)SetStatus("Đang tải lại âm thanh: "+video.Title+" — "+(progress.Total>0?
+                            (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
+                    }),cancellation.Token);
+                    if(stamp!=generation || disposed)return;
+                    if(!playback.PlayMedia(repaired,preserveStereo:true))throw new IOException("Không phát được video đã tải lại.");
+                    active=true;RefreshQueue();
+                    var deadline=DateTime.UtcNow.AddSeconds(15);
+                    while(playback.Player.State==OriginalVideoState.Preparing && DateTime.UtcNow<deadline)
+                        await Task.Delay(50,cancellation.Token);
+                    if(stamp!=generation || disposed)return;
+                    if(playback.Player.State==OriginalVideoState.Play && resumeAt>0 && resumeAt<playback.Decoder.Duration)playback.Player.Seek(resumeAt);
+                }
                 if(stamp==generation && !disposed)SetStatus("Đang phát: "+video.Title+" — đã tải xong");
             }
         }

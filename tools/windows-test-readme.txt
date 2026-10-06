@@ -13,6 +13,9 @@ Main music source: YouTube (yt-dlp + native TV decoder)
   a growing local MPEG-TS stream. A short initial buffer is still needed.
 - Fully verified transfers are cached for replay. Incomplete files are not
   marked complete. Seeking ahead of downloaded data is not supported.
+- Audio coverage is checked against video length. A transfer whose audio ends
+  early retries through the regular downloader and resumes near the old position.
+  Older caches are downloaded again once to apply this audio validation.
 - TV and panel preview share decoded frames directly; there is no snapshot
   timer or second decoder. Slow PCs can still drop presentation frames.
 - Next, pause/play, replay and volume use the existing bottom controls.
@@ -36,6 +39,8 @@ Available to test:
 - Independent panel and TV windows with bundled Windows video decoder.
 - TV video and overlays are also previewed inside the panel's black video slot.
 - Original TV play/pause/replay/volume images and scrolling current/next song.
+- Confirmed vocal/accompaniment switches show the original TV feedback image.
+  Pause uses the original repeating indicator; other control feedback hides it.
 - Original idle marquee remains visible when no song is selected. Additional
   scrolling text can be edited using Firefox menu > Chu chay tren TV.
 - An actual Demo.mp4 beside the EXE, or in the app-state folder below, plays

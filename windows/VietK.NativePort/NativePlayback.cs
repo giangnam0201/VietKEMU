@@ -32,7 +32,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public MediaPlayer Native { get; }
     public OriginalVideoPlayer? Original { get; set; }
     public Action<bool>? ConfirmedPause { get; set; }
-    public Action? ConfirmedTrack { get; set; }
+    public Action<bool>? ConfirmedTrack { get; set; }
     public Action? Started { get; set; }
     public int OutputVolumeStep { get; private set; } = 15;
     public int LastAudioTrackCount { get; private set; }
@@ -106,7 +106,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
         {
             LastAudioTrackCount=Native.AudioTrackDescription.Count(track=>track.Id>=0);
             LastTrackSwitchSucceeded=Native.SetChannel(AudioOutputChannel.Stereo);
-            if(LastTrackSwitchSucceeded)Post(()=>ConfirmedTrack?.Invoke());
+            if(LastTrackSwitchSucceeded)Post(()=>ConfirmedTrack?.Invoke(original));
             return LastTrackSwitchSucceeded;
         }
         var tracks = Native.AudioTrackDescription.Where(track => track.Id >= 0).ToArray();
@@ -134,7 +134,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
                 _ => false
             };
         }
-        if (changed) Post(() => ConfirmedTrack?.Invoke());
+        if (changed) Post(() => ConfirmedTrack?.Invoke(original));
         LastTrackSwitchSucceeded=changed;
         return changed;
     }
@@ -209,6 +209,7 @@ public sealed class NativePlayback : IDisposable
     public Func<string,bool>? CommandOverride { get; set; }
     public SongMedia? CurrentMedia { get; private set; }
     private string idleVideoPath="";
+    private OriginalSingMode? pendingTrackFeedback;
     public bool IsPlayingIdle=>playingIdle;
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
@@ -221,8 +222,14 @@ public sealed class NativePlayback : IDisposable
         Decoder.Original = Player;
         Decoder.ConfirmedPause = paused => { bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
             Television.Overlay.SetPaused(paused); };
-        Decoder.ConfirmedTrack = () => bottom.SetConfirmedPlaybackState(Player.State == OriginalVideoState.Pause,
-            Player.SingMode == OriginalSingMode.Original);
+        Decoder.ConfirmedTrack = original =>
+        {
+            bottom.SetConfirmedPlaybackState(Player.State==OriginalVideoState.Pause,original);
+            if(!Decoder.PreserveStereo && pendingTrackFeedback==(original?OriginalSingMode.Original:OriginalSingMode.Accompaniment))
+            {
+                Television.Overlay.ShowControl(original?"original":"accompany");pendingTrackFeedback=null;
+            }
+        };
         Player.Completed += () => Dispatcher.CurrentDispatcher.BeginInvoke(() =>
         {
             if(playingIdle) { StartIdleDemo();return; }
@@ -267,6 +274,7 @@ public sealed class NativePlayback : IDisposable
     }
     private void ResetPreview()
     {
+        pendingTrackFeedback=null;
         Television.Overlay.SetPaused(false);
     }
     public void SetIdleVideo(string path)
@@ -305,7 +313,9 @@ public sealed class NativePlayback : IDisposable
                 break;
             case "ori_imv": case "accp_imv":
                 if (CurrentMedia is { OriginalTrack: 0, AccompanyTrack: 5 } or { OriginalTrack: 5, AccompanyTrack: 0 }) break;
-                Player.SetSingMode(Player.SingMode == OriginalSingMode.Original ? OriginalSingMode.Accompaniment : OriginalSingMode.Original);
+                var mode=Player.SingMode==OriginalSingMode.Original?OriginalSingMode.Accompaniment:OriginalSingMode.Original;
+                pendingTrackFeedback=Player.State is OriginalVideoState.Play or OriginalVideoState.Pause or OriginalVideoState.Buffering?mode:null;
+                Player.SetSingMode(mode);
                 break;
             case "replay_imv":
                 if(playingIdle)StartIdleDemo();

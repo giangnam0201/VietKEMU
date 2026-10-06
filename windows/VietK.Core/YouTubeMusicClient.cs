@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -7,6 +8,7 @@ namespace VietK.Core;
 
 public sealed record YouTubeVideo(string Id,string Title,string Channel,string Thumbnail);
 public sealed record YouTubeTransferProgress(long Received,long Total,string State);
+public sealed class YouTubeIncompleteAudioException(string message):IOException(message);
 
 // Arguments never pass through a shell. Authentication is optional and only
 // uses an explicitly selected cookie file or Firefox login; public-only is default.
@@ -72,13 +74,13 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
     {
         if(VideoId(video.Id)!=video.Id)throw new ArgumentException("Invalid YouTube video ID");
         var directory=Path.GetFullPath(Path.Combine(cacheDirectory,video.Id));Directory.CreateDirectory(directory);
-        var destination=Path.Combine(directory,video.Id+".mkv");var marker=destination+".complete";
+        var destination=Path.Combine(directory,video.Id+".mkv");var marker=destination+".complete.av2";
         if(File.Exists(marker) && File.Exists(destination) &&
             long.TryParse(await File.ReadAllTextAsync(marker,cancellation),out var length) && new FileInfo(destination).Length==length && length>0)return destination;
         var completed="";
         await Run(Tool("yt-dlp"),Common().Concat(new[]{"--no-playlist","--no-simulate","--newline","--progress",
             "--ffmpeg-location",Path.GetFullPath(toolDirectory),"--format","bv*[height<=1080]+ba/b[height<=1080]/b",
-            "--merge-output-format","mkv","--remux-video","mkv","--output",Path.Combine(directory,video.Id+".%(ext)s"),
+            "--force-overwrites","--merge-output-format","mkv","--remux-video","mkv","--output",Path.Combine(directory,video.Id+".%(ext)s"),
             "--progress-template","download:VietKProgress:%(progress)j","--print","after_move:VietKFile:%(filepath)s",
             "--","https://www.youtube.com/watch?v="+video.Id}),line=>
         {
@@ -94,10 +96,7 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         cancellation.ThrowIfCancellationRequested();
         if(!string.Equals(completed,destination,StringComparison.OrdinalIgnoreCase) || !File.Exists(destination) || new FileInfo(destination).Length==0)
             throw new IOException("YouTube transfer did not produce a completed video");
-        var probe=await Run(Tool("ffprobe"),["-v","error","-show_entries","stream=codec_type","-of","json",destination],null,cancellation,TimeSpan.FromSeconds(30));
-        using var inspection=JsonDocument.Parse(probe);
-        var streams=inspection.RootElement.GetProperty("streams").EnumerateArray().Select(s=>s.GetProperty("codec_type").GetString()).ToArray();
-        if(!streams.Contains("video") || !streams.Contains("audio"))throw new IOException("Downloaded video is missing video or audio");
+        await VerifyAudioCoverage(destination,cancellation);
         await File.WriteAllTextAsync(marker+".tmp",new FileInfo(destination).Length.ToString(),cancellation);
         File.Move(marker+".tmp",marker,true);
         return destination;
@@ -134,10 +133,12 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         var directory=Path.GetFullPath(Path.Combine(cacheDirectory,video.Id));Directory.CreateDirectory(directory);
         var file=Path.Combine(directory,video.Id+".stream.ts");
         if(File.Exists(file+".complete"))File.Delete(file+".complete");
+        if(File.Exists(file+".complete.av2"))File.Delete(file+".complete.av2");
         return new ProgressiveVideo(file,async (output,token)=>
         {
             var arguments=Common().Concat(new[]{"--no-playlist","--no-simulate","--quiet","--no-progress",
                 "--ffmpeg-location",Path.GetFullPath(toolDirectory),"--downloader","ffmpeg",
+                "--downloader-args","ffmpeg_i:-reconnect 1 -reconnect_streamed 1 -reconnect_on_network_error 1 -reconnect_on_http_error 5xx -reconnect_delay_max 5 -reconnect_max_retries 5",
                 "--downloader-args","ffmpeg_o:-f mpegts -flush_packets 1 -mpegts_flags +resend_headers",
                 "--format","bv[vcodec^=avc1][height<=1080]+ba[acodec^=mp4a]/b[ext=mp4][height<=1080]",
                 "--output","-"}).ToList();
@@ -162,11 +163,8 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
                 await process.WaitForExitAsync(timeout.Token);
                 var error=await errors;
                 if(process.ExitCode!=0)throw new IOException("YouTube progressive fetch failed: "+string.Join('\n',error.Split('\n').TakeLast(8)));
-                var probe=await Run(Tool("ffprobe"),["-v","error","-show_entries","stream=codec_type","-of","json",file],null,token,TimeSpan.FromSeconds(30));
-                using var inspection=JsonDocument.Parse(probe);
-                var types=inspection.RootElement.GetProperty("streams").EnumerateArray().Select(item=>item.GetProperty("codec_type").GetString()).ToArray();
-                if(!types.Contains("audio") || !types.Contains("video"))throw new IOException("Progressive transfer is missing video or audio");
-                await File.WriteAllTextAsync(file+".complete",received.ToString(),token);
+                await VerifyAudioCoverage(file,token);
+                await File.WriteAllTextAsync(file+".complete.av2",received.ToString(),token);
                 progress(new(received,received,"finished"));
             }
             catch { if(!process.HasExited)process.Kill(true);throw; }
@@ -178,9 +176,40 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         foreach(var extension in new[]{".stream.ts",".mkv"})
         {
             var path=Path.GetFullPath(Path.Combine(cacheDirectory,video.Id,video.Id+extension));
-            if(File.Exists(path+".complete") && File.Exists(path) && long.TryParse(File.ReadAllText(path+".complete"),out var size)
+            var marker=path+".complete.av2";
+            if(File.Exists(marker) && File.Exists(path) && long.TryParse(File.ReadAllText(marker),out var size)
                 && size>0 && new FileInfo(path).Length==size)return path;
         }
         return null;
+    }
+    private async Task VerifyAudioCoverage(string path,CancellationToken cancellation)
+    {
+        var probe=await Run(Tool("ffprobe"),["-v","error","-show_entries",
+            "stream=codec_type,start_time,duration:stream_tags=DURATION","-of","json",path],null,cancellation,TimeSpan.FromSeconds(30));
+        ValidateAudioCoverage(probe);
+    }
+    public static void ValidateAudioCoverage(string probe)
+    {
+        using var inspection=JsonDocument.Parse(probe);double videoEnd=0,audioEnd=0;
+        foreach(var stream in inspection.RootElement.GetProperty("streams").EnumerateArray())
+        {
+            double duration=0,start=0;
+            if(stream.TryGetProperty("start_time",out var beginning))double.TryParse(beginning.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out start);
+            if(stream.TryGetProperty("duration",out var length))double.TryParse(length.GetString(),NumberStyles.Float,CultureInfo.InvariantCulture,out duration);
+            if(duration<=0 && stream.TryGetProperty("tags",out var tags) && tags.TryGetProperty("DURATION",out var tag))
+            {
+                // Matroska tags use nanoseconds (9 fractional digits), beyond
+                // TimeSpan.Parse's precision. Parse seconds without truncating.
+                var parts=(tag.GetString()??"").Split(':');
+                if(parts.Length==3 && double.TryParse(parts[0],NumberStyles.Float,CultureInfo.InvariantCulture,out var hours) &&
+                    double.TryParse(parts[1],NumberStyles.Float,CultureInfo.InvariantCulture,out var minutes) &&
+                    double.TryParse(parts[2],NumberStyles.Float,CultureInfo.InvariantCulture,out var seconds))duration=hours*3600+minutes*60+seconds;
+            }
+            var kind=stream.GetProperty("codec_type").GetString();
+            if(kind=="video")videoEnd=Math.Max(videoEnd,start+duration);
+            if(kind=="audio")audioEnd=Math.Max(audioEnd,start+duration);
+        }
+        if(videoEnd<=0 || audioEnd<=0 || audioEnd<videoEnd-Math.Max(3,videoEnd*.03))
+            throw new YouTubeIncompleteAudioException($"Video tải thiếu âm thanh ({audioEnd:F1}s / {videoEnd:F1}s).");
     }
 }
