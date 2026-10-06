@@ -532,3 +532,61 @@ var differentType=DownItem(80);differentType.PlayUrl="same-url";
 Require(OriginalPlaylistIdentity.Exists(new[]{differentType},identityCandidate) &&
     !OriginalPlaylistIdentity.Exists(new[]{differentType},DownItem(70)),"Combined playlist typed identity differs");
 Console.WriteLine("Original download worker/selection verified: independent persistence, FIFO dispatch, stop/reentry, duplicate states and original media/non-Evideo routing.");
+
+System.Text.Json.JsonElement Response(string text)
+{ using var document=System.Text.Json.JsonDocument.Parse(text);return document.RootElement.Clone(); }
+var resolverResponse=Response("""
+    {"origininfo":"1","accompanyinfo":2,"vol":"+75","subtitletype":"0","subtitleurl":"https://fixture.invalid/sub.erc",
+     "medialist":[{"type":4,"url":"https://fixture.invalid/first%2F.ts?attname=title","filesize":"123.9"},
+                  {"type":99,"url":"https://fixture.invalid/second.mp3","filesize":4294967297}]}
+    """);
+var resolverEvents=new List<string>();var remoteScore=-1;var resolverLinked=false;string? resolverMac="00:11:22:33:44:55";
+var resolver=new OriginalMediaUrlResolver(request=>
+{
+    Require((string)request["cmdid"]=="sn_song_media_list" && (int)request["songid"]==10 &&
+        (string)request["token"]=="" && (resolverMac is null?!request.ContainsKey("mac"):(string)request["mac"]==resolverMac),
+        "Original media URL request command, identity or empty-token fields differ");
+    resolverEvents.Add("request");return resolverResponse;
+},()=>resolverMac,url=>resolverEvents.Add("probe:"+url),_=>executionSong,
+    _=>remoteScore==0,(_,score)=> { remoteScore=score;resolverEvents.Add("score:"+score); },()=>resolverLinked,
+    ()=> { resolverEvents.Add("volume");return "fixture-volume"; });
+var remoteMedia=resolver.Request(10);
+Require(remoteMedia.Count==2 && remoteMedia[0].Metadata==new SongMedia(0,10,"songname",75,1,2,"0","0",1,
+    "0","0","0","0",0,"0","0","fixture-volume") && remoteMedia.All(media=>media.LocalSubtitle=="") &&
+    remoteMedia[1].Metadata.MediaType=="0" && remoteMedia[0].RemoteSubtitle=="https://fixture.invalid/sub.erc" &&
+    resolverEvents.SequenceEqual(new[]{"request","probe:https://fixture.invalid/first%2F.ts?attname=title","score:0","volume",
+        "probe:https://fixture.invalid/second.mp3","volume"}),
+    "Media response order, HTTP probing, score polarity, active-volume selection or original constructor defaults differ");
+resolverLinked=true;resolverMac=null;resolverEvents.Clear();remoteMedia=resolver.Request(10);
+Require(remoteMedia.All(media=>media.Metadata.VolumeUuid=="") && !resolverEvents.Contains("volume"),"Linked media resolver touched local storage");
+resolverResponse=Response("""{"origininfo":1,"accompanyinfo":2,"vol":75,"subtitletype":0,"medialist":[]}""");
+Require(resolver.Request(10).Count==0,"Empty original medialist invented a media entry");
+foreach(var badResponse in new[]{"{}","{\"medialist\":null}","{\"medialist\":[]}",
+    "{\"origininfo\":\" 1\",\"accompanyinfo\":2,\"vol\":75,\"subtitletype\":0,\"medialist\":[]}"})
+{
+    resolverResponse=Response(badResponse);var rejectedResponse=false;
+    try { resolver.Request(10); }catch(Exception) { rejectedResponse=true; }
+    Require(rejectedResponse,"Malformed original server response was silently accepted");
+}
+var urlEvents=new List<string>();var networkAvailable=true;var urlMedia=remoteMedia;var failMediaUpdate=false;
+OriginalDownloadUrlStage? urlStage=null;
+urlStage=new(()=>networkAvailable,_=> { urlEvents.Add("request");return urlMedia; },()=>urlEvents.Add("stop"),
+    (code,interrupt)=>urlEvents.Add($"error:{code}:{interrupt}"),
+    media=> { urlEvents.Add("update:"+media.Url);if(failMediaUpdate)throw new IOException("fixture persistence failure"); },
+    ()=>urlEvents.Add("download:"+urlStage!.VideoUrl));
+urlStage.Run(10);
+Require(urlEvents.SequenceEqual(new[]{"request","update:https://fixture.invalid/first%2F.ts?attname=title",
+    "download:https://fixture.invalid/first/.tstitle"}),"First media selection, URL replacement or update-before-transfer order differs");
+urlEvents.Clear();networkAvailable=false;urlStage.Run(10);
+Require(urlEvents.SequenceEqual(new[]{"stop","error:1015:False"}),"Offline download did not stop before error 1015");
+networkAvailable=true;urlMedia=Array.Empty<RemoteSongMedia>();urlEvents.Clear();urlStage.Run(10);
+Require(urlEvents.SequenceEqual(new[]{"request","error:1013:False"}),"Empty media list did not take original exception error 1013");
+urlMedia=new[]{remoteMedia[0] with { Url="?attname=" }};urlEvents.Clear();urlStage.Run(10);
+Require(urlStage.VideoUrl=="" && urlEvents.SequenceEqual(new[]{"request","error:1012:False"}),"Empty transformed URL did not return error 1012");
+urlMedia=new[]{remoteMedia[0] with { Url="https://fixture.invalid/a%2fb?attname=c?attname=d" }};
+urlEvents.Clear();urlStage.Run(10);
+Require(urlStage.VideoUrl=="https://fixture.invalid/a%2fbcd","URL normalization decoded lowercase escapes or changed replacement scope");
+failMediaUpdate=true;urlEvents.Clear();urlStage.Run(10);
+Require(urlEvents.Last()=="error:1013:False" && !urlEvents.Any(item=>item.StartsWith("download:")),"Media persistence failure started a transfer");
+urlStage.Reset();Require(urlStage.VideoUrl is null,"Download URL reset differs");
+Console.WriteLine("Original media URL resolver verified: request fields, response schema, HTTP probes, score/volume callbacks, first-media selection and 1012/1013/1015 routing.");
