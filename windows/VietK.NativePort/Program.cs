@@ -110,6 +110,32 @@ public static class Program
                 if (!SHA256.HashData(File.ReadAllBytes(localPath)).SequenceEqual(upgradedHash) ||
                     !SHA256.HashData(File.ReadAllBytes(seedPath)).SequenceEqual(originalSeedHash))
                     throw new InvalidDataException("Repeat startup changed local state or modified original seed");
+                var importPath = Path.Combine(args[1],"catalogue-import-check.db");
+                var wholePath = Path.Combine(root,"wholekmbox.db");
+                var catalogueHash = SHA256.HashData(File.ReadAllBytes(wholePath));
+                using (var imported = new LocalSongDatabase(seedPath,importPath))
+                {
+                    var before = imported.SongCount;
+                    var count = imported.ImportOnlineCatalogue(wholePath);
+                    if(imported.SongCount!=72325 || count!=72325-before || imported.ImportOnlineCatalogue(wholePath)!=0)
+                        throw new InvalidDataException("Original catalogue import count/idempotence differs");
+                    var mediaBefore=imported.MediaCount;
+                    var mediaInserted=imported.ImportOnlineMedia(wholePath);
+                    if(imported.MediaCount!=72325 || mediaInserted!=72325-mediaBefore || imported.ImportOnlineMedia(wholePath)!=0)
+                        throw new InvalidDataException("Original media metadata import count/idempotence differs");
+                    var importedMedia=imported.GetMedia(101000);
+                    if(importedMedia.Count!=1 || importedMedia[0] is not { Id:1,FileName:"101000.MPG",DefaultVolume:184,
+                        OriginalTrack:1,AccompanyTrack:0,MediaType:"MUSIC",VolumeBalance:291308162,
+                        UpdateDateTime:"2019-11-05 16:49:04",VolumeUuid:"" } || imported.GetMedia(-1).Count!=0)
+                        throw new InvalidDataException("Original MediaDAO fields or missing media handling differ");
+                    if(imported.Search.BySpell("",0,0,new(),new()).Count!=0 ||
+                        imported.Search.BySpell("MDH",0,0,new(),new(true,false)).Count!=0)
+                        throw new InvalidDataException("Catalogue import claimed local availability or a connected server");
+                    if(imported.Search.BySpell("MDH",0,0,new(),new(true,true)).Count==0)
+                        throw new InvalidDataException("Explicit connected query fixture lost original remote metadata");
+                }
+                if(!SHA256.HashData(File.ReadAllBytes(wholePath)).SequenceEqual(catalogueHash))
+                    throw new InvalidDataException("Local import modified the original whole catalogue");
                 if (!bottom.IsVisible("pause_imv") || bottom.IsVisible("play_imv") ||
                     !bottom.IsVisible("ori_imv") || bottom.IsVisible("accp_imv"))
                     throw new InvalidDataException("Original default paired control state differs");
@@ -141,6 +167,8 @@ public static class Program
                     originalAssetsVerifiedDuringPackaging = true,
                     nativeCatalogueLookupVerified = true,
                     originalLocalSeedUpgradeVerified = true,
+                    originalRemoteCatalogueImportVerified = true,
+                    originalMediaMetadataLookupVerified = true,
                     originalSongCount = catalogue.GetCount(),
                     bottomControlStateRulesVerified = true,
                     originalNavigationHistoryVerified = true,

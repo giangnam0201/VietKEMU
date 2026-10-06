@@ -73,6 +73,17 @@ and preserves that state on later starts. The supplied seed has zero songs;
 media-index import and the panel connection remain pending. The original seed
 is packaged with its APK hash and never upgraded in place.
 
+`LocalSongDatabase.ImportOnlineCatalogue` and `ImportOnlineMedia` translate
+`SongIdDAO.saveOnlineToSong`/`saveOnlineToMedia`: insert eligible remote entries
+without replacing existing rows, set their local flag to zero and volume UUID
+to empty, and retain the original media metadata. `GetMedia` translates all
+17 `MediaDAO.getMedia` fields, including volume, original/accompaniment tracks
+and the MD5 metadata. The imports are not yet wired to the original storage
+traversal/update lifecycle. They never change data-centre connection state or
+download music. The capture checks exercise them in a separate verification
+database using the supplied catalogue; that state is not the interactive app's
+database.
+
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,
 and component capture checks. Search fixtures are synthetic and verify query
