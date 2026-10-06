@@ -35,6 +35,23 @@ Windows CI clicks the actual TV-tab and toggle handlers, checks every pixel of
 the TV visual and preview is opaque black, and checks stereo PCM and the song
 clock continue. Unmasking preserves the running expression.
 
-Still pending: wishes/barrage tab and original scheduling, room-state reset
+The wishes tab ports `SendBarrageView`: single-line 30-character input, empty
+input ignored, nonempty input dispatched then cleared, and an empty preset list
+as in the supplied APK. TV rendering uses the local ellipse/rocket images,
+yellow 30px text at baseline 45, and the original 1280 by 64 message bitmap.
+
+Scrolling duration and float motion are translated from `classes11.dex`:
+`BaseDanmakuParser`, `DanmakuFactory`, `Duration`, `R2LDanmaku` and the two-item
+collision check in `DanmakuUtils`. Messages start after 1200ms. Native rendering
+prevents overlapping messages in up to ten rows and filters vertical overflow.
+Duplicate messages are not merged. A growing message bitmap retains its width,
+matching `BarrageManager`.
+
+Core checks cover duration clamps, midpoint/end position and catch-up collisions.
+Windows checks click the wishes tab/send button and verify the delayed moving
+message appears in the shared preview. Exact Android `StaticLayout` font metrics,
+line retention under saturation, and screenshot equivalence remain unverified.
+
+Still pending: complete Android barrage layout/retainer equivalence, room-state reset
 integration, peripheral lighting, and complete original dialog
 navigation. The expression page is a partial port, not proof of full fidelity.

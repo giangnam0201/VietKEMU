@@ -237,6 +237,8 @@ public static class NativePlaybackVerification
                 File.Copy(Path.Combine(root,"player","pause.png"),Path.Combine(expressionDirectory,"dc_overseas_popup_close.png"));
                 File.Copy(Path.Combine(root,"player","pause.png"),Path.Combine(expressionDirectory,"dc_overseas_set_off.png"));
                 File.Copy(Path.Combine(root,"player","play.png"),Path.Combine(expressionDirectory,"dc_overseas_set_on.png"));
+                File.Copy(Path.Combine(expressionDirectory,"memeda.png"),Path.Combine(expressionDirectory,"barrage_ellipse.png"));
+                File.Copy(Path.Combine(expressionDirectory,"memeda.png"),Path.Combine(expressionDirectory,"barrage_rocket.png"));
                 File.Copy(Path.Combine(fixtures,"expression.wav"),Path.Combine(expressionDirectory,"memeda.wav"));
                 using(var expressions=new AmbienceExpressions(playback.Television.Overlay,playback.Television))
                 using(var expressionTap=new PcmTap(expressions.Sound))
@@ -257,7 +259,7 @@ public static class NativePlaybackVerification
                     var dialog=(Canvas)panel.Children[panel.Children.Count-1];var content=(Canvas)((Border)dialog.Children[0]).Child;
                     var tvHeading=content.Children.OfType<Border>().Single(child=>child.Child is TextBlock { Text:"TV" });
                     Click(tvHeading);Require(expressions.CurrentTab==12,"Original TV tab did not select");
-                    var tvPage=content.Children.OfType<Canvas>().Single();
+                    var tvPage=content.Children.OfType<Canvas>().Single(child=>Equals(child.Tag,"original-tv-page"));
                     var toggle=tvPage.Children.OfType<Image>().Single();Click(toggle);
                     Require(playback.Television.IsScreenMasked,"Original TV mask toggle did not blank output");
                     var hidden=playback.Television.CompositePreview(playback.Decoder.VideoSurface);
@@ -276,7 +278,24 @@ public static class NativePlaybackVerification
                     expressions.ShowDialog(host,expressionRoot);
                     Require(expressions.CurrentTab==12 && panel.Children.Count==beforeChildren+1,"Ambience dialog lost the selected TV tab on reopen");
                     var reopened=(Canvas)((Border)((Canvas)panel.Children[panel.Children.Count-1]).Children[0]).Child;
-                    Require(reopened.Children.OfType<Canvas>().Single().Visibility==Visibility.Visible,"Reopened ambience dialog did not restore TV page visibility");
+                    Require(reopened.Children.OfType<Canvas>().Single(child=>Equals(child.Tag,"original-tv-page")).Visibility==Visibility.Visible,"Reopened ambience dialog did not restore TV page visibility");
+                    var barrageHeading=reopened.Children.OfType<Border>().Single(child=>child.Child is TextBlock { Text:"Lời chúc" });Click(barrageHeading);
+                    Require(expressions.CurrentTab==11,"Wishes tab did not select");
+                    var barragePage=reopened.Children.OfType<Canvas>().Single(child=>Equals(child.Tag,"original-barrage-page"));
+                    var input=(TextBox)barragePage.Children.OfType<Border>().Single(child=>child.Child is TextBox).Child;
+                    Require(input.MaxLength==30 && !input.AcceptsReturn,"Wishes input differs from the original single-line limit");
+                    var send=barragePage.Children.OfType<Border>().Single(child=>Equals(child.Tag,"original-barrage-send"));
+                    Click(send);Require(playback.Television.Overlay.Barrage.PendingCount==0,"Empty wishes input submitted a message");
+                    input.Text="Chúc mừng sinh nhật";Click(send);Require(input.Text=="","Submitted wishes input was not cleared");
+                    var barrage=playback.Television.Overlay.Barrage;Require(barrage.PendingCount==1 && barrage.VisibleCount==0,"Barrage appeared before its original delay");
+                    await Until(()=>barrage.VisibleCount==1,"Submitted message did not appear on the TV");
+                    var beforeLeft=barrage.FirstVisibleLeft!.Value;await Task.Delay(300);
+                    Require(barrage.FirstVisibleLeft<beforeLeft-50,"Wishes message did not move right to left");
+                    var preview=playback.Television.CompositePreview(null); // Exclude red pixels in the decoder fixture.
+                    var pixels=new byte[preview.PixelWidth*preview.PixelHeight*4];preview.CopyPixels(pixels,preview.PixelWidth*4,0);
+                    Require(Enumerable.Range(0,pixels.Length/4).Any(pixel=>pixels[pixel*4+2]>245 && pixels[pixel*4]<10 && pixels[pixel*4+1]<10),
+                        "Shared panel preview omitted the moving barrage bitmap");
+                    barrage.Clear();Require(barrage.VisibleCount==0 && barrage.PendingCount==0,"Barrage clear left delayed messages running");
                     panel.Children.RemoveAt(panel.Children.Count-1);playback.Player.Stop();
                 }
                 var unsafeSupplement=Path.Combine(output,"unsafe-supplement-fixture.zip");
@@ -298,6 +317,7 @@ public static class NativePlaybackVerification
                     localSupplementImportIdlePrecedenceAndTraversalRejectionVerified=true,
                     expressionDialogSharedPreviewLoopingSoundAndTimeoutVerified=true,
                     tvMaskButtonFullOutputSharedPreviewAndContinuedStereoPlaybackVerified=true,
+                    wishesInputDelayRightToLeftMovementAndSharedPreviewVerified=true,
                     idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
                     playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,

@@ -39,7 +39,10 @@ Available to test:
   loop their sound at half volume, and disappear after six seconds. Karaoke
   playback continues. TV tab > Tat man hinh TV blanks the entire TV picture and
   panel preview while the song continues. Toggle it again to restore output.
-  Wishes/barrage and lighting tabs are still pending.
+  Loi chuc accepts a single-line message (30 characters), then sends a scrolling
+  TV message after the original 1.2-second delay. The panel previews the same
+  moving message. Original local graphics remain in the supplemental bundle.
+  Exact Android font/line layout and peripheral lighting remain unverified.
 - Home and More screens using extracted original resources.
 - Song browser, Vietnamese keyboard, song grid and catalogue search.
 - Native database and queue logic translated from the original app.

@@ -70,26 +70,50 @@ public sealed class AmbienceExpressions : IDisposable
             Background=new LinearGradientBrush(Color.FromRgb(0xc0,0x37,0xd0),Color.FromRgb(0x74,0x37,0xe9),0),
             Child=new TextBlock { Text="Biểu cảm",FontSize=22,Foreground=Brushes.White,FontFamily=OriginalFont.Family } };
         Put(content,heading,30,10);
+        var barrageHeading=new Border { CornerRadius=new CornerRadius(30),Padding=new Thickness(15,0,15,0),Background=Brushes.Transparent,
+            Child=new TextBlock { Text="Lời chúc",FontSize=22,Foreground=Brushes.White,FontFamily=OriginalFont.Family } };
         var televisionHeading=new Border { CornerRadius=new CornerRadius(30),Padding=new Thickness(15,0,15,0),
             Background=Brushes.Transparent,Child=new TextBlock { Text="TV",FontSize=22,Foreground=Brushes.White,FontFamily=OriginalFont.Family } };
-        // Reserve the original Lời chúc tab's width while its scheduler is
-        // being ported, rather than guessing the position of the TV tab.
+        // Original tab widths include 15px padding on either side and 20px gaps.
         double TabWidth(string text)
         {
             var label=new TextBlock { Text=text,FontSize=22,FontFamily=OriginalFont.Family };
             label.Measure(new Size(double.PositiveInfinity,double.PositiveInfinity));return Math.Max(50,label.DesiredSize.Width+30);
         }
         if(television is not null)Put(content,televisionHeading,30+TabWidth("Biểu cảm")+20+TabWidth("Lời chúc")+20,10);
+        Put(content,barrageHeading,30+TabWidth("Biểu cảm")+20,10);
         var close=new Image { Width=35,Height=35,Source=LoadImage(Path.Combine(directory,"dc_overseas_popup_close.png")) };
         close.MouseLeftButtonUp+=(_,_)=>Close();Put(content,close,730,10);
         var grid=new Canvas { Width=704,Height=340 };
         var scroll=new ScrollViewer { Width=740,Height=358,HorizontalScrollBarVisibility=ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility=ScrollBarVisibility.Disabled,Content=grid };
         Put(content,scroll,40,60);
+        var barragePage=new Canvas { Width=780,Height=390,Visibility=Visibility.Collapsed,Tag="original-barrage-page" };
+        var input=new TextBox { Width=522,Height=50,MaxLength=30,AcceptsReturn=false,AcceptsTab=false,FontSize=22,
+            Foreground=Brushes.White,Background=Brushes.Transparent,BorderThickness=new Thickness(0),
+            Padding=new Thickness(4,0,0,0),VerticalContentAlignment=VerticalAlignment.Center,FontFamily=OriginalFont.Family,Tag="original-barrage-input" };
+        input.ContextMenu=null;
+        var inputBackground=new Border { Width=522,Height=50,CornerRadius=new CornerRadius(10),
+            Background=new SolidColorBrush(Color.FromArgb(51,2,25,27)),Child=input };
+        Put(barragePage,inputBackground,79,50);
+        var hint=new TextBlock { Text="Nhập chữ để gửi",FontSize=22,FontFamily=OriginalFont.Family,
+            Foreground=new SolidColorBrush(Color.FromRgb(0xd4,0xca,0xc8)),IsHitTestVisible=false };
+        Put(barragePage,hint,83,61);
+        input.TextChanged+=(_,_)=>hint.Visibility=input.Text.Length==0?Visibility.Visible:Visibility.Collapsed;
+        var send=new Border { Width=90,Height=50,CornerRadius=new CornerRadius(26),Tag="original-barrage-send",
+            Background=new LinearGradientBrush(Color.FromRgb(4,160,227),Color.FromRgb(0,250,246),270),
+            Child=new TextBlock { Text="Gửi",FontSize=20,Foreground=Brushes.White,FontFamily=OriginalFont.Family,
+                HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center } };
+        send.MouseLeftButtonUp+=(_,e)=>
+        {
+            if(input.Text.Length>0) { overlay.Barrage.Send(input.Text,resourceRoot);input.Clear(); }
+            System.Windows.Input.Keyboard.ClearFocus();e.Handled=true;
+        };
+        Put(barragePage,send,611,50);Put(content,barragePage,0,50);
         Canvas? tvPage=null;
         if(television is not null)
         {
-            tvPage=new Canvas { Width=780,Height=390,Visibility=Visibility.Collapsed };
+            tvPage=new Canvas { Width=780,Height=390,Visibility=Visibility.Collapsed,Tag="original-tv-page" };
             var text=new StackPanel();text.Children.Add(new TextBlock { Text="Tắt màn hình TV",FontSize=18,Foreground=Brushes.White,FontFamily=OriginalFont.Family });
             text.Children.Add(new TextBlock { Text="Có thể tắt màn hình TV, chỉ phát nhạc",FontSize=16,
                 Foreground=new SolidColorBrush(Color.FromRgb(0x9b,0x8d,0xb0)),FontFamily=OriginalFont.Family });
@@ -105,11 +129,14 @@ public sealed class AmbienceExpressions : IDisposable
         void SelectTab(int tab)
         {
             CurrentTab=tab;scroll.Visibility=tab==10?Visibility.Visible:Visibility.Collapsed;
+            barragePage.Visibility=tab==11?Visibility.Visible:Visibility.Collapsed;
             if(tvPage is not null)tvPage.Visibility=tab==12?Visibility.Visible:Visibility.Collapsed;
             var selected=new LinearGradientBrush(Color.FromRgb(0xc0,0x37,0xd0),Color.FromRgb(0x74,0x37,0xe9),0);
             heading.Background=tab==10?selected:Brushes.Transparent;televisionHeading.Background=tab==12?selected:Brushes.Transparent;
+            barrageHeading.Background=tab==11?selected:Brushes.Transparent;
         }
         heading.MouseLeftButtonUp+=(_,e)=> { SelectTab(10);e.Handled=true; };
+        barrageHeading.MouseLeftButtonUp+=(_,e)=> { SelectTab(11);e.Handled=true; };
         televisionHeading.MouseLeftButtonUp+=(_,e)=> { SelectTab(12);e.Handled=true; };
         SelectTab(CurrentTab);
         for(var i=0;i<Items.Length;i++)

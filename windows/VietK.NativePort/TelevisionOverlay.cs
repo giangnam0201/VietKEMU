@@ -16,6 +16,7 @@ public sealed record TvOsdContract(double ControlWidth,double ControlHeight,doub
 public sealed class TelevisionOverlay
 {
     public Canvas Canvas { get; }=new() { Width=1280,Height=720,IsHitTestVisible=false };
+    public TelevisionBarrage Barrage { get; }=new();
     private readonly string root;
     private readonly TvOsdContract contract;
     private readonly Image control,pause;
@@ -50,6 +51,7 @@ public sealed class TelevisionOverlay
         var strip=new Canvas { Width=1060,Height=54,ClipToBounds=true };
         marqueeTrain.RenderTransform=marqueeShift;strip.Children.Add(marqueeTrain);Put(strip,200,10);
         control=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Visibility=Visibility.Collapsed };
+        Put(Barrage.Canvas,0,0);
         pause=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Source=Bitmap("player/pause.png"),Visibility=Visibility.Collapsed };
         Put(control,(1280-contract.ControlWidth)/2,contract.ControlY);
         Put(pause,(1280-contract.ControlWidth)/2,contract.ControlY);
@@ -112,7 +114,7 @@ public sealed class TelevisionOverlay
         control.BeginAnimation(UIElement.OpacityProperty,new DoubleAnimation(.3,1,TimeSpan.FromMilliseconds(150)));
         timeout.Stop();timeout.Start();
     }
-    public void Stop() { timeout.Stop();pauseRepeat.Stop();marqueeShift.BeginAnimation(TranslateTransform.XProperty,null); }
+    public void Stop() { timeout.Stop();pauseRepeat.Stop();Barrage.Dispose();marqueeShift.BeginAnimation(TranslateTransform.XProperty,null); }
     public void ShowExpression(BitmapSource picture,string avatarPath)
     {
         expressionImage.Source=picture;
