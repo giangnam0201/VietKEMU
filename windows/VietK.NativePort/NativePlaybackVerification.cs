@@ -88,11 +88,17 @@ public static class NativePlaybackVerification
                 await Until(() => playback.Player.State == OriginalVideoState.Play && playback.Decoder.Position is > 0 and < 2000,
                     "Replay did not restart actual media");
                 var volume = playback.Decoder.OutputVolumeStep;
+                var quietPower=await MeasurePower(tap,440);
                 playback.Command("volinc");
-                Require(playback.Decoder.OutputVolumeStep == volume + 1 && playback.Decoder.Native.Volume == (volume + 1) * 5,
-                    "Original 0..20 volume step not applied to decoder");
+                Require(playback.Decoder.OutputVolumeStep == volume + 1,"Original 0..20 volume step differs");
+                // libVLC's amem output does not publish a volume report for its
+                // getter. Verify actual decoded sample amplitude instead.
+                var loudPower=await UntilPower(tap,440,value=>value>quietPower*1.15,
+                    "Volume increment did not increase actual output PCM amplitude");
                 playback.Command("voldec");
                 Require(playback.Decoder.OutputVolumeStep == volume, "Volume decrement did not restore level");
+                var restoredPower=await UntilPower(tap,440,value=>value>=quietPower*.8 && value<=quietPower*1.2,
+                    "Volume decrement did not restore actual output PCM amplitude");
 
                 var multi = Path.GetFullPath(Path.Combine(fixtures, "multiple.ts"));
                 // Vocal mode persists between songs in the original player.
@@ -122,6 +128,7 @@ public static class NativePlaybackVerification
                     stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,
                     pauseResumeClockVerified = true, nativeSeekReplayVerified = true,
                     panelPlaybackObserverVerified = true, volumeStepVerified = true,
+                    volumePcmPowerBefore=quietPower,volumePcmPowerAfterIncrement=loudPower,volumePcmPowerRestored=restoredPower,
                     nextAndDecoderCompletionVerified = true,
                     httpDownloadedVideoHashAndDecoderVerified = true,
                     signedHttpLoginMediaRequestCacheQueueAndDecoderVerified = true,
@@ -157,6 +164,19 @@ public static class NativePlaybackVerification
             if (samples.Length >= 4800 && signal > 0.000001 && signal > other * 25) return;
         } while (DateTime.UtcNow < stop);
         throw new InvalidDataException($"{message}; decoded power expected={signal}, unwanted={other}");
+    }
+    private static async Task<double> MeasurePower(PcmTap tap,int frequency)
+    {
+        tap.Reset();await Task.Delay(400);
+        var samples=tap.Read();
+        if(samples.Length<4800)throw new InvalidDataException("No decoded PCM available for gain verification");
+        return Math.Min(PcmTap.Power(samples,frequency,0),PcmTap.Power(samples,frequency,1));
+    }
+    private static async Task<double> UntilPower(PcmTap tap,int frequency,Func<double,bool> accepted,string message)
+    {
+        var deadline=DateTime.UtcNow.AddSeconds(5);double power;
+        do { power=await MeasurePower(tap,frequency);if(accepted(power))return power; } while(DateTime.UtcNow<deadline);
+        throw new InvalidDataException(message+"; measured power="+power);
     }
     // Native audio output tap enables CI without an audio device, while checking
     // the actual downmix/stream-selection result in the decoder's PCM output.
