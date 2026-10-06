@@ -45,7 +45,12 @@ jobs:
           $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--capture', 'artifacts/native-verification' -WindowStyle Hidden -Wait -PassThru
           if ($process.ExitCode -ne 0) { throw "Native rendering failed: $($process.ExitCode)" }
       - name: Verify shared frames and playback before download completion
+        env:
+          VIETK_MOBILE_BROWSER_CHECK: '1'
         run: |
+          python -m pip install playwright --quiet
+          python -m playwright install chromium
+          if ($LASTEXITCODE -ne 0) { throw 'Phone browser verification dependencies failed' }
           $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-playback', 'artifacts/playback-fixtures', 'artifacts/native-verification/playback' -WindowStyle Hidden -PassThru
           if (!$process.WaitForExit(180000)) { $process.Kill(); throw 'Native playback verification timed out' }
           if ($process.ExitCode -ne 0) { Get-Content artifacts/native-verification/playback/playback-error.txt; throw "Native playback verification failed: $($process.ExitCode)" }

@@ -46,6 +46,20 @@ internal static class MobileRemoteVerification
         }
         var results=await client.GetFromJsonAsync<YouTubeVideo[]>("api/search?q=fixture");
         Require(results is { Length:1 } && results[0].Id=="fixture0003","Remote search result lost");
+        if(Environment.GetEnvironmentVariable("VIETK_MOBILE_BROWSER_CHECK")=="1")
+        {
+            var start=new System.Diagnostics.ProcessStartInfo("python") { UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true };
+            start.ArgumentList.Add("tools/verify_mobile_browser.py");
+            start.Environment["VIETK_REMOTE_TEST_URL"]=client.BaseAddress!.ToString();
+            start.Environment["VIETK_REMOTE_TEST_TOKEN"]=server.TestToken;
+            start.Environment["VIETK_REMOTE_TEST_OUTPUT"]=Path.GetFullPath(directory);
+            using var browser=System.Diagnostics.Process.Start(start)!;
+            var stdout=browser.StandardOutput.ReadToEndAsync();var stderr=browser.StandardError.ReadToEndAsync();
+            await browser.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(60));
+            // Never write subprocess diagnostics: a failed browser navigation could contain the pairing secret.
+            Require(browser.ExitCode==0,"Phone browser verification failed (diagnostics suppressed to protect its pairing token)");
+            await stdout;await stderr;
+        }
         await Send(new { action="add",id="fixture0003" });Require((await Queue()).Length==3,"Phone add did not reach actual panel queue");
         await Send(new { action="top",id="fixture0003" });Require((await Queue())[1]=="fixture0003","Phone priority failed");
         await Send(new { action="move",id="fixture0003",target=2 });Require((await Queue())[2]=="fixture0003","Phone reorder failed");

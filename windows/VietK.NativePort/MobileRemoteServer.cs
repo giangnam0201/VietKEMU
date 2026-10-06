@@ -148,6 +148,12 @@ public sealed class MobileRemoteServer : IDisposable
             .FirstOrDefault(a=>a.AddressFamily==AddressFamily.InterNetwork&&!IPAddress.IsLoopback(a)&&!a.ToString().StartsWith("169.254."));
         if(ip is not null)ShowPairing(ip);
     }
-    public void Dispose() { web.StopAsync(TimeSpan.FromSeconds(3)).GetAwaiter().GetResult();web.DisposeAsync().AsTask().GetAwaiter().GetResult(); }
+    public void Dispose()
+    {
+        using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        try { web.StopAsync(timeout.Token).GetAwaiter().GetResult(); }
+        catch(OperationCanceledException) { }
+        web.DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
     public sealed record RemoteAction(string Action="",string Id="",bool First=false,int Target=0);
 }
