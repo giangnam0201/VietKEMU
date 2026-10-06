@@ -24,12 +24,16 @@ public sealed class AmbienceExpressions : IDisposable
     private Media? media;
     private readonly DispatcherTimer expiry=new() { Interval=TimeSpan.FromMilliseconds(6000) };
     public string ActiveExpression { get; private set; }="";
-    public AmbienceExpressions(TelevisionOverlay overlay,TelevisionWindow? television=null)
+    private readonly NativePlayback? playback;
+    private bool muted;
+    public AmbienceExpressions(TelevisionOverlay overlay,TelevisionWindow? television=null,NativePlayback? playback=null)
     {
+        this.playback=playback;muted=playback?.Decoder.Muted??false;
         this.television=television;
         this.overlay=overlay;library=new LibVLC("--no-video","--no-video-title-show");
         Sound=new LibVLCSharp.Shared.MediaPlayer(library) { Volume=50 };
-        Sound.Playing+=(_,_)=>Sound.Volume=50;
+        Sound.Playing+=(_,_)=>Sound.Volume=muted?0:50;
+        if(playback is not null)playback.MuteChanged+=SetMuted;
         expiry.Tick+=(_,_)=>Hide();
     }
     public bool Show(string name,string? resourceRoot=null)
@@ -44,7 +48,7 @@ public sealed class AmbienceExpressions : IDisposable
         if(File.Exists(wave))
         {
             media=new Media(library,new Uri(Path.GetFullPath(wave)));media.AddOption(":input-repeat=65535");
-            Sound.Volume=50;Sound.Play(media);
+            Sound.Volume=muted?0:50;Sound.Play(media);
         }
         expiry.Start();return true;
     }
@@ -161,5 +165,6 @@ public sealed class AmbienceExpressions : IDisposable
     private static BitmapImage LoadImage(string path)=>new(new Uri(Path.GetFullPath(path)));
     private static void Put(Canvas canvas,UIElement child,double x,double y)
     { Canvas.SetLeft(child,x);Canvas.SetTop(child,y);canvas.Children.Add(child); }
-    public void Dispose() { Hide();Sound.Dispose();library.Dispose(); }
+    private void SetMuted(bool value) { muted=value;Sound.Volume=value?0:50; }
+    public void Dispose() { if(playback is not null)playback.MuteChanged-=SetMuted;Hide();Sound.Dispose();library.Dispose(); }
 }

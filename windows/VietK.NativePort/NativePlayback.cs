@@ -237,6 +237,7 @@ public sealed class NativePlayback : IDisposable
     public TelevisionWindow Television { get; }
     public event Action? NextRequested;
     public event Action? LocalMediaRequested;
+    public event Action<bool>? MuteChanged;
     public Func<string,bool>? CommandOverride { get; set; }
     public SongMedia? CurrentMedia { get; private set; }
     private string idleVideoPath="";
@@ -374,7 +375,9 @@ public sealed class NativePlayback : IDisposable
     }
     public void SetMuted(bool value,bool showFeedback=true)
     {
+        var changed=Decoder.Muted!=value;
         Decoder.SetMuted(value);Television.Overlay.SetMuted(value);
+        if(changed)MuteChanged?.Invoke(value);
         if(!value&&showFeedback)Television.Overlay.ShowMuteOff();
     }
     public void SaveVideoFrame(string path)

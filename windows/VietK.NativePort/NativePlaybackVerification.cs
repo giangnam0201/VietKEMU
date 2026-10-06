@@ -286,7 +286,7 @@ public static class NativePlaybackVerification
                 File.Copy(Path.Combine(expressionDirectory,"memeda.png"),Path.Combine(expressionDirectory,"barrage_ellipse.png"));
                 File.Copy(Path.Combine(expressionDirectory,"memeda.png"),Path.Combine(expressionDirectory,"barrage_rocket.png"));
                 File.Copy(Path.Combine(fixtures,"expression.wav"),Path.Combine(expressionDirectory,"memeda.wav"));
-                using(var expressions=new AmbienceExpressions(playback.Television.Overlay,playback.Television))
+                using(var expressions=new AmbienceExpressions(playback.Television.Overlay,playback.Television,playback))
                 using(var expressionTap=new PcmTap(expressions.Sound))
                 {
                     var beforeChildren=panel.Children.Count;expressions.ShowDialog(host,expressionRoot);
@@ -301,6 +301,11 @@ public static class NativePlaybackVerification
                     combined.CopyPixels(new Int32Rect(320,110,1,1),center,4,0);
                     Require(center[2]>240 && center[0]<10 && center[1]<10,"Panel preview omitted the TV expression pixels");
                     await Task.Delay(1600);await Tone(expressionTap,1600,880,"Expression sound did not loop beyond its first second");
+                    var expressionPower=await MeasurePower(expressionTap,1600);
+                    playback.SetMuted(true);
+                    await UntilPower(expressionTap,1600,power=>power<expressionPower*.001,"Mute left expression WAV audible");
+                    playback.SetMuted(false);
+                    await UntilPower(expressionTap,1600,power=>power>=expressionPower*.8,"Expression audio did not recover after unmute");
                     Require(playback.Decoder.Position>before+1000 && playback.Decoder.PreserveStereo,"Expression replaced or interrupted karaoke playback");
                     var dialog=(Canvas)panel.Children[panel.Children.Count-1];var content=(Canvas)((Border)dialog.Children[0]).Child;
                     var tvHeading=content.Children.OfType<Border>().Single(child=>child.Child is TextBlock { Text:"TV" });
