@@ -1,0 +1,20 @@
+name: Test public original VietK service routes
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnostics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify report privacy and error interpretation
+        run: python3 -m unittest discover -s tests -p test_public_server_diagnostics.py -v
+      - name: Test public firmware routes from a second network
+        run: python3 tools/probe_public_vietk_services.py --output diagnostics/public-service-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: redacted-public-service-diagnostics
+          path: diagnostics/public-service-results.json
+          retention-days: 7
