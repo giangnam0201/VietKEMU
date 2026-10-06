@@ -30,7 +30,6 @@ public sealed class YouTubeMusicScreen : IDisposable
     private StackPanel? queueView;
     private TextBlock? status;
     private TextBox? input;
-    private Image? preview;
     private string category="Karaoke";
     private int generation;
     private bool active,disposed;
@@ -51,7 +50,6 @@ public sealed class YouTubeMusicScreen : IDisposable
             .Where(video=>YouTubeMusicClient.VideoId(video.Id)==video.Id));
         playback.CommandOverride=Command;
         playback.LocalMediaRequested+=()=> { active=false; };
-        playback.PreviewFrameChanged+=PreviewChanged;
     }
     public Canvas Create(string? query=null,bool loadDefault=true)
     {
@@ -98,7 +96,6 @@ public sealed class YouTubeMusicScreen : IDisposable
         catch(Exception ex) { if(!disposed)SetStatus(ex.Message); }
         finally { if(ReferenceEquals(searching,cancellation))searching=null;cancellation.Dispose(); }
     }
-    private void PreviewChanged(BitmapSource frame) { if(preview is not null)preview.Source=frame; }
     private void CreateKeyboard(Canvas canvas,string text)
     {
         var contract=JsonSerializer.Deserialize<SongBrowserContract>(File.ReadAllText(Path.Combine(root,"song-browser.json")),
@@ -143,8 +140,16 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Dùng phiên YouTube từ Firefox",()=> { cookieFile="";useFirefoxCookies=true;SaveSettings();_=Search(); });
         Add("Chọn file cookies…",ChooseCookies);
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
-        Add("Thử lại bài đang tải",()=>_=PlayFirst());menu.IsOpen=true;
+        Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Chữ chạy trên TV…",EditMarquee);
+        Add("Chọn video chờ (Demo.mp4)…",ChooseIdleVideo);menu.IsOpen=true;
+    }
+    private void ChooseIdleVideo()
+    {
+        var dialog=new Microsoft.Win32.OpenFileDialog { Title="Chọn video chờ VietK",Filter="MP4 video|*.mp4",CheckFileExists=true };
+        if(dialog.ShowDialog()!=true)return;
+        try { playback.SetIdleVideo(dialog.FileName);SetStatus("Đã lưu video chờ. Video sẽ phát khi hàng chờ trống."); }
+        catch(Exception error) { SetStatus(error.Message); }
     }
     private void EditMarquee()
     {
@@ -272,6 +277,13 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private bool Command(string command)
     {
+        if(command=="decoder_failed")
+        {
+            if(!active)return false;
+            ++generation;active=false;downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;
+            playback.StartIdleDemo();UpdateMarquee();
+            SetStatus("Không giải mã được video — bấm Thử lại hoặc chọn bài khác.");return true;
+        }
         if(command=="replay_imv" && active && playback.Player.Source is string source)
         {
             active=playback.PlayMedia(source,preserveStereo:true);
@@ -312,5 +324,5 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private static void Put(Canvas canvas,UIElement element,double x,double y)
     { Canvas.SetLeft(element,x);Canvas.SetTop(element,y);canvas.Children.Add(element); }
-    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();liveTransfer?.Dispose();playback.CommandOverride=null;playback.PreviewFrameChanged-=PreviewChanged; }
+    public void Dispose() { disposed=true;++generation;searching?.Cancel();downloading?.Cancel();liveTransfer?.Dispose();playback.CommandOverride=null; }
 }

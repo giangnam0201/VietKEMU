@@ -185,6 +185,16 @@ public static class NativePlaybackVerification
                 playback.Player.Seek(playback.Decoder.Duration-800);
                 await Until(()=>played>idleStarts+1,"Idle video did not loop after real decoder completion");
                 Require(next==2,"Idle broadcast advanced the song queue");
+                idleStarts=played;playback.Command("replay_imv");
+                Require(playback.IsPlayingIdle,"Replay changed idle broadcast into a queued song");
+                await Until(()=>played>idleStarts && playback.Decoder.Duration>0,"Idle replay did not decode");
+                playback.Player.Seek(playback.Decoder.Duration-800);
+                await Until(()=>played>idleStarts+1,"Replayed idle broadcast stopped looping");
+                Require(next==2,"Replayed idle broadcast advanced the queue");
+                playback.SetIdleVideo(multi);playback.Command("volinc");
+                using(var preferences=JsonDocument.Parse(File.ReadAllText(Path.Combine(output,"playback-state.json"))))
+                    Require(preferences.RootElement.GetProperty("IdleVideoPath").GetString()==Path.GetFullPath(multi),
+                        "Volume save lost custom idle-video selection");
                 playback.Player.Stop();File.Delete(Path.Combine(output,"Demo.mp4"));
                 File.WriteAllText(Path.Combine(output, "playback-verification.json"), JsonSerializer.Serialize(new
                 {
@@ -192,6 +202,7 @@ public static class NativePlaybackVerification
                     independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
                     decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,
                     configuredIdleDemoDecoderAndLoopVerified=true,
+                    idleReplayLoopAndSavedVideoSelectionVerified=true,
                     bundledOriginalBackgroundDecodedIntoPreview=true,
                     playbackBeforeDownloadCompletionVerified=true,sharedFrameRateAbove10FpsVerified=true,
                     stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,

@@ -43,6 +43,9 @@ Available to test:
   The original APK background video is bundled as the default idle fallback.
   Its bytes are authentic; it is not verified identical to the missing HDD
   factory idle clip. Add your device's clip to reproduce that idle broadcast.
+- Firefox menu > Chon video cho selects a local MP4 as the saved idle video.
+  Replay keeps idle looping; changing volume preserves your selected video.
+- Decoder failures return to idle and keep the selected YouTube song for retry.
 - Server login/media-request transport and music file download to playback queue.
 - Pause, replay, seek, original/accompaniment and output volume controls.
 

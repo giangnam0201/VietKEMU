@@ -208,6 +208,8 @@ public sealed class NativePlayback : IDisposable
     public event Action? LocalMediaRequested;
     public Func<string,bool>? CommandOverride { get; set; }
     public SongMedia? CurrentMedia { get; private set; }
+    private string idleVideoPath="";
+    public bool IsPlayingIdle=>playingIdle;
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
         this.bottom = bottom;
@@ -226,7 +228,15 @@ public sealed class NativePlayback : IDisposable
             if(playingIdle) { StartIdleDemo();return; }
             if(CommandOverride?.Invoke("decoder_completed")!=true)NextRequested?.Invoke();
         });
-        if (File.Exists(stateFile)) Decoder.SetOutputVolumeStep(JsonSerializer.Deserialize<PlaybackPreferences>(File.ReadAllText(stateFile))!.Volume);
+        if (File.Exists(stateFile))
+        {
+            var settings=JsonSerializer.Deserialize<PlaybackPreferences>(File.ReadAllText(stateFile));
+            Decoder.SetOutputVolumeStep(settings?.Volume??15);idleVideoPath=settings?.IdleVideoPath??"";
+        }
+        Player.Failed+=_=>Dispatcher.CurrentDispatcher.BeginInvoke(()=>
+        {
+            if(!playingIdle && Player.State==OriginalVideoState.Errors)CommandOverride?.Invoke("decoder_failed");
+        });
     }
     public void ShowTelevision(Window panel)
     { Television.Show(); }
@@ -240,7 +250,7 @@ public sealed class NativePlayback : IDisposable
     {
         // BroadcastListManager / USBSetBroadcastDialog: Demo.mp4 is a separate
         // idle broadcast, not the APK's grade_video.mp4 scoring animation.
-        var paths=new[] { Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
+        var paths=new[] { idleVideoPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4"),
             Path.Combine(Path.GetDirectoryName(stateFile)!,"60003950.mp4"),
@@ -258,6 +268,17 @@ public sealed class NativePlayback : IDisposable
     private void ResetPreview()
     {
         Television.Overlay.SetPaused(false);
+    }
+    public void SetIdleVideo(string path)
+    {
+        if(!File.Exists(path))throw new FileNotFoundException("Video chờ không tồn tại.",path);
+        idleVideoPath=Path.GetFullPath(path);SavePreferences();
+        if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
+    }
+    private void SavePreferences()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
+        File.WriteAllText(stateFile,JsonSerializer.Serialize(new PlaybackPreferences(Decoder.OutputVolumeStep,idleVideoPath)));
     }
     public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false)
     {
@@ -287,15 +308,15 @@ public sealed class NativePlayback : IDisposable
                 Player.SetSingMode(Player.SingMode == OriginalSingMode.Original ? OriginalSingMode.Accompaniment : OriginalSingMode.Original);
                 break;
             case "replay_imv":
-                if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path)
+                if(playingIdle)StartIdleDemo();
+                else if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path)
                     PlayMedia(path, CurrentMedia,Decoder.PreserveStereo);
                 Television.Overlay.ShowControl("replay");
                 break;
             case "cut_song_imv": Player.Stop(); NextRequested?.Invoke(); break;
             case "volinc": case "voldec":
                 Decoder.SetOutputVolumeStep(Decoder.OutputVolumeStep + (command == "volinc" ? 1 : -1));
-                Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
-                File.WriteAllText(stateFile, JsonSerializer.Serialize(new PlaybackPreferences(Decoder.OutputVolumeStep)));
+                SavePreferences();
                 Television.Overlay.ShowControl("play_ctrl_audio_bg",Decoder.OutputVolumeStep);
                 break;
         }
@@ -306,5 +327,5 @@ public sealed class NativePlayback : IDisposable
         using var file=File.Create(path);encoder.Save(file);
     }
     public void Dispose() { Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
-    private sealed record PlaybackPreferences(int Volume);
+    private sealed record PlaybackPreferences(int Volume,string IdleVideoPath="");
 }

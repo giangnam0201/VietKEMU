@@ -52,6 +52,9 @@ jobs:
           $process = Start-Process artifacts/native-windows/VietK.NativePort.exe -ArgumentList '--verify-youtube', 'https://www.youtube.com/watch?v=YE7VzlLtp-4', 'artifacts/native-verification/youtube' -WindowStyle Hidden -PassThru
           if (!$process.WaitForExit(300000)) { $process.Kill(); throw 'Live YouTube verification timed out' }
           Get-Content artifacts/native-verification/youtube/youtube-verification.json
+          $report = Get-Content artifacts/native-verification/youtube/youtube-verification.json -Raw | ConvertFrom-Json
+          "Live YouTube probe: downloaded=$($report.realYouTubeDownload), decoded=$($report.nativeVideoDecoded). $($report.error)" | Add-Content $env:GITHUB_STEP_SUMMARY
+          if (!$report.realYouTubeDownload -or !$report.nativeVideoDecoded) { throw 'Live YouTube download/decoding was not verified; consult the report.' }
           if ($process.ExitCode -ne 0) { throw 'Public YouTube fetch failed; this does not establish live server playback.' }
       - name: Print failure diagnostics
         if: failure()
