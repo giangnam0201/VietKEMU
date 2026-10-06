@@ -1,0 +1,23 @@
+name: Package current music service evidence
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download completed official firmware inspection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 37427570700 -n current-official-music-firmware -D artifacts/current-firmware
+      - name: Retain vendor source and original protocol bytecode
+        run: python tools/package_music_evidence.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-music-service-evidence
+          path: artifacts/current-music-evidence/
+          retention-days: 7
