@@ -51,6 +51,45 @@ does not register the PC with the production music service. The REST helpers
 inspected in `VietDataCenter` route YouTube, app-market and metadata services,
 not a second karaoke-file API replacing `sn_song_media_list`.
 
+## Newer official firmware comparison
+
+The manufacturer's [update page](https://vietk.vn/cap-nhat-phan-mem/) links a
+public firmware folder. Its KTV-PlusAll 1.9.4 folder supplied
+`KTV-Plus_ota_package.zip` (703893965 bytes, SHA-256
+`4d6006e41411064a1d3ed513978f688581fafff0985ade37aff15b7cd01b8242`).
+The folder label is not a claim about every embedded APK's version. This package
+reports model `KTVPLUSV2` and `ro.product.version=1.0.b1F`; its OTA metadata has a
+2025 build fingerprint. No firmware was installed or executed on this PC.
+
+GitHub run `37427570700` reconstructed the partitions and decoded
+`KmDataCenterService`, `dcservice` and `dualkmbox`. The resource/bytecode decodes
+completed, but JADX reported unresolved methods for the latter two applications;
+this is not a complete recovered Java implementation. Focused original code,
+protocol bytecode and version properties are retained in run `37428609194` and
+locally under `artifacts/current-music-evidence-v2`.
+
+The newer `KmDataCenterService` APK SHA-256 is
+`171a922b2ddf38cccce159952bf821eb790bbe7729d6c9a9f7b31b3f6bb95fcd`;
+the controlling `dualkmbox` APK SHA-256 is
+`88b4528e2d211721af7c5655d87dcfeb355f156e2043bdec0b35174f3a313658`.
+Its default route remains `http://viet.duochang.cc/login`, protocol `1.9.1`,
+sign version `1.0` and service APK version `1.0.0`. `DCDomain` still sends
+`sn_song_media_list` through ordinary `sendMessage`, with song ID, MAC and an
+empty body token. `DCCloudMusicLibCommu` still uses
+`os_unlock_cloud_information` and `auth_unlock_cloud`. Bytecode confirms that
+`CloudMusicUnlockManager.getCloudState()` still returns false. The separate KTV
+service calls inspected handle other features; this media method does not route
+through them. No usable firmware-only registration path was established.
+
+The previously approved real-PC login, read-only status and song-101000 checks
+were repeated using the newer package's exact generated header,
+`KTVPLUSV2/1.0.b1F/1.9.1/android/1.0.0`. Login again returned normal authentication;
+status again returned `404: sn not in devices_table`; media lookup again returned
+HTTP 200, code zero, no media list and no URL. No song was downloaded. No new
+activation, account binding, SMS or alternate device identity was sent. Private
+identity/session replies remain in ignored local `artifacts/server-probe` files.
+The newer-client test therefore does not resolve production music access.
+
 ## Original protocol evidence
 
 - `KmDataCenterService` resources specify `http://viet.duochang.cc/login`, signing
