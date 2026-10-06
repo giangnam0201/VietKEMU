@@ -112,6 +112,14 @@ jobs:
               target=output/relative;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
           (output/'provenance.json').write_text(json.dumps(records,indent=2))
           PY
+      - name: Inspect original stereo channel implementation
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y binutils-arm-linux-gnueabi
+          mkdir -p bytecode-review/original-audio-native
+          cp decoded/daulkmboxosdtv/apktool/lib/armeabi-v7a/libijkplayer.so bytecode-review/original-audio-native/
+          arm-linux-gnueabi-objdump -d decoded/daulkmboxosdtv/apktool/lib/armeabi-v7a/libijkplayer.so > bytecode-review/original-audio-native/disassembly.txt
+          readelf -Ws decoded/daulkmboxosdtv/apktool/lib/armeabi-v7a/libijkplayer.so > bytecode-review/original-audio-native/symbols.txt
+          strings -a -t x decoded/daulkmboxosdtv/apktool/lib/armeabi-v7a/libijkplayer.so | grep -E 'pan=|channel|c0=|c1=' > bytecode-review/original-audio-native/channel-strings.txt
       - name: Retain original main-screen UI reference
         run: |
           python - <<'PY'
