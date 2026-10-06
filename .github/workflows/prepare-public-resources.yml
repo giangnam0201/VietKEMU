@@ -1,0 +1,44 @@
+name: Prepare audited public build resources
+on:
+  workflow_dispatch:
+    inputs:
+      source_release:
+        required: true
+        default: windows-test-37456975710
+permissions:
+  contents: write
+jobs:
+  resources:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the existing cloud-built Windows package
+        run: gh release download '${{ inputs.source_release }}' --pattern 'VietK-Windows-*.zip' --dir incoming
+      - name: Package only the original UI resources
+        run: |
+          python - <<'PY'
+          from pathlib import Path, PurePosixPath
+          import zipfile
+          source = next(Path('incoming').glob('*.zip'))
+          count = 0
+          with zipfile.ZipFile(source) as archive, zipfile.ZipFile('original-native-resources.zip', 'w', zipfile.ZIP_DEFLATED) as output:
+              for entry in archive.infolist():
+                  parts = PurePosixPath(entry.filename).parts
+                  if 'Original' not in parts or entry.is_dir():
+                      continue
+                  tail = parts[parts.index('Original') + 1:]
+                  if not tail or '..' in tail:
+                      raise RuntimeError('Unexpected resource path')
+                  if any(term in '/'.join(tail).lower() for term in ('cookies', 'music-server', 'playback-state', 'youtube-settings', '.pem', '.apk')):
+                      raise RuntimeError('Private input found in resource bundle')
+                  output.writestr('/'.join(tail), archive.read(entry))
+                  count += 1
+          if count < 20:
+              raise RuntimeError('Original resources were not found')
+          print('Prepared original UI resource files:', count)
+          PY
+      - name: Save the reusable resource bundle
+        run: gh release upload '${{ inputs.source_release }}' original-native-resources.zip
