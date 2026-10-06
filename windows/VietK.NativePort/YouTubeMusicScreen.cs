@@ -86,10 +86,13 @@ public sealed class YouTubeMusicScreen : IDisposable
     {
         if(source==PlaybackSource.LocalKaraoke)
         {
-            ++generation;active=false;downloading?.Cancel();liveTransfer?.Dispose();liveTransfer=null;
+            ++generation;active=false;
+            var previous=downloading;downloading=null;previous?.Cancel();
+            liveTransfer?.Dispose();liveTransfer=null;
             SetStatus("Đang phát bài VietK từ hàng chờ cục bộ.");
         }
-        else if(source==PlaybackSource.Idle)active=false;
+        else if(source==PlaybackSource.Idle)
+        { active=false;SetStatus("Đang phát video chờ."); }
     }
     public Canvas Create(string? query=null,bool loadDefault=true)
     {
@@ -450,7 +453,11 @@ public sealed class YouTubeMusicScreen : IDisposable
         }
         if(command=="decoder_completed") { if(!active)return false;Next();return true; }
         if(command=="cut_song_imv")
-        { if(!active&&downloading is null&&playback.Source!=PlaybackSource.YouTube)return false;Next();return true; }
+        {
+            if(playback.Source==PlaybackSource.LocalKaraoke)return false;
+            if(!active&&downloading is null&&playback.Source!=PlaybackSource.YouTube)return false;
+            Next();return true;
+        }
         if(command is "ori_imv" or "accp_imv")
         {
             if(playback.CanSwitchVocal)return false;

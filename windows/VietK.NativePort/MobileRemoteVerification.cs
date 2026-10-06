@@ -21,7 +21,7 @@ internal static class MobileRemoteVerification
         var stereo=Path.GetFullPath(Path.Combine(fixtures,"stereo.mkv"));
         var metadata=new SongMedia(1,101000,stereo,100,0,1,"0","0",1,"","","","",0,null,null,"remote-vocal-fixture");
         playback.Player.SetSingMode(OriginalSingMode.Original);
-        RequireMedia(playback.PlayMedia(stereo,metadata));
+        RequireMedia(playback.PlayMedia(stereo,metadata,source:PlaybackSource.YouTube));
         var deadline=DateTime.UtcNow.AddSeconds(15);
         while(playback.Player.State!=OriginalVideoState.Play)
         { if(DateTime.UtcNow>=deadline)throw new TimeoutException("Remote vocal fixture did not start");await Task.Delay(50); }
@@ -202,6 +202,8 @@ internal static class MobileRemoteVerification
             Require(remote.Active&&playback.CurrentMedia is null,"Playing order identity depended on vocal metadata");
             await Send("clear");Require(selected.Count==1&&playback.CurrentFlowId==third[6..],"Metadata-free playing order was cleared");
             await Send("remove",third);Require(selected.Count==0&&playback.IsPlayingIdle,"Original last-song removal did not restore idle output");
+            using(var idle=JsonDocument.Parse(await client.GetStringAsync("api/state")))
+                Require(idle.RootElement.GetProperty("source").GetString()=="Idle"&&idle.RootElement.GetProperty("status").GetString()=="Đang phát video chờ.","Phone idle status still claimed a playing song");
         }
         finally { playback.NextRequested-=Next;playback.Player.Played-=remote.Refresh;music.OriginalQueue=null; }
     }
