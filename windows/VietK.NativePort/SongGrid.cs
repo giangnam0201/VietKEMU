@@ -3,7 +3,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using VietK.Core;
 
@@ -48,15 +47,8 @@ public sealed class SongGrid(string root,SongGridContract contract)
                     RenderTransformOrigin=new(.5,.5),RenderTransform=new ScaleTransform(1,1) };
                 actionWidth+=data.Width+rightMargin;actions.Children.Add(image);
                 if(action=="online")return; // Original online indicator has no click listener.
-                void Scale(double target)
-                {
-                    var transform=(ScaleTransform)image.RenderTransform;
-                    var anim=new DoubleAnimation(target,TimeSpan.FromMilliseconds(25))
-                        { EasingFunction=new SineEase { EasingMode=EasingMode.EaseInOut } };
-                    transform.BeginAnimation(ScaleTransform.ScaleXProperty,anim);
-                    transform.BeginAnimation(ScaleTransform.ScaleYProperty,anim);
-                }
-                image.MouseLeftButtonDown+=(_,e)=> { image.CaptureMouse();Scale(.9);
+                OriginalPressFeedback.Bind(image,.9);
+                image.MouseLeftButtonDown+=(_,e)=> { image.CaptureMouse();
                     if(pressed is not null)image.Source=Bitmap(contract.Icons[pressed].File);e.Handled=true; };
                 image.MouseLeftButtonUp+=(_,e)=> { var inside=new Rect(0,0,image.ActualWidth,image.ActualHeight).Contains(e.GetPosition(image));
                     image.ReleaseMouseCapture();
@@ -67,7 +59,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
                     }
                     else if(inside) { if(action=="top")AnimateOrder(cell,song,queued,collected);ActionRequested?.Invoke(song,action); }
                     e.Handled=true; };
-                image.LostMouseCapture+=(_,_)=> { Scale(1);image.Source=Bitmap(data.File); };
+                image.LostMouseCapture+=(_,_)=>image.Source=Bitmap(data.File);
             }
             if(song.LocalState is >=1 and <=2)Icon("preview_dialog_button",null,"preview",5);
             else Icon("icon_online_bg",null,"online",5);

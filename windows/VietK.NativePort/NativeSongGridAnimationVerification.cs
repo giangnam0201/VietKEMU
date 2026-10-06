@@ -26,6 +26,13 @@ internal static class NativeSongGridAnimationVerification
             await Until(()=>scroll.IsLoaded&&scroll.ViewportHeight>0,"Order fixture grid never loaded");scroll.ScrollToVerticalOffset(200);
             await Until(()=>scroll.VerticalOffset>100,"Order fixture did not scroll");host.UpdateLayout();
             var body=(Canvas)scroll.Content;var cell=(Canvas)body.Children[6];var tile=(Canvas)cell.Children[0];
+            var press=Descendants<Image>(tile).Single(element=>Equals(element.Tag,"top:70000007"));
+            press.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.PreviewMouseLeftButtonDownEvent });
+            await Task.Delay(60);var pressScale=(ScaleTransform)press.RenderTransform;
+            Require(Math.Abs(pressScale.ScaleX-.9)<.001&&Math.Abs(pressScale.ScaleY-.9)<.001,"Grid icon did not reach its original pressed scale");
+            press.RaiseEvent(new MouseEventArgs(Mouse.PrimaryDevice,Environment.TickCount) { RoutedEvent=UIElement.MouseLeaveEvent });
+            await Task.Delay(60);
+            Require(Math.Abs(pressScale.ScaleX-1)<.001&&Math.Abs(pressScale.ScaleY-1)<.001&&actions.Count==0,"Canceled grid press retained its scale or ordered a song");
             var position=cell.TranslatePoint(new Point(),panel);await Click(tile);
             var first=panel.Children.OfType<Canvas>().Single(element=>Equals(element.Tag,"song-grid-order-animation:70000007"));
             Require(first.Width==246&&first.Height==147&&!first.IsHitTestVisible&&first.RenderTransform is TransformGroup,"Order did not inflate an independent original grid item");
@@ -42,7 +49,8 @@ internal static class NativeSongGridAnimationVerification
             Require(actions.Count==count+1&&actions[^1].Action=="collect"&&!panel.Children.OfType<Canvas>().Any(element=>element.Tag is string tag&&tag.StartsWith("song-grid-order-animation:")),"Favorite action unexpectedly played an order animation");
             File.WriteAllText(Path.Combine(output,"song-grid-order-animation-verification.json"),JsonSerializer.Serialize(new {
                 originalGridItemClone=true,scrolledSourceCoordinates=true,movementScaleAndFade=true,orderAndPriorityCallbacks=true,
-                concurrentFeedback=true,sourcePreserved=true,completionCleanup=true,favoriteDoesNotAnimateOrder=true,queueConfirmationNotSimulated=true
+                concurrentFeedback=true,sourcePreserved=true,completionCleanup=true,favoriteDoesNotAnimateOrder=true,queueConfirmationNotSimulated=true,
+                originalIconPressedScale=true,canceledIconPressRestoresScale=true
             },new JsonSerializerOptions { WriteIndented=true }));
             async Task Click(FrameworkElement element)
             {

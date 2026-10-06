@@ -23,7 +23,7 @@ internal static class OriginalPressFeedback
         element.PreviewMouseLeftButtonDown+=(_,e)=> { start=e.GetPosition(element);Animate(1,pressedScale); };
         element.AddHandler(UIElement.MouseLeftButtonUpEvent,new MouseButtonEventHandler((_,_)=>Restore()),true);
         element.MouseMove+=(_,e)=> { if(restoreAfterDrag&&start is { } point&&Math.Abs(e.GetPosition(element).X-point.X)>30)Restore(); };
-        element.MouseLeave+=(_,_)=>Restore();element.LostKeyboardFocus+=(_,_)=>Restore();
+        element.MouseLeave+=(_,_)=>Restore();element.LostKeyboardFocus+=(_,_)=>Restore();element.LostMouseCapture+=(_,_)=>Restore();
         element.Unloaded+=(_,_)=> { start=null;scale.BeginAnimation(ScaleTransform.ScaleXProperty,null);scale.BeginAnimation(ScaleTransform.ScaleYProperty,null);scale.ScaleX=scale.ScaleY=1; };
     }
     private sealed class AndroidCosine : IEasingFunction
