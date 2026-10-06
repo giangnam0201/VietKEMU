@@ -39,6 +39,13 @@ public static class NativePlaybackVerification
                 var played = 0; playback.Player.Played += () => played++;
                 await NativeMusicPipelineVerification.Run(playback,root,fixtures,output);
                 played=0;
+                var idlePreviewBefore=playback.DecodedPreviewFrames;
+                Require(playback.StartIdleDemo(),"Bundled original idle background unavailable");
+                await Until(()=>played>0 && playback.DecodedPreviewFrames>idlePreviewBefore,
+                    "Bundled original idle background did not decode into the panel preview");
+                var idleEncoder=new PngBitmapEncoder();idleEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
+                using(var idleFile=File.Create(Path.Combine(output,"bundled-idle-preview.png")))idleEncoder.Save(idleFile);
+                played=0;
                 var clip = Path.GetFullPath(Path.Combine(root, "player", "grade_video.mp4"));
                 var previewFramesBefore=playback.DecodedPreviewFrames;
                 Require(playback.PlayMedia(clip), "Original APK grading video rejected");
@@ -163,6 +170,7 @@ public static class NativePlaybackVerification
                     independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
                     decodedPanelPreviewVerified=true, tvPauseAndVolumeFeedbackVerified=true,
                     configuredIdleDemoDecoderAndLoopVerified=true,
+                    bundledOriginalBackgroundDecodedIntoPreview=true,
                     stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,
                     youtubeStereoPcmAndReplayVerified = true,
                     pauseResumeClockVerified = true, nativeSeekReplayVerified = true,
