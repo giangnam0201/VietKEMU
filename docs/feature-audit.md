@@ -32,6 +32,18 @@ The controller also coordinates scoring,
 recording, secondary presentations, resource availability and player events.
 Port those call paths before advertising working playback or two-screen parity.
 
+The authoritative player DEX was retained in run 37417466325 and checked against
+the Java listing. `KmVideoPlayer.setAudioTrackInfo` reduces both metadata indexes
+with Java's `% 2`; `AdaptedEvMediaPlayer.switchTrack` forwards the chosen original
+or accompaniment index to `EvMediaPlayer.switchAudioTrack`. For two or more audio
+tracks, that helper counts only track type 2 and selects the corresponding index
+in the complete interleaved track array. For one audio track, it maps index 0 to
+channel 1 and index 1 to channel 0, passing other values through. Therefore a
+single-track song needs channel switching, not selection of a nonexistent second
+audio stream. The Windows media adapter must implement both paths. Backend
+channel-number semantics still need comparison against the original native
+decoder; this research does not constitute working playback.
+
 ## Evidence retained locally
 
 Original UI templates/layouts/values: `artifacts/original-ui-reference-v1/ui-reference`.
