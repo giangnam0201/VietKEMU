@@ -450,9 +450,15 @@ def package_player_reference(decoded, destination, firmware):
     for name in dimension_names:
         choices = [(path, values[name]) for path, values in dimension_sets if name in values]
         preferred = [item for item in choices if '1280x720' in str(item[0])]
+        television_density = [item for item in choices if item[0].parent.name == 'values-tvdpi']
         defaults = [item for item in choices if item[0].parent.name == 'values']
         if preferred:
             selected = preferred[0]
+        elif television_density:
+            # This native overlay's coordinate space is 1280x720. The APK's
+            # TV-density pixel resources are the 720p set; xhdpi uses 1.5x
+            # dimensions for 1080p and is not copied into this canvas.
+            selected = television_density[0]
         elif defaults:
             selected = defaults[0]
         elif len({value for _, value in choices}) == 1:

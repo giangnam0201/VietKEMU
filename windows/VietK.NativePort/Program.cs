@@ -477,6 +477,7 @@ public static class Program
             app.MainWindow = window;
             app.ShutdownMode = ShutdownMode.OnMainWindowClose;
             using var nativePlayback = new NativePlayback(bottom, stateDirectory);
+            renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             playback = nativePlayback;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
             youtube=youtubeMusic;

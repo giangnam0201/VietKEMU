@@ -19,6 +19,7 @@ public sealed record HomeContract(HomeTile[] Tiles, string SongName, double Tile
 public sealed class HomeScreen(string root, HomeContract contract)
 {
     public event Action<int>? NavigationRequested;
+    public NativePlayback? Playback { get; set; }
 
     public Canvas Create()
     {
@@ -32,7 +33,7 @@ public sealed class HomeScreen(string root, HomeContract contract)
         var phantom = new Border
         {
             Width = 404, Height = contract.TileHeight,
-            Background = Brushes.Black, CornerRadius = new CornerRadius(15)
+            Background = Brushes.Black, CornerRadius = new CornerRadius(15),Child=Playback?.CreatePanelPreview()
         };
         Put(canvas, phantom, 50, contract.PaddingTop);
         var song = Tile("icon_song_name.png", contract.SongName, 404, 2);

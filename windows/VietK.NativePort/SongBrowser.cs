@@ -16,12 +16,13 @@ public sealed record SongBrowserContract(string Title, string EmptyMessage, stri
     string[] AlphabetLetters, string[] SymbolLetters, string Provenance);
 
 // First local SongNameFragment path. Song tiles/actions, alternate input modes,
-// Phantom video and YouTube service navigation are separate unfinished ports.
+// The phantom shares the TV decoder's preview and overlay composition.
 public sealed class SongBrowser(string root, SongBrowserContract contract,
     MoreContract more, LocalSongDatabase local, SongGridContract gridContract,
     Func<SongQueryContext>? queryContext=null)
 {
     public event Action? HomeRequested;
+    public NativePlayback? Playback { get; set; }
     public event Action<string>? YoutubeRequested;
     public event Action<int>? InputModeRequested;
     public event Action<CatalogueSong,string>? SongActionRequested;
@@ -94,7 +95,8 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
             BorderBrush=Brush("#195375be"),Background=shellGradient });
         var column=new StackPanel(); shell.Children.Add(column);
         column.Children.Add(new Border { Width=contract.PhantomWidth,Height=contract.PhantomHeight,
-            Margin=new(20,5,20,5),Padding=new(2),CornerRadius=new(5),Background=Brushes.Black });
+            Margin=new(20,5,20,5),Padding=new(2),CornerRadius=new(5),Background=Brushes.Black,
+            Child=Playback?.CreatePanelPreview() });
         var keyboard=new Canvas { Width=contract.KeyboardWidth,Height=contract.KeyboardHeight };
         column.Children.Add(keyboard); Put(canvas,shell,1280-contract.KeyboardWidth,contract.KeyboardY);
         var display=Text("",28); display.FontWeight=FontWeights.Bold; display.Width=380;display.Height=35;

@@ -227,6 +227,14 @@ public sealed class NativePlayback : IDisposable
     }
     public void ShowTelevision(Window panel)
     { Television.Show(); }
+    public Image CreatePanelPreview()
+    {
+        var image=new Image { Stretch=Stretch.Uniform,Source=PreviewFrame };
+        void Update(BitmapSource frame)=>image.Source=frame;
+        image.Loaded+=(_,_)=> { image.Source=PreviewFrame;PreviewFrameChanged+=Update; };
+        image.Unloaded+=(_,_)=>PreviewFrameChanged-=Update;
+        return image;
+    }
     public bool StartIdleDemo()
     {
         // BroadcastListManager / USBSetBroadcastDialog: Demo.mp4 is a separate
