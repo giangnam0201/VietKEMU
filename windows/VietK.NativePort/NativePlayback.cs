@@ -240,6 +240,7 @@ public sealed class NativePlayback : IDisposable
     public event Action? NextRequested;
     public event Action<PlaybackSource>? SourceChanged;
     public PlaybackSource Source { get; private set; }=PlaybackSource.Idle;
+    public string CurrentFlowId { get; private set; }="";
     public event Action<bool>? MuteChanged;
     public Func<string,bool>? CommandOverride { get; set; }
     public SongMedia? CurrentMedia { get; private set; }
@@ -314,7 +315,7 @@ public sealed class NativePlayback : IDisposable
             Path.Combine(AppContext.BaseDirectory,"Original","player","random_bg_default.mp4") };
         var demo=paths.FirstOrDefault(File.Exists);
         playingIdle=false;Player.Stop();CurrentMedia=null;IdleVideoSource=demo;ResetPreview();
-        Source=PlaybackSource.Idle;SourceChanged?.Invoke(Source);
+        Source=PlaybackSource.Idle;CurrentFlowId="";SourceChanged?.Invoke(Source);
         Television.Overlay.SetSong("");
         if(demo is null)return false;
         demo=Path.GetFullPath(demo);
@@ -343,10 +344,10 @@ public sealed class NativePlayback : IDisposable
         Directory.CreateDirectory(Path.GetDirectoryName(stateFile)!);
         File.WriteAllText(stateFile,JsonSerializer.Serialize(new PlaybackPreferences(Decoder.OutputVolumeStep,idleVideoPath)));
     }
-    public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false,PlaybackSource source=PlaybackSource.LocalKaraoke)
+    public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false,PlaybackSource source=PlaybackSource.LocalKaraoke,string flowId="")
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
-        Source=source;SourceChanged?.Invoke(source);
+        Source=source;CurrentFlowId=flowId;SourceChanged?.Invoke(source);
         playingIdle=false;Player.Stop(); CurrentMedia = metadata;ResetPreview();
         Decoder.PreserveStereo=preserveStereo || metadata is { OriginalTrack:0,AccompanyTrack:5 } or { OriginalTrack:5,AccompanyTrack:0 };
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
@@ -375,7 +376,7 @@ public sealed class NativePlayback : IDisposable
             case "replay_imv":
                 if(playingIdle)StartIdleDemo();
                 else if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path)
-                    PlayMedia(path, CurrentMedia,Decoder.PreserveStereo,Source);
+                    PlayMedia(path, CurrentMedia,Decoder.PreserveStereo,Source,CurrentFlowId);
                 Television.Overlay.ShowControl("replay");
                 break;
             case "cut_song_imv": Player.Stop(); NextRequested?.Invoke(); break;

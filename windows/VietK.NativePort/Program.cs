@@ -77,7 +77,7 @@ public static class Program
                     var cached=musicServer.Get(item.SongMetadata.Id);
                     var path=string.IsNullOrEmpty(item.PlayUrl)?cached?.Path:item.PlayUrl;
                     if(item.PlayType!="normal" || string.IsNullOrEmpty(path))return;
-                    playback?.PlayMedia(path,cached?.Metadata??item.VideoMedia);
+                    playback?.PlayMedia(path,cached?.Metadata??item.VideoMedia,flowId:item.FlowId);
                 });
             }
             void QueueChanged()

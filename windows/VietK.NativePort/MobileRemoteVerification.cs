@@ -139,7 +139,7 @@ internal static class MobileRemoteVerification
         void Start()
         {
             var head=selected!.Snapshot().FirstOrDefault();
-            if(head is null)playback.StartIdleDemo();else RequireMedia(playback.PlayMedia(head.PlayUrl,head.VideoMedia));
+            if(head is null)playback.StartIdleDemo();else RequireMedia(playback.PlayMedia(head.PlayUrl,head.VideoMedia,flowId:head.FlowId));
         }
         selected=new OriginalSelectedQueue(Song,command=>command.Apply(store,_=>false),()=>remote?.Refresh(),Start);
         selected.Initialize(store,()=>[]);
@@ -158,7 +158,7 @@ internal static class MobileRemoteVerification
             remote.Refresh();
             Require(bottom.QueueCount==4,"Original selected/download badge differs");
             var local=selected.Snapshot();var first="local:"+local[0].FlowId;var repeated="local:"+local[1].FlowId;var third="local:"+local[2].FlowId;
-            Require(first!=repeated,"Repeated original song orders lost their distinct flow IDs");
+            Require(first!=repeated&&playback.CurrentFlowId==first[6..],"Repeated original song orders lost their distinct playing flow ID");
             using(var state=JsonDocument.Parse(await client.GetStringAsync("api/state")))
             {
                 var original=state.RootElement.GetProperty("original");
@@ -185,7 +185,7 @@ internal static class MobileRemoteVerification
             await Send("remove",repeated);Require(selected.Count==2&&selected.Snapshot()[0].FlowId==first[6..],"Original repeated-row removal affected playing copy");
             await Send("shuffle");Require(selected.Snapshot()[0].FlowId==first[6..],"Original shuffle replaced the playing head");
             using(var response=await client.PostAsJsonAsync("api/action",new { action="command",id="cut_song_imv" }))Require(response.IsSuccessStatusCode,"Original next command failed");
-            Require(selected.Count==1&&selected.Snapshot()[0].FlowId==third[6..],"Next advanced YouTube instead of original karaoke");
+            Require(selected.Count==1&&selected.Snapshot()[0].FlowId==third[6..]&&playback.CurrentFlowId==third[6..],"Next advanced YouTube instead of original karaoke");
             using(var state=JsonDocument.Parse(await client.GetStringAsync("api/state")))Require(state.RootElement.GetProperty("queue").GetArrayLength()==2,"Local next modified saved YouTube orders");
             deadline=DateTime.UtcNow.AddSeconds(10);
             while(playback.Player.State!=OriginalVideoState.Play) { if(DateTime.UtcNow>deadline)throw new TimeoutException("Next original song failed to start");await Task.Delay(50); }
@@ -196,6 +196,11 @@ internal static class MobileRemoteVerification
             Require(playback.Source==PlaybackSource.LocalKaraoke&&playback.Player.State==OriginalVideoState.Play&&selected.Count==1,"Normal YouTube add took over local playback");
             await Send("clear");Require(selected.Count==1&&downloads.Count==0&&cancelled==1,"Original clear stopped playing song or failed to cancel downloads");
             await Send("retry");Require(retried==1,"Original retry did not reach its native callback");
+            RequireMedia(playback.PlayMedia(stereo,preserveStereo:true,flowId:third[6..]));
+            deadline=DateTime.UtcNow.AddSeconds(10);
+            while(playback.Player.State!=OriginalVideoState.Play) { if(DateTime.UtcNow>deadline)throw new TimeoutException("Metadata-free ordered media did not start");await Task.Delay(50); }
+            Require(remote.Active&&playback.CurrentMedia is null,"Playing order identity depended on vocal metadata");
+            await Send("clear");Require(selected.Count==1&&playback.CurrentFlowId==third[6..],"Metadata-free playing order was cleared");
             await Send("remove",third);Require(selected.Count==0&&playback.IsPlayingIdle,"Original last-song removal did not restore idle output");
         }
         finally { playback.NextRequested-=Next;playback.Player.Played-=remote.Refresh;music.OriginalQueue=null; }

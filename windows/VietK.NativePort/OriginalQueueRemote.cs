@@ -12,7 +12,7 @@ public sealed class OriginalQueueRemote(OriginalSelectedQueue selected,OriginalD
     private SelectedQueueDialog? dialog;
     public bool Active=>playback.Source==PlaybackSource.LocalKaraoke &&
         playback.Player.State is OriginalVideoState.Play or OriginalVideoState.Pause or OriginalVideoState.Buffering &&
-        selected.Snapshot().FirstOrDefault()?.SongMetadata.Id==playback.CurrentMedia?.SongId && playback.CurrentMedia is not null;
+        playback.CurrentFlowId.Length>0 && selected.Snapshot().FirstOrDefault()?.FlowId==playback.CurrentFlowId;
     public bool ShouldPresent=>playback.Source!=PlaybackSource.YouTube && selected.Count+downloads.Count>0;
     public object State()=>new { queue=Rows(),active=Active,transfers=Transfers(),
         status=Active?"Đang phát: "+Title(selected.Snapshot()[0]):"Hàng chờ VietK: "+(selected.Count+downloads.Count)+" bài" };

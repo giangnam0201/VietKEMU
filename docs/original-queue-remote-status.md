@@ -1,6 +1,6 @@
 # Original local queue controls
 
-The phone's queue selector exposes the translated VietK selected and download lists separately from the yt-dlp queue. Rows use `local:<FlowId>` and `download:<FlowId>`, so repeated orders of one song remain distinct. Source selection changes the list being edited, while playback buttons operate on the current native player.
+The phone's queue selector exposes the translated VietK selected and download lists separately from the yt-dlp queue. Rows use `local:<FlowId>` and `download:<FlowId>`, so repeated orders of one song remain distinct. The decoder retains the exact playing flow ID, including replay and media without vocal metadata; clear-except-playing therefore does not infer order identity from a catalogue ID. Source selection changes the list being edited, while playback buttons operate on the current native player.
 
 Original local rows use `OriginalSelectedQueue` for priority, drag/reorder and deletion, including its existing one-based delete/top DAO messages and zero-based sort messages. Shuffle and clear-except-playing now follow `SelectedLocalListManager`: runtime state changes without an invented DAO message. Download rows expose their actual percentage/error/waiting state and use the existing download-list removal/priority methods. Clearing the original queue retains a playing local head and cancels the download list. Download-row drag and cross-list priority are unavailable; the native download manager has no translated sort operation.
 
