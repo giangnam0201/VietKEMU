@@ -120,6 +120,14 @@ operations remain allowed at capacity. This policy is a prerequisite for the
 queue backend; it does not itself enqueue, download or start playback. The
 decompiled Java duplicates and inverts some capacity/duplicate branches, so the
 policy follows the original smali control flow.
+Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37394952347
+passed the gate boundary checks and the real local lookup of song 101000,
+including all singer/type/language IDs, metadata, constructor defaults and
+missing-ID behavior, plus Windows build/capture checks. The selected-list store,
+download queue and UI handlers still need translation. Original
+`SelectedLocalListManager.topItemBySerial` preserves index zero (current song)
+and moves eligible items to index one (next song); it does not insert ahead of
+the current song.
 
 Verified cloud run: https://github.com/giangnam0201/VietKEMU/actions/runs/37391148804
 passed the search fixture checks, original resource packaging, Windows build,
