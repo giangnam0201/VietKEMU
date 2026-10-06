@@ -72,7 +72,7 @@ public static class Program
                 id=>System.Diagnostics.Trace.WriteLine($"Original media URL request {id}; DCDomain network port pending"),
                 (item,action)=>System.Diagnostics.Trace.WriteLine($"Original non-Evideo download request {item.PlayType}, action {action}; handler port pending"));
             downloadQueue.Initialize(()=>songState.DownloadList.Clear(),
-                ()=>songState.DownloadList.Restore(songState.GetSongById,songState.GetMedia,_=>null),onlineNeeded:true);
+                ()=>songState.DownloadList.Restore(id=>songState.GetSongById(id),songState.GetMedia,_=>null),onlineNeeded:true);
             QueueChanged();
             var gridContract=JsonSerializer.Deserialize<SongGridContract>(File.ReadAllText(Path.Combine(root,"song-grid.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original song grid contract");
@@ -250,7 +250,7 @@ public static class Program
                             ()=>selectionFixture!.Reset(),_=>{},_=>{});
                         selectionFixture=new(downloadFixture,()=>notifiedCount=downloadFixture.Count,
                             id=>requestedId=id,(_,_)=>throw new InvalidDataException("Normal song reached non-Evideo downloader"));
-                        downloadFixture.Initialize(()=>downloads.Clear(),()=>downloads.Restore(imported.GetSongById,imported.GetMedia,_=>null),true);
+                        downloadFixture.Initialize(()=>downloads.Clear(),()=>downloads.Restore(id=>imported.GetSongById(id),imported.GetMedia,_=>null),true);
                         // A backend fixture, not a claim that this machine has
                         // registered storage, server access or playable music.
                         downloadFixture.Add(restoredItem);fixtureDownloadDispatcher.FlushAsync().GetAwaiter().GetResult();
