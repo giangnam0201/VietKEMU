@@ -22,6 +22,13 @@ internal static class MobileQrChecks
             Require(pixels.Width==400 && pixels.Height==400 && decoded?.Text==text,"Original-sized QR failed to decode its binding payload");
             Require(decoded.ResultMetadata[ResultMetadataType.ERROR_CORRECTION_LEVEL].ToString()==(television?"M":"L"),"Panel/TV QR error correction differs");
         }
+        foreach(var text in new[]{OriginalMobileQr.TelevisionPayload(binding),"http://192.168.1.20:9167/#token="+new string('a',64)})
+        {
+            var compact=OriginalMobileQr.Render(text,true,31);
+            var decoded=new BarcodeReaderGeneric { Options=new ZXing.Common.DecodingOptions { TryHarder=true } }
+                .Decode(compact.Pixels,compact.Width,compact.Height,RGBLuminanceSource.BitmapFormat.BGRA32);
+            Require(compact.Width<80&&decoded?.Text==text,"Compact QR lost modules or changed its connection payload");
+        }
         var state=new OriginalTvQrState();state.ChangeMode(0);Require(state.ImageVisible,"Always-show mode hidden");
         state.ChangeMode(1);Require(!state.ImageVisible,"Mode-one source branch was replaced with an automatic timer");
         state.ChangeMode(0);state.ScheduleHide(100);Require(state.Tick(20099,100)==0 && state.ImageVisible,"QR hid before the original 20-second delay");

@@ -28,13 +28,13 @@ public static class OriginalMobileQr
     }
     public static string TelevisionPayload(MobileQrBinding binding)=>
         binding.BindingPrefix+(binding.RandomCode??"")+"&sn="+binding.Serial+"&from=603";
-    public static PixelData Render(string payload,bool television)
+    public static PixelData Render(string payload,bool television,int size=400)
     {
         if(string.IsNullOrEmpty(payload))throw new ArgumentException("Empty QR payload",nameof(payload));
         return new BarcodeWriterPixelData
         {
             Format=BarcodeFormat.QR_CODE,
-            Options=new QrCodeEncodingOptions { Width=400,Height=400,Margin=1,CharacterSet="UTF-8",
+            Options=new QrCodeEncodingOptions { Width=size,Height=size,Margin=1,CharacterSet="UTF-8",
                 ErrorCorrection=television?ErrorCorrectionLevel.M:ErrorCorrectionLevel.L }
         }.Write(payload);
     }
