@@ -45,16 +45,22 @@ internal static class NativeSingerNavigationVerification
             Require(database.ImportReferencedSingers(whole)==2&&database.ImportReferencedSingers(whole)==0&&database.Singers.Find("Unreferenced fixture") is null,"Referenced-singer import included an unrelated row or replaced existing metadata");
             var contract=Read<SongBrowserContract>("song-browser.json");var more=Read<MoreContract>("more.json");var grid=Read<SongGridContract>("song-grid.json");
             var original=new SongBrowser(root,contract,more,database,grid) { Playback=playback };
+            var bottomContract=Read<BottomContract>("bottom.json");var bottom=new BottomBar(root,bottomContract);
             var duet=new CatalogueSong(70000001,"Fixture duet","FA",2,"Fixture one,Fixture two",8,1000,1,"") { LocalState=1 };
-            var originalPanel=original.CreateVerificationFixture(new[]{duet});var originalView=new Viewbox { Child=originalPanel };host.Content=originalView;
+            var originalPanel=original.CreateVerificationFixture(new[]{duet});Decorate(originalPanel);var originalView=new Viewbox { Child=originalPanel };host.Content=originalView;
             var selected=new HashSet<int>();var collected=new HashSet<int>();var actions=new List<(int Id,string Action)>();var home=0;
-            var navigation=new OriginalSingerNavigation(root,contract,more,database,grid,()=>host,_=>{},()=>new(),()=>playback,()=>selected,()=>collected);
+            var navigation=new OriginalSingerNavigation(root,contract,more,database,grid,()=>host,Decorate,()=>new(),()=>playback,()=>selected,()=>collected);
             original.SingerRequested+=name=>navigation.Open(name);navigation.SongActionRequested+=(song,action)=>actions.Add((song.Id,action));navigation.FragmentRequested+=fragment=> { Require(fragment==1,"Singer category requested the wrong original fragment");home++; };
             original.Input!.Letter("F");host.UpdateLayout();
             ClickSinger(originalPanel,"song-singers:70000001","Fixture two");
             Require(navigation.Active?.Singer?.Id==10&&navigation.Active.Results.Count==7,"Second duet span did not open the exact singer ID's songs");
             Require(actions.Count==0&&Application.Current.Windows.Count==2,"Singer click ordered a song or introduced a third window");
+            bottom.SetConfirmedPlaybackState(true,true);bottom.SetConfirmedQueueCount(3);
             await ClickBack();Require(ReferenceEquals(host.Content,originalView)&&original.Input.Text=="F","Singer Back did not restore the previous view/input object");
+            await Until(()=>originalPanel.IsLoaded,"Restored song panel did not load");
+            Require(Descendants<FrameworkElement>(originalPanel).Single(element=>Equals(element.Tag,"play_imv")).Visibility==Visibility.Visible&&
+                Descendants<FrameworkElement>(originalPanel).Single(element=>Equals(element.Tag,"pause_imv")).Visibility==Visibility.Hidden&&
+                Descendants<TextBlock>(originalPanel).Single(element=>Equals(element.Tag,"original-queue-badge")).Text=="3","Back restored stale playback controls or queue count");
             Require(!navigation.Open("missing fixture")&&ReferenceEquals(host.Content,originalView),"Unknown singer replaced the screen");
             ClickSinger(originalPanel,"song-singers:70000001","Fixture one");
             var active=navigation.Active!;Require(active.Singer?.Id==9&&active.Results.Count==60,"Singer initial fetch did not retain the original 60-record page");
@@ -92,10 +98,11 @@ internal static class NativeSingerNavigationVerification
             File.WriteAllText(Path.Combine(output,"singer-navigation-verification.json"),JsonSerializer.Serialize(new {
                 referencedSingerImport=true,individualDuetSpans=true,exactSingerMembership=true,originalInitialPageSize=true,
                 continuousNextPage=true,singerScopedSearch=true,shortResultListTopAligned=true,confirmedFavoriteState=true,sharedActionCallback=true,
-                unknownSingerNoOp=true,restoresPreviousViewAndInput=true,nestedSingerBack=true,collectionSingerRoute=true,
+                unknownSingerNoOp=true,restoresPreviousViewAndInput=true,restoredFooterUsesCurrentState=true,nestedSingerBack=true,collectionSingerRoute=true,
                 categoryDirectoryRequest=true,directoryScreen=false,twoWindows=true,manufacturerSingerPictures=false
             },new JsonSerializerOptions { WriteIndented=true }));
             T Read<T>(string file)=>JsonSerializer.Deserialize<T>(File.ReadAllText(Path.Combine(root,file)),new JsonSerializerOptions { PropertyNameCaseInsensitive=true })!;
+            void Decorate(Canvas canvas) { var bar=bottom.Create();Canvas.SetTop(bar,bottomContract.Y);canvas.Children.Add(bar); }
             async Task ClickBack()
             {
                 host.UpdateLayout();var back=Descendants<Border>((Viewbox)host.Content).Single(element=>Equals(element.Tag,"singer-song-back"));

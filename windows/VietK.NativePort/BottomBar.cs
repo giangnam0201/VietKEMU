@@ -26,13 +26,14 @@ public sealed class BottomBar(string root, BottomContract contract)
     public Canvas Create()
     {
         buttons.Clear();
-        var bar = new Canvas { Width = 1280, Height = 100, ClipToBounds = false };
+        var createdButtons=new Dictionary<string,FrameworkElement>();
+        var bar = new Canvas { Width = 1280, Height = 100, ClipToBounds = false,Tag="original-bottom-bar" };
         foreach (var data in contract.Buttons)
         {
             var control = new Grid
             {
                 Width = data.Width, Height = data.Height, Background = Brushes.Transparent,
-                RenderTransformOrigin = new Point(.5, .5), RenderTransform = new ScaleTransform(1, 1)
+                RenderTransformOrigin = new Point(.5, .5), RenderTransform = new ScaleTransform(1, 1),Tag=data.Href
             };
             control.Children.Add(new Image
             {
@@ -59,19 +60,26 @@ public sealed class BottomBar(string root, BottomContract contract)
             };
             control.LostMouseCapture += (_, _) => Scale(control, 1);
             Canvas.SetLeft(control, data.X); Canvas.SetTop(control, contract.ModuleTop + data.Y);
-            bar.Children.Add(control); buttons.Add(data.Href, control);
+            bar.Children.Add(control); buttons.Add(data.Href, control);createdButtons.Add(data.Href,control);
         }
         // BottomMenuBarView.addListener: queue badge at x=1220,y=0,
         // 30x20px, white bold count, original icon_playlist_num background.
         var count = new TextBlock
         {
-            Width = 30, Height = 20, Text = QueueCount.ToString(), FontSize = 14,IsHitTestVisible=false,
+            Width = 30, Height = 20, Text = QueueCount.ToString(), FontSize = 14,IsHitTestVisible=false,Tag="original-queue-badge",
             FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center,
             Background = new ImageBrush(new BitmapImage(new Uri(Path.Combine(root, "icon_playlist_num.png"))))
         };
         Canvas.SetLeft(count, 1220); Canvas.SetTop(count, 0); bar.Children.Add(count);
         queueBadge=count;
         SetConfirmedPlaybackState(Paused, OriginalVocal);
+        // Retained fragment views can return after a newer footer was created.
+        // Rebind the shared controller to the footer actually on screen.
+        bar.Loaded+=(_,_)=>
+        {
+            buttons.Clear();foreach(var entry in createdButtons)buttons.Add(entry.Key,entry.Value);
+            queueBadge=count;SetConfirmedQueueCount(QueueCount);SetConfirmedPlaybackState(Paused,OriginalVocal);
+        };
         return bar;
     }
 
