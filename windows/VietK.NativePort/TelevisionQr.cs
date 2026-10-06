@@ -49,6 +49,13 @@ public sealed class TelevisionQr
         code.Visibility=string.IsNullOrEmpty(binding.TvBindCode)?Visibility.Collapsed:Visibility.Visible;
         Canvas.Visibility=Visibility.Visible;Refresh();
     }
+    public void ConfigureLocalRemote(string url)
+    {
+        var pixels=OriginalMobileQr.Render(url,true);
+        image.Source=BitmapSource.Create(pixels.Width,pixels.Height,96,96,PixelFormats.Bgra32,null,pixels.Pixels,pixels.Width*4);
+        RenderOptions.SetBitmapScalingMode(image,BitmapScalingMode.NearestNeighbor);
+        code.Text="";code.Visibility=Visibility.Collapsed;Canvas.Visibility=Visibility.Visible;Refresh();
+    }
     public void SetMode(int mode,bool persist=true)
     {
         State.ChangeMode(mode);Refresh();

@@ -54,7 +54,7 @@ public sealed class BottomBar(string root, BottomContract contract)
                 var inside = new Rect(0, 0, control.ActualWidth, control.ActualHeight).Contains(e.GetPosition(control));
                 control.ReleaseMouseCapture(); Scale(control, 1);
                 var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                if (inside && clickGuard.TryClick(now)) CommandRequested?.Invoke(data.Href);
+                if (inside && clickGuard.TryClick(now))RequestButton(data.Href);
                 e.Handled = true;
             };
             control.LostMouseCapture += (_, _) => Scale(control, 1);
@@ -65,7 +65,7 @@ public sealed class BottomBar(string root, BottomContract contract)
         // 30x20px, white bold count, original icon_playlist_num background.
         var count = new TextBlock
         {
-            Width = 30, Height = 20, Text = QueueCount.ToString(), FontSize = 14,
+            Width = 30, Height = 20, Text = QueueCount.ToString(), FontSize = 14,IsHitTestVisible=false,
             FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center,
             Background = new ImageBrush(new BitmapImage(new Uri(Path.Combine(root, "icon_playlist_num.png"))))
         };
@@ -88,6 +88,11 @@ public sealed class BottomBar(string root, BottomContract contract)
     }
 
     public bool IsVisible(string href) => buttons.TryGetValue(href, out var button) && button.Visibility == Visibility.Visible;
+    internal void RequestButton(string href)
+    {
+        if(!contract.Buttons.Any(button=>button.Href==href))throw new ArgumentException("Unknown bottom control");
+        CommandRequested?.Invoke(href);
+    }
     private void Set(string href, bool visible)
     { if (buttons.TryGetValue(href, out var button)) button.Visibility = visible ? Visibility.Visible : Visibility.Hidden; }
 

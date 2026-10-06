@@ -36,6 +36,31 @@ public sealed class YouTubeMusicScreen : IDisposable
     private bool active,disposed;
     private string message="Tìm bài hát hoặc dán liên kết YouTube. Bấm bài để thêm vào hàng chờ.";
     public event Action? HomeRequested;
+    internal Func<string>? MobileConnectionInfo { get; set; }
+    internal Action? RePairMobile { get; set; }
+    internal object RemoteState()=>new { queue=queue.ToArray(),active,paused=playback.Player.State==OriginalVideoState.Pause,
+        volume=playback.Decoder.OutputVolumeStep,status=message,transfers=queueTransfers };
+    internal Task<IReadOnlyList<YouTubeVideo>> RemoteSearch(string query,CancellationToken cancellation)=>client.Search(query,cancellation);
+    internal void RemoteAdd(YouTubeVideo video,bool first)=>Add(video,first);
+    internal void SeedRemoteFixture()
+    {
+        queue.Clear();queue.Add(new("fixture0001","Playing fixture","",""));
+        queue.Add(new("fixture0002","Waiting fixture","",""));active=true;Save();RefreshQueue();
+    }
+    internal void RemoteQueue(string action,string id,int target)
+    {
+        var video=queue.FirstOrDefault(item=>item.Id==id);
+        switch(action)
+        {
+            case "clear":Clear();break;
+            case "shuffle":Shuffle();break;
+            case "retry":_=PlayFirst();break;
+            case "remove" when video is not null:Remove(video);break;
+            case "top" when video is not null:TopNext(video);break;
+            case "move" when video is not null:MoveQueue(video,target);break;
+            default:throw new ArgumentException("Unknown queue action or song");
+        }
+    }
     public YouTubeMusicScreen(string root,string stateDirectory,NativePlayback playback,BottomBar bottom)
     {
         this.root=root;this.playback=playback;this.bottom=bottom;
@@ -143,6 +168,8 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Bỏ đăng nhập",()=> { cookieFile="";useFirefoxCookies=false;SaveSettings(); });
         Add("Thử lại bài đang tải",()=>_=PlayFirst());
         Add("Chữ chạy trên TV…",EditMarquee);
+        Add("Kết nối điều khiển bằng điện thoại",()=>SetStatus(MobileConnectionInfo?.Invoke()??"Điều khiển điện thoại chưa khởi động."));
+        Add("Ngắt điện thoại cũ / tạo QR mới",()=> { RePairMobile?.Invoke();SetStatus("Đã đổi mã kết nối. Quét lại QR trên TV."); });
         Add("Chế độ hiển thị mã QR lên TV…",()=>
         {
             if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new TvQrModeDialog(panel,playback.Television.Overlay.Qr);
@@ -407,7 +434,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         if(command=="cut_song_imv") { Next();return true; }
         if(command is "ori_imv" or "accp_imv")
         { SetStatus("Video YouTube không có thông tin kênh nguyên xướng / nhạc đệm của VietK.");return true; }
-        if(command=="orderlist_imv") { ShowQueue();return true; }
+        if(command is "order_bg" or "orderlist_imv") { ShowQueue();return true; }
         return false;
     }
     private void Next()

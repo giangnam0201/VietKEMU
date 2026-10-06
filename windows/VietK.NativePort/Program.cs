@@ -486,6 +486,9 @@ public static class Program
             renderer.Playback=nativePlayback;browser.Playback=nativePlayback;
             playback = nativePlayback;
             using var youtubeMusic=new YouTubeMusicScreen(root,stateDirectory,nativePlayback,bottom);
+            using var mobileRemote=new MobileRemoteServer(app.Dispatcher,youtubeMusic,nativePlayback,ambience:ambienceExpressions);
+            youtubeMusic.MobileConnectionInfo=()=>mobileRemote.ConnectionInfo;
+            youtubeMusic.RePairMobile=mobileRemote.RePair;
             youtube=youtubeMusic;
             window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(34) };
             youtube.HomeRequested+=()=>window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel() };
@@ -503,6 +506,8 @@ public static class Program
             {
                 nativePlayback.ShowTelevision(window);
                 nativePlayback.StartIdleDemo();
+                try { await mobileRemote.StartAsync(); }
+                catch(Exception) { System.Diagnostics.Trace.WriteLine("Local mobile remote failed to start; see connection status menu."); }
                 // Developer probe, separate from the original song-library UI.
                 if (args.Length == 2 && args[0] == "--play-media" && !nativePlayback.PlayMedia(Path.GetFullPath(args[1])))
                     throw new InvalidDataException("Playback probe source is unavailable");

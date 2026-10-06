@@ -9,6 +9,8 @@
     <StartupObject>VietK.NativePort.Program</StartupObject>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <EmbeddedResource Include="mobile-remote.html" />
     <PackageReference Include="LibVLCSharp.WPF" Version="3.10.1" />
     <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
     <ProjectReference Include="..\VietK.Core\VietK.Core.csproj" />

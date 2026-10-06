@@ -58,12 +58,16 @@ public static class NativePlaybackVerification
                 var binding=new MobileQrBinding("fixture","https://x.invalid/?c=","1234","5678");
                 qr.Configure(binding);qr.SetMode(0,false);
                 await Task.Delay(120);
-                var qrFrame=playback.Television.CompositePreview(playback.Decoder.VideoSurface);
+                var qrFrame=new RenderTargetBitmap(1280,720,96,96,PixelFormats.Pbgra32);
+                playback.Television.VideoLayers.UpdateLayout();qrFrame.Render(playback.Television.VideoLayers);
                 var qrPixels=new byte[qrFrame.PixelWidth*qrFrame.PixelHeight*4];
                 qrFrame.CopyPixels(qrPixels,qrFrame.PixelWidth*4,0);
                 var qrReader=new ZXing.BarcodeReaderGeneric { Options=new ZXing.Common.DecodingOptions { TryHarder=true } };
                 var qrResult=qrReader.Decode(qrPixels,qrFrame.PixelWidth,qrFrame.PixelHeight,ZXing.RGBLuminanceSource.BitmapFormat.BGRA32);
-                Require(qrResult?.Text==OriginalMobileQr.TelevisionPayload(binding),"TV QR did not decode from shared panel preview");
+                Require(qrResult?.Text==OriginalMobileQr.TelevisionPayload(binding),"TV QR did not decode from the actual shared TV surface");
+                var sharedQr=playback.Television.CompositePreview(playback.Decoder.VideoSurface);
+                var qrCorner=new byte[4];sharedQr.CopyPixels(new Int32Rect(34,38,1,1),qrCorner,4,0);
+                Require(qrCorner.Take(3).All(v=>v>240),"QR white margin missing in composed panel preview");
                 var qrEncoder=new PngBitmapEncoder();qrEncoder.Frames.Add(BitmapFrame.Create(qrFrame));
                 using(var qrFile=File.Create(Path.Combine(output,"synthetic-mobile-qr-preview.png")))qrEncoder.Save(qrFile);
                 var modeDialog=new TvQrModeDialog(panel,qr);modeDialog.Select(2);modeDialog.Close();
@@ -71,6 +75,7 @@ public static class NativePlaybackVerification
                 modeDialog=new TvQrModeDialog(panel,qr);modeDialog.Select(1);modeDialog.Confirm(false);
                 Require(qr.State.Mode==1&&!qr.State.ImageVisible,"Original mode-one visibility branch was replaced");
                 qr.SetMode(savedMode,false);qr.Configure(savedBinding);
+                await MobileRemoteVerification.Run(playback,bottom,panel,root,output);
                 var idleEncoder=new PngBitmapEncoder();idleEncoder.Frames.Add(BitmapFrame.Create(playback.PreviewFrame!));
                 using(var idleFile=File.Create(Path.Combine(output,"bundled-idle-preview.png")))idleEncoder.Save(idleFile);
                 played=0;

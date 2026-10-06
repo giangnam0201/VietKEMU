@@ -5,6 +5,14 @@ Extract the ENTIRE ZIP into a folder before opening VietK.NativePort.exe.
 Keep the DLLs and Original folder beside the executable.
 Keep YouTubeTools beside the executable as well.
 
+Phone control: connect phone and PC to the same Wi-Fi/LAN, then scan the TV QR.
+Allow VietK through Windows Firewall on the private network if prompted.
+The phone browser controls the actual PC queue and playback; music stays on TV.
+Firefox/options > Ket noi dieu khien bang dien thoai shows LAN addresses.
+Ngat dien thoai cu / tao QR moi revokes paired phones and generates a new QR.
+This local remote replaces the unavailable cloud route; it is not the original
+manufacturer website. Expressions/wishes require the local original supplement.
+
 Main music source: YouTube (yt-dlp + native TV decoder)
 - Search a song name, or paste a YouTube video link into the search field.
 - Click a result to queue it; right-click and choose Hat ngay to play it first.
