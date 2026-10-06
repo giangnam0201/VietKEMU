@@ -103,6 +103,12 @@ public static class NativePlaybackVerification
                 var restoredPower=await UntilPower(tap,440,value=>value>=quietPower*.8 && value<=quietPower*1.2,
                     "Volume decrement did not restore actual output PCM amplitude");
 
+                Require(playback.PlayMedia(stereo,preserveStereo:true), "YouTube-style stereo media rejected");
+                await Stereo(tap);
+                playback.Command("replay_imv");
+                await Stereo(tap);
+                Require(playback.Decoder.PreserveStereo,"Replay lost stereo playback mode");
+
                 var multi = Path.GetFullPath(Path.Combine(fixtures, "multiple.ts"));
                 // Vocal mode persists between songs in the original player.
                 // Select original explicitly before testing stream index 1.
@@ -129,6 +135,7 @@ public static class NativePlaybackVerification
                     nativeWindowsDecoder = "bundled libVLC", androidRuntimeUsed = false,
                     independentPanelAndTvWindows = true, originalApkVideoDecoded = true,
                     stereoChannelPcmVerified = true, multipleAudioStreamPcmVerified = true,
+                    youtubeStereoPcmAndReplayVerified = true,
                     pauseResumeClockVerified = true, nativeSeekReplayVerified = true,
                     panelPlaybackObserverVerified = true, volumeStepVerified = true,
                     volumePcmPowerBefore=quietPower,volumePcmPowerAfterIncrement=loudPower,volumePcmPowerRestored=restoredPower,
@@ -167,6 +174,19 @@ public static class NativePlaybackVerification
             if (samples.Length >= 4800 && signal > 0.000001 && signal > other * 25) return;
         } while (DateTime.UtcNow < stop);
         throw new InvalidDataException($"{message}; decoded power expected={signal}, unwanted={other}");
+    }
+    private static async Task Stereo(PcmTap tap)
+    {
+        var deadline=DateTime.UtcNow.AddSeconds(5);
+        do
+        {
+            tap.Reset();await Task.Delay(300);var samples=tap.Read();
+            if(samples.Length>=4800 && PcmTap.Power(samples,440,0)>0.000001 &&
+                PcmTap.Power(samples,880,1)>0.000001 &&
+                PcmTap.Power(samples,440,0)>PcmTap.Power(samples,880,0)*25 &&
+                PcmTap.Power(samples,880,1)>PcmTap.Power(samples,440,1)*25)return;
+        }while(DateTime.UtcNow<deadline);
+        throw new InvalidDataException("Native stereo playback collapsed or swapped the decoded left/right audio channels");
     }
     private static async Task<double> MeasurePower(PcmTap tap,int frequency)
     {

@@ -8,9 +8,9 @@ namespace VietK.Core;
 public sealed record YouTubeVideo(string Id,string Title,string Channel,string Thumbnail);
 public sealed record YouTubeTransferProgress(long Received,long Total,string State);
 
-// Public YouTube videos only. Arguments never pass through a shell. No browser
-// cookies, login credentials, DRM workarounds or original VietK identity used.
-public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirectory)
+// Arguments never pass through a shell. Authentication is optional and only
+// uses a cookie file explicitly supplied by the user; no browser auto-discovery.
+public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirectory,Func<string?>? cookiesFile=null)
 {
     public static string? VideoId(string value)
     {
@@ -30,8 +30,17 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         if(!File.Exists(path))throw new FileNotFoundException("YouTube tool missing: "+name+". Extract the complete Windows test ZIP.");
         return path;
     }
-    private string[] Common()=>["--ignore-config","--no-plugin-dirs","--no-warnings","--no-colors","--encoding","utf-8",
-        "--js-runtimes","deno:"+Tool("deno"),"--socket-timeout","20","--retries","3"];
+    private IEnumerable<string> Common()
+    {
+        var arguments=new List<string> { "--ignore-config","--no-plugin-dirs","--no-warnings","--no-colors","--encoding","utf-8",
+            "--js-runtimes","deno:"+Tool("deno"),"--socket-timeout","20","--retries","3" };
+        if(cookiesFile?.Invoke() is { Length:>0 } file)
+        {
+            if(!File.Exists(file))throw new FileNotFoundException("The configured YouTube cookie file is missing; choose it again or clear it in the panel.");
+            arguments.Add("--cookies");arguments.Add(Path.GetFullPath(file));
+        }
+        return arguments;
+    }
     public async Task<IReadOnlyList<YouTubeVideo>> Search(string query,CancellationToken cancellation)
     {
         if(string.IsNullOrWhiteSpace(query))return [];

@@ -49,7 +49,7 @@ def main():
     (args.output / 'login-session.private.json').write_text(json.dumps(reply), encoding='utf-8')
     accepted = bool(reply.get('validatecode') and reply.get('serverip') and reply.get('token'))
     message = str(reply.get('errormessage', '')).replace(chip, '[device]').replace(mac, '[MAC]')
-    result = {'identitySource': 'actual Windows BIOS serial and physical network adapter',
+    result = {'identitySource': config.get('IdentitySource', 'actual Windows BIOS serial and physical network adapter'),
               'loginAccepted': accepted, 'errorcode': reply.get('errorcode', ''),
               'errormessage': message,
               'hasValidationCode': bool(reply.get('validatecode')),

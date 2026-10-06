@@ -13,7 +13,8 @@ namespace VietK.NativePort;
 // public search/media in place of the unavailable manufacturer service.
 public sealed class YouTubeMusicScreen : IDisposable
 {
-    private readonly string root,queueFile;
+    private readonly string root,queueFile,settingsFile;
+    private string cookieFile="";
     private readonly NativePlayback playback;
     private readonly BottomBar bottom;
     private readonly YouTubeMusicClient client;
@@ -31,7 +32,9 @@ public sealed class YouTubeMusicScreen : IDisposable
     {
         this.root=root;this.playback=playback;this.bottom=bottom;
         queueFile=Path.Combine(stateDirectory,"youtube-queue.json");
-        client=new(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(stateDirectory,"youtube-music"));
+        settingsFile=Path.Combine(stateDirectory,"youtube-settings.json");
+        if(File.Exists(settingsFile))cookieFile=JsonSerializer.Deserialize<YouTubeSettings>(File.ReadAllText(settingsFile))?.CookiesFile??"";
+        client=new(Path.Combine(AppContext.BaseDirectory,"YouTubeTools"),Path.Combine(stateDirectory,"youtube-music"),()=>cookieFile);
         if(File.Exists(queueFile))queue.AddRange((JsonSerializer.Deserialize<YouTubeVideo[]>(File.ReadAllText(queueFile))??[])
             .Where(video=>YouTubeMusicClient.VideoId(video.Id)==video.Id));
         playback.CommandOverride=Command;
@@ -57,6 +60,9 @@ public sealed class YouTubeMusicScreen : IDisposable
         queueView=new StackPanel();side.Children.Add(new ScrollViewer { Content=queueView,Height=220,Margin=new(0,8,0,5) });
         var actions=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(actions);
         actions.Children.Add(Button("Thử lại",()=>_=PlayFirst()));actions.Children.Add(Button("Xóa hàng chờ",Clear));
+        var login=new StackPanel { Orientation=Orientation.Horizontal };side.Children.Add(login);
+        login.Children.Add(Button("Cookies YouTube…",ChooseCookies));
+        login.Children.Add(Button("Bỏ cookies",()=> { cookieFile="";SaveSettings();SetStatus("Chế độ công khai; không dùng phiên đăng nhập."); }));
         status=Label(message,20);status.TextWrapping=TextWrapping.Wrap;status.Width=1180;Put(canvas,status,38,603);
         RefreshQueue();
         if(!string.IsNullOrWhiteSpace(query))_=Search();
@@ -129,7 +135,7 @@ public sealed class YouTubeMusicScreen : IDisposable
                     (100*progress.Received/progress.Total)+"%":(progress.Received/1048576)+" MiB"));
             }),cancellation.Token);
             if(stamp!=generation || disposed)return;
-            if(!playback.PlayMedia(file))throw new IOException("Không phát được video đã tải.");
+            if(!playback.PlayMedia(file,preserveStereo:true))throw new IOException("Không phát được video đã tải.");
             active=true;SetStatus("Đang phát: "+video.Title);RefreshQueue();
         }
         catch(OperationCanceledException) { }
@@ -138,6 +144,11 @@ public sealed class YouTubeMusicScreen : IDisposable
     }
     private bool Command(string command)
     {
+        if(command=="replay_imv" && active && playback.Player.Source is string source)
+        {
+            active=playback.PlayMedia(source,preserveStereo:true);
+            return true;
+        }
         if(command=="decoder_completed") { if(!active)return false;Next();return true; }
         if(command=="cut_song_imv") { Next();return true; }
         if(command is "ori_imv" or "accp_imv")
@@ -151,6 +162,16 @@ public sealed class YouTubeMusicScreen : IDisposable
     { downloading?.Cancel();++generation;active=false;playback.Player.Stop();queue.Clear();Save();RefreshQueue();SetStatus("Hàng chờ trống."); }
     private void Save()
     { File.WriteAllText(queueFile+".tmp",JsonSerializer.Serialize(queue));File.Move(queueFile+".tmp",queueFile,true); }
+    private void ChooseCookies()
+    {
+        var dialog=new Microsoft.Win32.OpenFileDialog { Title="Chọn file cookies YouTube của chính bạn (định dạng Netscape)",
+            Filter="Cookie text files|*.txt|All files|*.*",CheckFileExists=true };
+        if(dialog.ShowDialog()!=true)return;
+        cookieFile=dialog.FileName;SaveSettings();
+        SetStatus("Đã chọn cookies của bạn. yt-dlp sẽ dùng phiên này cho yêu cầu YouTube; file ở lại trên máy này.");
+    }
+    private void SaveSettings()=>File.WriteAllText(settingsFile,JsonSerializer.Serialize(new YouTubeSettings(cookieFile)));
+    private sealed record YouTubeSettings(string CookiesFile);
     private void SetStatus(string value) { message=value;if(status is not null)status.Text=value; }
     private static TextBlock Label(string text,double size)=>new() { Text=text,FontSize=size,Foreground=Brushes.White,Margin=new(0,6,0,6) };
     private static Button Button(string text,Action action)

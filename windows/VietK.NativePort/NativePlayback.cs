@@ -33,6 +33,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public int OutputVolumeStep { get; private set; } = 15;
     public int LastAudioTrackCount { get; private set; }
     public bool LastTrackSwitchSucceeded { get; private set; }
+    public bool PreserveStereo { get; set; }
     public int Position => (int)Math.Clamp(Native.Time, 0, int.MaxValue);
     public int Duration => (int)Math.Clamp(Native.Length, 0, int.MaxValue);
 
@@ -96,6 +97,13 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     { originalTrack = original; accompanimentTrack = accompaniment; }
     public bool SwitchTrack(bool original)
     {
+        if(PreserveStereo)
+        {
+            LastAudioTrackCount=Native.AudioTrackDescription.Count(track=>track.Id>=0);
+            LastTrackSwitchSucceeded=Native.SetChannel(AudioOutputChannel.Stereo);
+            if(LastTrackSwitchSucceeded)Post(()=>ConfirmedTrack?.Invoke());
+            return LastTrackSwitchSucceeded;
+        }
         var tracks = Native.AudioTrackDescription.Where(track => track.Id >= 0).ToArray();
         LastAudioTrackCount=tracks.Length;LastTrackSwitchSucceeded=false;
         if (tracks.Length == 0) return false;
@@ -186,11 +194,12 @@ public sealed class NativePlayback : IDisposable
     }
     public void ShowTelevision(Window panel)
     { Television.Show(); }
-    public bool PlayMedia(string path, SongMedia? metadata = null)
+    public bool PlayMedia(string path, SongMedia? metadata = null,bool preserveStereo=false)
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
         LocalMediaRequested?.Invoke();
         Player.Stop(); CurrentMedia = metadata;
+        Decoder.PreserveStereo=preserveStereo;
         Player.SetTrackInfo(metadata?.OriginalTrack ?? 0, metadata?.AccompanyTrack ?? 1);
         // KmPlayerCtrlImpl.getMediaVolume; configured HDD scale defaults to 1.
         var gain=(metadata?.DefaultVolume??100)/100f;
@@ -211,7 +220,8 @@ public sealed class NativePlayback : IDisposable
                 Player.SetSingMode(Player.SingMode == OriginalSingMode.Original ? OriginalSingMode.Accompaniment : OriginalSingMode.Original);
                 break;
             case "replay_imv":
-                if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path) PlayMedia(path, CurrentMedia);
+                if ((Player.State is OriginalVideoState.Play or OriginalVideoState.Pause) && Player.Source is { } path)
+                    PlayMedia(path, CurrentMedia,Decoder.PreserveStereo);
                 break;
             case "cut_song_imv": Player.Stop(); NextRequested?.Invoke(); break;
             case "volinc": case "voldec":

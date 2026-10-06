@@ -23,7 +23,7 @@ static class NativeYouTubeVerification
                 using var timeout=new CancellationTokenSource(TimeSpan.FromMinutes(4));
                 var path=await client.Download(new(id,"Public live verification video","",""),_=>{},timeout.Token);
                 downloaded=true;
-                if(!playback.PlayMedia(path))throw new IOException("Downloaded YouTube media was rejected by decoder");
+                if(!playback.PlayMedia(path,preserveStereo:true))throw new IOException("Downloaded YouTube media was rejected by decoder");
                 var deadline=DateTime.UtcNow.AddSeconds(30);
                 while(playback.Decoder.Position<500 && DateTime.UtcNow<deadline)await Task.Delay(100);
                 uint width=0,height=0;

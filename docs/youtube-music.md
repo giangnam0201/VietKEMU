@@ -24,8 +24,12 @@ fetch and advances; failures remain visible for retry/removal. Persistent queue
 restoration requires the user to press retry to start playback.
 
 The download tool may fail because of YouTube restrictions or extractor changes.
-This integration does not work around account, age, private-video, DRM or other
-access restrictions. It does not reuse VietK hardware IDs or tokens. No API key
+An optional Netscape cookie file explicitly selected in the panel can supply the
+user's own YouTube login. The app records its path in `youtube-settings.json`;
+it does not automatically read browser cookies or copy credentials to GitHub.
+Public-only mode is the default, and the panel can clear the cookie setting.
+This integration does not bypass account entitlements, DRM or other access
+restrictions. It does not reuse VietK hardware IDs or tokens. No API key
 is required because this implementation uses yt-dlp search rather than the
 YouTube Data API. This implementation should not be described as an official
 YouTube API player.
