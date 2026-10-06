@@ -26,6 +26,11 @@ public static class Program
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Missing original bottom bar contract");
             var bottom = new BottomBar(root, bottomContract);
+            var topContract = JsonSerializer.Deserialize<TopContract>(File.ReadAllText(Path.Combine(root, "top.json")),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                ?? throw new InvalidDataException("Missing original top bar contract");
+            var top = new TopBar(root, topContract, Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VietKNativePort", "download", "logo"));
             var moreContract = JsonSerializer.Deserialize<MoreContract>(File.ReadAllText(Path.Combine(root, "more.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Missing original More screen contract");
@@ -109,6 +114,7 @@ public static class Program
                 var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
+                panel.Children.Add(top.Create());
                 return panel;
             }
             if (args.Length == 2 && args[0] == "--capture")
@@ -369,6 +375,7 @@ public static class Program
                     vietnameseKeyboard = "default layout/input translated; Thai and handwriting pending",
                     songGrid = "original default tiles rendered; actions, thumbnails, seekbar and pagination pending",
                     homeResourcePort = "implemented; visual fidelity requires comparison",
+                    header = "original template restored; bundled logo placeholder, server branding and control services pending",
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"
                 }, new JsonSerializerOptions { WriteIndented = true }));
@@ -388,6 +395,12 @@ public static class Program
                     window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
                 // Playback, queue and ambience requests need their real backends.
                 // They are not translated into invented playback success/state.
+            };
+            top.CommandRequested += command =>
+            {
+                if (command == "logo")
+                    window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
+                else System.Diagnostics.Trace.WriteLine($"Original top command {command}; service/dialog port pending");
             };
             renderer.NavigationRequested += fragment =>
             {

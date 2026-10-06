@@ -371,3 +371,16 @@ function at 0x9484 formats `%s:%s` in a 64-byte buffer and passes the truncated
 C string to `CMd5.MDString`; it returns lowercase hexadecimal via `%02x`.
 Native signing still needs a Windows translation and comparison against original
 function results, preserving the certificate gate and JNI string encoding.
+
+UI audit: the previous host omitted TopMenuBarView completely. The native host
+now renders the default skin's logo frame and home-state dynamic header with
+original icons, language gradient and source dimensions. The bundled logo is a
+blank placeholder; the original product branding is downloaded through
+PictureUpdateManager's ui_request_logo_url_list. A previously downloaded
+`download/logo/touch.png` in the native state directory is displayed using the
+original replacement frame. The network indicator starts disconnected because
+the original network/DC service adapter is not yet wired. Header dialogs/services,
+animated playing indicator, marquees and complete font fidelity are pending.
+Original home_content_view_marginTop was verified as 0px, so no guessed vertical
+offset was added. See feature-audit.md for the visible feature call-path inventory
+and the priority karaoke playback/TV implementation path.

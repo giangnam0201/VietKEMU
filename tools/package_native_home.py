@@ -81,6 +81,7 @@ def package(decoded, destination):
         'media_availability': 'not established by catalogue metadata'
     }, indent=2))
     package_bottom(app, destination, entries, strings)
+    package_top(app, destination, entries, values)
     package_more(app, destination, entries, strings, values)
     package_song_browser(app, destination, entries, strings, values)
     package_song_grid(app, destination, entries)
@@ -274,6 +275,65 @@ def package_more(app, destination, entries, strings, values):
         'backCorner': number('@dimen/icon_back_corner'),
         'backStartColor': colors['bg_btn_ok_star'], 'backEndColor': colors['bg_btn_ok_end']}
     (destination / 'more.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
+
+
+class TopParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.anchor = None
+        self.items = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'a': self.anchor = attrs
+        if tag == 'img' and self.anchor:
+            self.items.append({'href': self.anchor.get('data-href', ''), 'src': attrs['src'],
+                'x': float(self.anchor['data-posx']), 'y': float(self.anchor['data-posy']),
+                'width': float(attrs['data-width']), 'height': float(attrs['data-height'])})
+
+    def handle_endtag(self, tag):
+        if tag == 'a': self.anchor = None
+
+
+def package_top(app, destination, entries, values):
+    archive = app / 'apktool/assets/default_template.zip'
+    if hashlib.sha256(archive.read_bytes()).hexdigest() != entries['assets/default_template.zip']['sha256']:
+        raise RuntimeError('Original top template archive differs')
+    parser = TopParser()
+    provenance = []
+    with zipfile.ZipFile(archive) as template:
+        parser.feed(template.read('module_top/index.html').decode('utf-8'))
+        for item in parser.items:
+            entry = 'module_top/' + item['src']
+            original = template.read(entry)
+            local = destination / ('top-' + item['src'])
+            local.write_bytes(original)
+            png = destination / ('top-' + Path(item['src']).stem + '.png')
+            if png != local:
+                subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', str(local), '-frames:v', '1', str(png)], check=True)
+            item['image'] = png.name
+            provenance.append({'archive': 'assets/default_template.zip', 'entry': entry,
+                'original_sha256': hashlib.sha256(original).hexdigest(),
+                'windows_png_sha256': hashlib.sha256(png.read_bytes()).hexdigest()})
+    earth = app / 'apktool/res/drawable-mdpi/keyboard_earth.png'
+    digest = hashlib.sha256(earth.read_bytes()).hexdigest()
+    if not any(entry['sha256'] == digest and Path(entry['path']).name == earth.name for entry in entries.values()):
+        raise RuntimeError('Original language icon differs')
+    shutil.copy2(earth, destination / earth.name)
+    def dim(name):
+        return float(re.fullmatch(r'([0-9.]+)(?:dip|dp|sp|px)', values[name])[1])
+    contract = {'items': parser.items, 'dynamicWidth': dim('auto_adaption_layout_width'),
+        'commonHeight': dim('auto_adaption_view_common_size'),
+        'iconLeft': dim('auto_adaption_view_icon_margin_left'),
+        'textLeft': dim('auto_adaption_view_text_margin_left'),
+        'languageWidth': dim('top_menu_change_language_btn_width'),
+        'languageHeight': dim('top_menu_change_language_btn_height'),
+        'languageTop': dim('top_menu_change_language_top_margin'),
+        'downloadedLogoWidth': dim('top_logo_width'), 'downloadedLogoHeight': dim('top_logo_height'),
+        'branding': 'Bundled logo is a placeholder; touch.png is supplied by ui_request_logo_url_list.',
+        'scope': 'Landscape header; service-driven controls and animated playing indicator remain incomplete.'}
+    (destination / 'top.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
+    (destination / 'top-provenance.json').write_text(json.dumps(provenance, indent=2))
 
 
 class BottomParser(HTMLParser):
