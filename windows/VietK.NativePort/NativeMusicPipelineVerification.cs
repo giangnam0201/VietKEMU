@@ -105,6 +105,12 @@ static class NativeMusicPipelineVerification
             var deadline=DateTime.UtcNow.AddSeconds(15);
             while(playback.Player.State!=OriginalVideoState.Play || playback.Decoder.Position<=0)
             { if(DateTime.UtcNow>=deadline)throw new TimeoutException("Downloaded queue media did not decode");await Task.Delay(50); }
+            File.WriteAllText(Path.Combine(directory,"pipeline-verification.json"),JsonSerializer.Serialize(new {
+                signedHttpLogin=true,returnedServiceUrlAndValidationCode=true,mediaUrlRequest=true,
+                downloadedFileHash=true,completedCacheRegistration=true,downloadToSelectedQueuePromotion=true,
+                actualWindowsDecoderProgress=true,
+                scope="Loopback protocol and media fixtures; production server authorization and karaoke availability unverified."
+            },new JsonSerializerOptions { WriteIndented=true }));
             playback.Player.Stop();
         }
         finally { listener.Stop(); }

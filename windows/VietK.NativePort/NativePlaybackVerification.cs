@@ -95,6 +95,9 @@ public static class NativePlaybackVerification
                 Require(playback.Decoder.OutputVolumeStep == volume, "Volume decrement did not restore level");
 
                 var multi = Path.GetFullPath(Path.Combine(fixtures, "multiple.ts"));
+                // Vocal mode persists between songs in the original player.
+                // Select original explicitly before testing stream index 1.
+                playback.Player.SetSingMode(OriginalSingMode.Original);
                 Require(playback.PlayMedia(multi, Metadata(multi, 1, 0)), "Multiple-track MPEG media rejected");
                 await Until(() => playback.Player.State == OriginalVideoState.Play && playback.Decoder.Native.AudioTrackDescription.Count(t => t.Id >= 0) == 2,
                     "Two MPEG audio streams not available");
@@ -126,7 +129,8 @@ public static class NativePlaybackVerification
                 }, new JsonSerializerOptions { WriteIndented = true }));
                 result = 0;
             }
-            catch (Exception error) { File.WriteAllText(Path.Combine(output, "playback-error.txt"), error.ToString()); }
+            catch (Exception error) { File.WriteAllText(Path.Combine(output, "playback-error.txt"), error+
+                $"\nAudio tracks={playback.Decoder.LastAudioTrackCount}; switch succeeded={playback.Decoder.LastTrackSwitchSucceeded}; channel={playback.Decoder.Native.Channel}"); }
             finally { app.Shutdown(); }
         };
         app.Run(host);

@@ -1,0 +1,72 @@
+# Music server and Windows output port
+
+The Windows host now connects the translated data-center client and media URL
+resolver to HTTP file transfer, a persistent completed-file cache, download and
+selected queues, and a separate native TV decoder window. This remains a partial
+manual port. Live production-server authorization and encrypted karaoke playback
+have not been verified.
+
+## Original protocol evidence
+
+- `KmDataCenterService` resources specify `http://viet.duochang.cc/login`, signing
+  version `1.0` and protocol `1.9.1`.
+- `BaseDataCenterCommu` submits URL-encoded form field `body`, containing JSON.
+  Its device login is `bs_device_login`; media lookup is `sn_song_media_list`.
+  Token, validation code, command filter and returned service URL retain the
+  translated original client's rules.
+- Original `BoardInfo.getSerialNumber` reads Android `Build.SERIAL`. A firmware
+  archive does not establish an individual device's hardware serial or MAC.
+  This host supplies no fabricated identity, token, or authentication success.
+- The default firmware User-Agent is `KTV-Plus/1.2.b57/1.9.1/android/1.0.0`:
+  original build properties, protocol resources and data-center APK version,
+  rather than the OTA archive's display name.
+- Native signing research established modified UTF-8, `chipId:salt`, a 63-byte
+  snprintf limit and lowercase MD5. Android APK certificate admission is a
+  separate platform mechanism; reproducing the hash does not establish server
+  authorization or complete native-library parity.
+- `LocalOnlineSongManager.downloadVideo` uses `<song ID>.ts.tmp`, or `.mp3.tmp`
+  when the returned URL contains `.mp3`, and requires 524288000 bytes of free
+  cache space. The Windows adapter streams bytes, checks known content length,
+  removes failed temporary files and promotes completed files before playback.
+  Original three-attempt HTTP recovery, NAS handling and all error transitions
+  remain incomplete.
+- Completed downloads update the local-song flag, move matching download entries
+  to the selected queue, and start the next download. Cache metadata contains the
+  returned vocal/accompaniment indexes and per-song gain. Windows paths are
+  registered after actual completion, never inferred from catalogue filenames.
+
+## Configuration and testing
+
+After first launch, `%LOCALAPPDATA%\VietKNativePort\music-server.json` contains
+`LoginUrl`, `ChipId`, `Mac`, `UserAgent` and optional `MusicDirectory`. Supply
+device information the original server accepts and restart. Missing identity
+prevents login; rejected requests display the real failure. The catalogue is
+metadata, and online search visibility requires a successful original login.
+
+The default Windows cache is `%LOCALAPPDATA%\VietKNativePort\music`. Its completed
+file registry is `music-cache.json`. This is a Windows storage adapter, not a
+claim that Windows disks are original Android scanned volumes.
+
+GitHub Actions runs actual HTTP form/header and byte-transfer tests, including
+truncated-file rejection. The Windows verification also exercises a clearly
+identified loopback login/media server through the cache and queues into the
+real decoder, and checks decoded frames and PCM. Those fixtures are not shipped
+as songs and do not prove access to VietK's production music library.
+
+For local video testing without server authorization, launch
+`VietK.NativePort.exe --play-media "C:\path\video.mp4"`. This is a developer probe,
+separate from the original song browser.
+
+## Output limitations
+
+The decoder is bundled Windows libVLC, using the selected original player state
+and control rules. Native research maps a one-track song to duplicate-right or
+duplicate-left audio, while multiple tracks use the corresponding audio stream.
+Per-song gain follows `getMediaVolume` with the default HDD scale of 1; Android
+system-volume curves and all broadcast/microphone paths remain incomplete.
+
+The original grading video is from **dualkmbox**, and the original TV layout is
+from **daulkmboxosdtv**. A decoded grading frame is evidence of video decoding,
+not a downloaded karaoke song or a complete original TV interface. Lyrics,
+scoring, encrypted media, all original overlays and full UI/UX parity remain
+unfinished.

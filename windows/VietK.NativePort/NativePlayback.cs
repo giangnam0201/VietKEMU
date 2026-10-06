@@ -31,6 +31,8 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public Action? ConfirmedTrack { get; set; }
     public Action? Started { get; set; }
     public int OutputVolumeStep { get; private set; } = 15;
+    public int LastAudioTrackCount { get; private set; }
+    public bool LastTrackSwitchSucceeded { get; private set; }
     public int Position => (int)Math.Clamp(Native.Time, 0, int.MaxValue);
     public int Duration => (int)Math.Clamp(Native.Length, 0, int.MaxValue);
 
@@ -62,6 +64,10 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
                 var hasVideo = Native.Size(0, ref width, ref height) && width > 0 && height > 0;
                 // Translate decoder progress/render readiness to the original
                 // event boundary; native snapshots verify actual decoded pixels.
+                // libVLC's Playing event can precede creation of its audio
+                // output. Reapply the original chosen mode once output exists.
+                if(Original is { } original)SwitchTrack(original.SingMode==OriginalSingMode.Original);
+                ApplyVolume();
                 Original?.OnInfo(hasVideo ? 10003 : 10004);
                 Original?.OnAudioRenderingStart(hasVideo);
                 if (hasVideo) Original?.OnVideoRenderingStart();
@@ -91,6 +97,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public bool SwitchTrack(bool original)
     {
         var tracks = Native.AudioTrackDescription.Where(track => track.Id >= 0).ToArray();
+        LastAudioTrackCount=tracks.Length;LastTrackSwitchSucceeded=false;
         if (tracks.Length == 0) return false;
         var index = original ? originalTrack : accompanimentTrack;
         bool changed;
@@ -115,6 +122,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
             };
         }
         if (changed) Post(() => ConfirmedTrack?.Invoke());
+        LastTrackSwitchSucceeded=changed;
         return changed;
     }
     public void SetVolume(float volume) { mediaVolume = volume; ApplyVolume(); }
