@@ -438,7 +438,29 @@ def package_player_reference(decoded, destination, firmware):
         shutil.copy2(image, output / (name + '.png'))
         records.append({'file': name + '.png', 'sha256': image_hash, 'original': matches[0]['path']})
     (output / 'osd-provenance.json').write_text(json.dumps(records, indent=2))
-    tv_dimensions = {item.get('name'): item.text for item in ET.parse(tv / 'apktool/res/values/dimens.xml').getroot()}
+    dimension_names = ('osd_tv_play_ctrl_width', 'osd_tv_play_ctrl_height',
+        'osd_tv_play_ctrl_margin_top', 'osd_tv_play_ctrl_number_margin_top', 'osd_tv_play_ctrl_text_size')
+    dimension_sets = [(path, {item.get('name'): item.text for item in ET.parse(path).getroot()})
+        for path in sorted((tv / 'apktool/res').glob('values*/dimens.xml'))]
+    print('TV control dimension configurations:', [(str(path.relative_to(tv)),
+        {name: values[name] for name in dimension_names if name in values})
+        for path, values in dimension_sets if any(name in values for name in dimension_names)], flush=True)
+    tv_dimensions = {}
+    dimension_sources = {}
+    for name in dimension_names:
+        choices = [(path, values[name]) for path, values in dimension_sets if name in values]
+        preferred = [item for item in choices if '1280x720' in str(item[0])]
+        defaults = [item for item in choices if item[0].parent.name == 'values']
+        if preferred:
+            selected = preferred[0]
+        elif defaults:
+            selected = defaults[0]
+        elif len({value for _, value in choices}) == 1:
+            selected = choices[0]
+        else:
+            raise RuntimeError('Cannot select original 720p TV dimension: ' + name + ' ' + str(choices))
+        tv_dimensions[name] = selected[1]
+        dimension_sources[name] = str(selected[0].relative_to(tv))
     def tv_dimension(name):
         return float(re.sub(r'(dip|dp|px|sp)$', '', tv_dimensions[name]))
     (output / 'osd.json').write_text(json.dumps({
@@ -448,6 +470,7 @@ def package_player_reference(decoded, destination, firmware):
         'numberY': tv_dimension('osd_tv_play_ctrl_number_margin_top'),
         'numberSize': tv_dimension('osd_tv_play_ctrl_text_size'),
         'timeoutMs': 6000,
+        'dimensionSources': dimension_sources,
         'provenance': 'km_msg_osdtv.xml; KmOSDMessageView; KmConfig.IntonationConfig.DOWNCOUNT_BEGINTIME'
     }, indent=2))
     (output / 'provenance.json').write_text(json.dumps({
