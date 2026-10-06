@@ -1,6 +1,7 @@
 name: Build Windows test release
 on:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: write
   actions: read
@@ -23,18 +24,13 @@ jobs:
           New-Item -ItemType Directory -Force artifacts/native-windows | Out-Null
           ./tools/package_youtube_tools.ps1 -PublishDirectory artifacts/native-windows
           (Resolve-Path artifacts/native-windows/YouTubeTools).Path | Add-Content $env:GITHUB_PATH
-      - name: Retrieve original decode, fonts and APK bytes
+      - name: Retrieve audited original UI resource bundle
         run: |
-          gh run download 37386126110 -n original-apk-full-decode -D decoded
-          if ($LASTEXITCODE -ne 0) { throw 'Original decode download failed' }
-          gh run download 37417309368 -n original-firmware-ui-assets -D firmware-ui-fonts
-          if ($LASTEXITCODE -ne 0) { throw 'Original font download failed' }
-          gh run download 37324921816 -n firmware-applications -D firmware
-          if ($LASTEXITCODE -ne 0) { throw 'Original APK download failed' }
-      - name: Package original resources and inspect embedded MP4s
+          gh release download windows-test-37456975710 --pattern original-native-resources.zip --dir incoming
+          if ($LASTEXITCODE -ne 0) { throw 'Original UI resource download failed' }
+          Expand-Archive incoming/original-native-resources.zip windows/VietK.NativePort/Original
+      - name: Inspect original MP4 inventory and create decoder fixtures
         run: |
-          python tools/package_native_home.py decoded windows/VietK.NativePort/Original --firmware-ui firmware-ui-fonts --firmware firmware
-          if ($LASTEXITCODE -ne 0) { throw 'Original resource packaging failed' }
           Get-Content windows/VietK.NativePort/Original/video-inspection/inventory.json
           python tools/create_playback_fixtures.py artifacts/playback-fixtures
           if ($LASTEXITCODE -ne 0) { throw 'Decoder fixture generation failed' }
@@ -62,15 +58,15 @@ jobs:
         run: |
           if (Test-Path "$env:TEMP/vietk-native-startup-error.txt") { Get-Content "$env:TEMP/vietk-native-startup-error.txt" }
           Get-ChildItem artifacts/native-verification -Filter '*error*.txt' -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName }
-      - name: Publish private Windows test release
+      - name: Publish Windows test release
         run: |
           ./tools/package_windows_test.ps1 -PublishDirectory artifacts/native-windows -OutputDirectory artifacts/windows-test -BuildId "${{ github.run_number }}-${{ github.sha }}"
           Compress-Archive artifacts/native-verification/* artifacts/native-verification.zip
           Compress-Archive windows/VietK.NativePort/Original/video-inspection/* artifacts/original-mp4-inspection.zip
           $tag = 'windows-test-${{ github.run_id }}'
           gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Windows test build ${{ github.run_number }}' --notes 'Native Windows test build with verification reports. Extract the complete Windows ZIP before opening VietK.NativePort.exe. Partial port; see included README for limitations.'
-          if ($LASTEXITCODE -ne 0) { throw 'Private release creation failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'Release creation failed' }
           $buildZip = (Get-ChildItem artifacts/windows-test -Filter '*.zip').FullName
           gh release upload $tag $buildZip artifacts/native-verification.zip artifacts/original-mp4-inspection.zip
-          if ($LASTEXITCODE -ne 0) { throw 'Private release upload failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
           "Windows test download: https://github.com/${{ github.repository }}/releases/tag/$tag" | Add-Content $env:GITHUB_STEP_SUMMARY

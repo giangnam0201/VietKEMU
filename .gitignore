@@ -9,6 +9,13 @@ node_modules/
 dist/
 artifacts/
 .reference/
+*.pem
+*cookies*.txt
+*cookies*.json
+music-server.json
+youtube-settings.json
+playback-state.json
+privacy-audit*.json
 firmware/
 reports/private/
 .venv/
