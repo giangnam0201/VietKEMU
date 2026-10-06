@@ -147,7 +147,7 @@ public sealed class SongBrowser(string root, SongBrowserContract contract,
     private static Color Color(string hex)=>(Color)ColorConverter.ConvertFromString(hex);
     private static SolidColorBrush Brush(string hex)=>new(Color(hex));
     private static LinearGradientBrush Gradient(string start,string end)=>new(Color(start),Color(end),new Point(0,.5),new Point(1,.5));
-    private static TextBlock Text(string text,double size)=>new() { Text=text,FontSize=size,Foreground=Brushes.White,FontFamily=new("sans-serif") };
+    private static TextBlock Text(string text,double size)=>new() { Text=text,FontSize=size,Foreground=Brushes.White,FontFamily=OriginalFont.Family };
     private static void Put(Canvas canvas,UIElement child,double x,double y)
     { Canvas.SetLeft(child,x);Canvas.SetTop(child,y);canvas.Children.Add(child); }
     private static void Click(Border button,Action action,bool outline=false)

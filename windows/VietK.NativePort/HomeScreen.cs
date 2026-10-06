@@ -64,7 +64,7 @@ public sealed class HomeScreen(string root, HomeContract contract)
         if (multilingual)
         {
             var measured = new FormattedText(text, CultureInfo.GetCultureInfo("vi-VN"), FlowDirection.LeftToRight,
-                new Typeface("sans-serif"), size, Brushes.White, 1);
+                new Typeface(OriginalFont.Family, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal), size, Brushes.White, 1);
             if (measured.Width > available)
             {
                 // Preserve MultiLanguageTextView.refitTextForSingleLine's
@@ -78,7 +78,7 @@ public sealed class HomeScreen(string root, HomeContract contract)
             Text = text, Foreground = Brushes.White, FontSize = size,
             MaxWidth = available, ClipToBounds = true, TextAlignment = TextAlignment.Center,
             TextWrapping = singleLine ? TextWrapping.NoWrap : TextWrapping.Wrap,
-            FontFamily = new FontFamily("sans-serif"), HorizontalAlignment = HorizontalAlignment.Center,
+            FontFamily = OriginalFont.Family, HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, textBottom ?? contract.TextBottom)
         });
         // BaseScaleOnTouchListener: down 1->0.9, up 0.9->1.

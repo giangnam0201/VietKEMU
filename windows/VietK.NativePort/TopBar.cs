@@ -23,7 +23,7 @@ public sealed class TopBar(string root, TopContract contract, string logoDirecto
         var logo = contract.Items.Single(item => item.Href == "logo");
         var downloaded = Path.Combine(logoDirectory, "touch.png");
         // TopMenuBarView.initLogoView/updateLogoView: retain the skin if the
-        // server-delivered logo is absent; downloaded logos have a new frame.
+        // server-delivered override is absent; downloaded logos have a new frame.
         var hasDownloadedLogo = File.Exists(downloaded);
         var image = Load(hasDownloadedLogo ? downloaded : Path.Combine(root, logo.Image));
         var logoView = new Image

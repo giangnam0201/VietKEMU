@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using VietK.Core;
@@ -17,6 +18,7 @@ public static class Program
         try
         {
             var root = Path.Combine(AppContext.BaseDirectory, "Original");
+            OriginalFont.Initialize(root);
             var contract = JsonSerializer.Deserialize<HomeContract>(File.ReadAllText(Path.Combine(root, "home.json")),
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                 ?? throw new InvalidDataException("Missing original home contract");
@@ -112,6 +114,7 @@ public static class Program
             Canvas Panel(int screen = 0)
             {
                 var panel = screen switch { 38 => more.Create(), 2 => browser.Create(), _ => renderer.Create() };
+                TextElement.SetFontFamily(panel, OriginalFont.Family);
                 var bar = bottom.Create();
                 Canvas.SetTop(bar, bottomContract.Y); panel.Children.Add(bar);
                 panel.Children.Add(top.Create());
@@ -375,7 +378,8 @@ public static class Program
                     vietnameseKeyboard = "default layout/input translated; Thai and handwriting pending",
                     songGrid = "original default tiles rendered; actions, thumbnails, seekbar and pagination pending",
                     homeResourcePort = "implemented; visual fidelity requires comparison",
-                    header = "original template restored; bundled logo placeholder, server branding and control services pending",
+                    header = "original VietK logo and header template restored; control services pending",
+                    originalFirmwareRobotoLoaded = true,
                     navigation = "pending", television = "pending", playback = "pending", servers = "pending",
                     fullFidelity = "unverified"
                 }, new JsonSerializerOptions { WriteIndented = true }));
@@ -387,6 +391,7 @@ public static class Program
             {
                 Title = "VietK — native home component (port in development)",
                 Width = 1280, Height = 800, Background = Brushes.Black,
+                FontFamily = OriginalFont.Family,
                 Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() }
             };
             bottom.CommandRequested += command =>

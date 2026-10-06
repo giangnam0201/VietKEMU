@@ -16,8 +16,9 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
-def package(decoded, destination):
+def package(decoded, destination, firmware_ui):
     destination.mkdir(parents=True, exist_ok=True)
+    package_fonts(firmware_ui, destination)
     app = decoded / 'dualkmbox'
     resources = app / 'apktool/res'
     values = {entry.get('name'): entry.text for entry in ET.parse(resources / 'values/dimens.xml').getroot()}
@@ -330,7 +331,7 @@ def package_top(app, destination, entries, values):
         'languageHeight': dim('top_menu_change_language_btn_height'),
         'languageTop': dim('top_menu_change_language_top_margin'),
         'downloadedLogoWidth': dim('top_logo_width'), 'downloadedLogoHeight': dim('top_logo_height'),
-        'branding': 'Bundled logo is a placeholder; touch.png is supplied by ui_request_logo_url_list.',
+        'branding': 'Bundled VietK logo retained; server touch.png can override it through ui_request_logo_url_list.',
         'scope': 'Landscape header; service-driven controls and animated playing indicator remain incomplete.'}
     (destination / 'top.json').write_text(json.dumps(contract, ensure_ascii=False, indent=2), encoding='utf-8')
     (destination / 'top-provenance.json').write_text(json.dumps(provenance, indent=2))
@@ -395,9 +396,38 @@ def package_bottom(app, destination, entries, strings):
     (destination / 'bottom-provenance.json').write_text(json.dumps(provenance, indent=2))
 
 
+def package_fonts(source, destination):
+    records = {item['path']: item for item in json.loads((source / 'provenance.json').read_text())}
+    font_config = source / 'system/etc/fonts.xml'
+    config_hash = hashlib.sha256(font_config.read_bytes()).hexdigest()
+    if records['system/etc/fonts.xml']['sha256'] != config_hash:
+        raise RuntimeError('Supplied original font configuration differs')
+    family = ET.parse(font_config).getroot().find("family[@name='sans-serif']")
+    if family is None:
+        raise RuntimeError('Cannot establish original default font')
+    output = destination / 'fonts'
+    output.mkdir(exist_ok=True)
+    provenance = []
+    for font in family.findall('font'):
+        name = font.text.strip()
+        if not name.startswith('Roboto-'):
+            raise RuntimeError('Unexpected original sans-serif font: ' + name)
+        path = 'system/fonts/' + name
+        payload = (source / path).read_bytes()
+        if hashlib.sha256(payload).hexdigest() != records[path]['sha256']:
+            raise RuntimeError('Supplied original font bytes differ: ' + name)
+        (output / name).write_bytes(payload)
+        provenance.append(records[path])
+    (destination / 'font-provenance.json').write_text(json.dumps({
+        'configuration': 'system/etc/fonts.xml', 'configurationSha256': config_hash,
+        'sourceRun': 37417309368, 'fonts': provenance,
+        'scope': 'Original Roboto glyphs; Android vs WPF text shaping and padding still need visual comparison.'}, indent=2))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('decoded', type=Path)
     parser.add_argument('destination', type=Path)
+    parser.add_argument('--firmware-ui', type=Path, required=True)
     args = parser.parse_args()
-    package(args.decoded, args.destination)
+    package(args.decoded, args.destination, args.firmware_ui)

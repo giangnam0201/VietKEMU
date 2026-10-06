@@ -7,8 +7,8 @@ executed on hardware. Playback/TV is the user's first priority.
 
 | Area | Original implementation | Current Windows behavior / gap |
 | --- | --- | --- |
-| Header / logo | TopMenuBarView, module_top/index.html, PictureUpdateManager | Header was entirely omitted. Template logo and home-state dynamic icons now rendered. Template logo is a blank placeholder. Actual branding comes from ui_request_logo_url_list, not a bundled VietK image. Live branding transport pending. |
-| Home layout | layout_home_fragment.xml, item_home_new_adapter.xml, activity_main.xml | Original assets and tile order used. Confirmed home_content_view_marginTop is 0px; do not invent an extra header offset. Original Android font metrics, phantom preview and pixel comparison remain pending. |
+| Header / logo | TopMenuBarView, module_top/index.html, PictureUpdateManager | Header was entirely omitted. Template logo and home-state dynamic icons now rendered. Original transparent VietK logo retained. Server branding overrides come from ui_request_logo_url_list; live override transport pending. |
+| Home layout | layout_home_fragment.xml, item_home_new_adapter.xml, activity_main.xml | Original assets and tile order used. Confirmed home_content_view_marginTop is 0px; do not invent an extra header offset. Original firmware Roboto is now packaged and loaded. Android text padding/metrics, phantom preview and pixel comparison remain pending. |
 | Home navigation | HomeNewAdapter, FragmentManagerUtil | Song name / More routes work. Singer, app manager, Mixcloud, YouTube and Soundcloud are missing. |
 | More | MoreFragment | Source tiles rendered; destination features mostly missing. |
 | Song search | SongSearchDAO and input widgets | Local metadata queries and Vietnamese input translated; thumbnails, complete pagination, filters, favourites and original dialogs incomplete. |

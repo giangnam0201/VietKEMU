@@ -374,13 +374,20 @@ function results, preserving the certificate gate and JNI string encoding.
 
 UI audit: the previous host omitted TopMenuBarView completely. The native host
 now renders the default skin's logo frame and home-state dynamic header with
-original icons, language gradient and source dimensions. The bundled logo is a
-blank placeholder; the original product branding is downloaded through
-PictureUpdateManager's ui_request_logo_url_list. A previously downloaded
+original icons, language gradient and source dimensions. The bundled transparent VietK logo is retained; branding overrides are downloaded
+through PictureUpdateManager's ui_request_logo_url_list. The first isolated image
+preview was misread; Windows rendering and matching SHA-256 confirm the bundled
+asset contains the original logo. A previously downloaded
 `download/logo/touch.png` in the native state directory is displayed using the
 original replacement frame. The network indicator starts disconnected because
 the original network/DC service adapter is not yet wired. Header dialogs/services,
-animated playing indicator, marquees and complete font fidelity are pending.
+animated playing indicator, marquees and complete text-layout fidelity are pending.
 Original home_content_view_marginTop was verified as 0px, so no guessed vertical
 offset was added. See feature-audit.md for the visible feature call-path inventory
 and the priority karaoke playback/TV implementation path.
+
+Original font recovery run 37417309368 retained the firmware system/etc/fonts.xml
+and Roboto files with hashes. The default sans-serif family is Roboto. The Windows
+resource job packages those exact fonts, and startup checks the normal and bold
+GlyphTypeface URIs to reject silent fallback. Labels inherit the recovered font;
+this does not prove identical Android/WPF shaping, padding or line metrics.

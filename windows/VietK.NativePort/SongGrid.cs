@@ -74,7 +74,7 @@ public sealed class SongGrid(string root,SongGridContract contract)
                 isCollected?"button_add_song_item_collected_select":"button_add_song_item_collect_selected","collect",5);
             Icon("ic_top_song",null,"top",10);
             var singer=new TextBlock { Text=song.Singer.Replace(",",", "),FontSize=16,Foreground=Brushes.White,
-                FontFamily=new("sans-serif"),TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,
+                FontFamily=OriginalFont.Family,TextTrimming=TextTrimming.CharacterEllipsis,TextWrapping=TextWrapping.NoWrap,
                 VerticalAlignment=VerticalAlignment.Center,Margin=new(10,0,actionWidth,0) };
             bar.Children.Add(singer);bar.Children.Add(actions);
             // Singer spans/navigation require the original singer DAO + handler.
@@ -100,7 +100,7 @@ public sealed class OutlinedSongName(string name,bool queued) : FrameworkElement
     {
         var size=32d;
         FormattedText Build()=>new(name,CultureInfo.GetCultureInfo("vi-VN"),FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("sans-serif"),FontStyles.Normal,FontWeights.Bold,FontStretches.Normal),
+            new Typeface(OriginalFont.Family,FontStyles.Normal,FontWeights.Bold,FontStretches.Normal),
             size,Brushes.White,VisualTreeHelper.GetDpi(this).PixelsPerDip)
             { MaxTextWidth=228,TextAlignment=TextAlignment.Center };
         var text=Build();
