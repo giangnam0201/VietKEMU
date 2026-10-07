@@ -281,7 +281,8 @@ table contains no original bitmap data. Catalogue language seven now uses
 this map, while other unsupported languages retain their original bytes.
 The importer offers Vietnamese and English titles from a user's local ISO.
 CI checks every Vietnamese catalogue entry and specific previously incorrect
-titles. Original font rendering is still unimplemented in the app.
+titles. Original font rendering is implemented as described below; exact device
+placement and highlight colors remain unverified.
 
 ## Vietnamese lyric streams
 
@@ -311,3 +312,31 @@ requires further investigation. It is not used to claim complete phrase
 alignment or hardware fidelity. Native synthetic tests exercise Unicode
 accents in both independently highlighted TV rows and the shared preview;
 no original lyrics, music or font bytes are bundled.
+
+## Original bitmap font rendering
+
+FONT1 entries two and four identify the Latin and Vietnamese banks. Their
+LE24 sector pointers and LE24 allocation lengths select 65,536-byte banks;
+224 glyph cells from byte codes 32 through 255 use 288 bytes each. The font
+metadata pointer is one-based. Its per-bank descriptor identifies width 24,
+height 48 and four-color storage, with language tags zero/one. The inspected
+glyph cells use packed two-bit values zero, one and three: transparent,
+outline and fill. Reserved value two is rejected until its semantics are known.
+
+The ISO reader validates the font extent, metadata, geometry, bank allocation
+and palette, then reads only a 2,048-byte header and one bank. Lyric cues retain
+their original byte codes so duplicate Unicode identities still select the
+original cell. Both TV voice rows draw those cells with black outlines and
+white/gold fills; those colors preserve the current app's highlight behavior
+without claiming exact hardware palette equivalence. Missing/unsupported fonts
+fall back to the text renderer with a visible notice. Standard MIDI/KAR still
+uses ordinary text.
+
+Each row caches glyph images by original code and highlight state. Unchanged
+frames reuse the existing row and cache. The panel preview continues to draw
+the same TV scene. Verification downloads only the two bounded original banks
+and checks all 224 glyphs in each: Latin has 161,578 transparent, 66,687 outline
+and 29,783 fill pixels; Vietnamese has 124,700, 75,555 and 57,793 respectively.
+Public native screenshots use independently generated toy glyphs, never copied
+original font pixels. Original fonts are read from the user's local ISO at
+runtime and are not extracted into the app or uploaded as build assets.
