@@ -19,8 +19,10 @@ establish identical instrument sounds to an Arirang hardware synthesizer.
 ## Actual INFO.DAT metadata
 
 The public Volume 48 `hk2/info.dat` is 1,320,466 bytes. Independently reading its
-English record block at `0x8BAFF` produced 3,609 title/artist/composer records,
-ending at `0xB27AE`. The new C# reader searches for a validated contiguous block
+English record block at `0x89AB3` produced 3,795 title/artist/composer records,
+ending at `0xB27AE`. The older researcher's hardcoded `0x8BAFF` start skipped
+the first 186 records in this volume; an independent full byte scan confirmed
+the complete block. The new C# reader searches for a validated contiguous block
 rather than using those offsets as universal constants. The GitHub workflow
 fetches this small public input privately, checks the reader and publishes only
 a count/status report. It does not redistribute the index or extracted list.

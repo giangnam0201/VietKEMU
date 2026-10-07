@@ -20,9 +20,9 @@ The Arirang disc tab reads the public Maseco archive catalogue and item file
 lists on demand. The ISO checker reads ISO9660 directories without loading a
 multi-gigabyte image into memory, and detects mislabeled RAR files. These tools
 also support reading the English metadata block in extracted `hk2/INFO.DAT` files;
-the reader is checked against 3,609 records in the archived Volume 48 index.
+the reader is checked against 3,795 records in the archived Volume 48 index.
 Song numbers and playable music extents are not inferred from title records.
-do not yet decode ARVNKR/MULTAK proprietary song data. Background video reels
+The player does not yet decode ARVNKR/MULTAK proprietary song data. Background video reels
 are not offered as selectable music. No full original-disc playback, Arirang
 hardware sound equivalence, legacy lyric encoding equivalence, UDF-only disc
 support, automatic disc downloads or mobile control is claimed in this build.

@@ -24,7 +24,9 @@ if sys.argv[1] == 'download':
             time.sleep(2)
 elif sys.argv[1] == 'report':
     parsed = json.loads((root / 'parsed.json').read_text(encoding='utf-8'))
-    assert parsed['count'] == 3609, 'Reader does not match the independently inspected English block'
+    assert parsed['count'] == 3795, 'Reader does not match the independently inspected full English block'
+    assert parsed['songs'][0]['RecordOffset'] == 0x89AB3
+    assert parsed['songs'][-1]['RecordOffset'] == 0xB2784
     assert not parsed['songIdsVerified'] and not parsed['playbackVerified']
     assert all(song['SongNumber'] is None and not song['PlaybackVerified'] for song in parsed['songs'])
     report = {'sourceUrl': url, 'originalIndexBytes': 1320466,

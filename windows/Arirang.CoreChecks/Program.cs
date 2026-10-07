@@ -80,10 +80,13 @@ for (int n = 0; n < 20; n++)
 {
     byte[] title = Encoding.ASCII.GetBytes("SONG " + n);
     index.AddRange(new byte[] { 0, 12, 1, 0, 1, 5, 0, (byte)title.Length });
-    index.AddRange(title); index.AddRange(new byte[] { 0, 0, 0, 0 });
+    index.AddRange(title);
+    if (n == 0) index.AddRange(new byte[] { 9, (byte)'P', (byte)'\'', 4, (byte)'S', (byte)'e', (byte)'e', (byte)'g', (byte)'e', (byte)'r', 0, 0, 0 });
+    else index.AddRange(new byte[] { 0, 0, 0, 0 });
 }
 var records = InfoDatIndex.ReadEnglish(index.ToArray());
 Check(records.Count == 20 && records[19].Title == "SONG 19" && records.All(s => s.SongNumber is null && !s.PlaybackVerified), "Disc text records must not invent music/song IDs.");
+Check(records[0].Artist == "P' Seeger", "Artist control byte must not truncate an otherwise valid record block.");
 if (args.Length == 2 && args[0] == "--fixture")
 {
     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[1]))!); File.WriteAllBytes(args[1], fixture);
