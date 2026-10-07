@@ -7,6 +7,7 @@ on:
       - 'windows/Arirang.CoreChecks/**'
       - 'windows/Arirang.MidiPlayer/**'
       - '.github/workflows/arirang-midi.yml'
+      - 'tools/verify_arirang_multak.py'
   workflow_dispatch:
 permissions:
   contents: write
@@ -37,6 +38,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Real Arirang index parsing failed' }
           python tools/verify_arirang_index.py report
           if ($LASTEXITCODE -ne 0) { throw 'Real Arirang index verification failed' }
+      - name: Verify actual Arirang Volume 40 music pointers
+        run: |
+          python tools/verify_arirang_multak.py download
+          if ($LASTEXITCODE -ne 0) { throw 'Public bounded TOC download failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --multak .reference/arirang-multak/header.bin 681682944 670775296 .reference/arirang-multak/parsed.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK pointer parsing failed' }
+          python tools/verify_arirang_multak.py report
+          if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK verification failed' }
       - name: Verify two native windows and capture UI
         run: |
           $process = Start-Process artifacts/arirang-windows/Arirang.MidiPlayer.exe -ArgumentList '--verify', 'artifacts/arirang-verification/synthetic-test.kar', 'artifacts/arirang-verification' -WindowStyle Hidden -PassThru

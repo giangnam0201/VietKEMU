@@ -191,8 +191,21 @@ internal sealed class Panel : Window
         try
         {
             var inventory = await Task.Run(() => DiscInventory.Read(picker.FileName));
+            string musicIndex = "";
+            if (inventory.Files.Any(f => f.Name.Equals("MULTAK.DAT", StringComparison.OrdinalIgnoreCase)))
+            {
+                try
+                {
+                    var table = await Task.Run(() => MultakIndex.ReadIso(picker.FileName, inventory));
+                    musicIndex = $"\n\nMULTAK: {table.Slots:N0} vị trí, {table.NullSlots:N0} vị trí trống; " +
+                        $"{table.Pointers.Count(p => p.StorageFile == 0):N0} bản ghi DAT, " +
+                        $"{table.Pointers.Count(p => p.StorageFile == 1):N0} bản ghi DA1.\n" +
+                        "Đã xác định vị trí dữ liệu. Mã bài và sự kiện nhạc chưa được giải mã.";
+                }
+                catch (InvalidDataException error) { musicIndex = "\n\nMULTAK: " + error.Message; }
+            }
             ShowReport("Đĩa Arirang — " + inventory.Format, string.Join("\n", inventory.Files.Select(f => $"{f.Name}   ({f.Bytes:N0} bytes)")) +
-                "\n\nARVNKR / MULTAK cần bộ giải mã riêng. Video nền không được thêm như một bài hát.");
+                musicIndex + "\n\nARVNKR / MULTAK cần bộ giải mã riêng. Video nền không được thêm như một bài hát.");
             status.Text = $"{inventory.Format}: {inventory.Files.Count} tệp";
         }
         catch (Exception error) { status.Text = error.Message; }

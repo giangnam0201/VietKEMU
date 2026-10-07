@@ -65,3 +65,22 @@ be assumed to be a playable device song ID: the researcher's cutting routine
 selects sequential records. The title mask must not silently be treated as a
 verified music mask. This research tool is separate from the Windows player
 and cannot import the proprietary song as playable music yet.
+
+## Volume 40 music storage pointers
+
+Bounded HTTP range reads of the public [Volume 40 ISO](https://archive.org/details/midi-vision-karaoke-vol-40)
+identified both original music containers in its ISO9660 directory. The music
+header declares 22,910 table slots: 10 null, 17,111 pointing into MULTAK.DAT and
+5,789 into MULTAK.DA1. All non-null offsets fit the declared container sizes.
+The independently written `MultakIndex` reader validates the `multak3.3` header,
+complete table, sector fields, storage selector and extent bounds. It preserves
+uninterpreted flags and explicitly names table positions rather than song IDs.
+The Windows ISO inspector now reports these counts for supported local discs.
+
+The [original author's pointer description](http://karaoke-engineering.44.s1.nabble.com/Arirang-MIDI-Karaoke-DVD-storage-file-struct-and-MP3-Extraction-td467.html)
+was checked against five small original record samples. Four begin with the
+expected `00 00 OK` song header; the second table slot's sample does not, so
+valid pointer arithmetic alone is not treated as proof of a playable song.
+Music decoding and song-number mapping remain unverified. GitHub checks fetch
+only a 128 KiB public TOC range and publish aggregate verification results;
+original music bytes remain excluded from releases.

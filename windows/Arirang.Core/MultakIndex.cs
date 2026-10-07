@@ -1,0 +1,52 @@
+using System.Buffers.Binary;
+
+namespace Arirang.Core;
+
+// Pointer-table positions are not device song numbers. Low flags are retained
+// without guessing their meaning; a valid extent is not proof of playable MIDI.
+public sealed record MultakPointer(int TableIndex, int StorageFile, long Offset, byte Flags);
+public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakPointer> Pointers)
+{
+    public const int TableOffset = 0xd20;
+    public const int MaximumHeaderBytes = TableOffset + ushort.MaxValue * 4;
+
+    public static MultakIndex Parse(ReadOnlySpan<byte> header, long datBytes, long da1Bytes)
+    {
+        if (header.Length < 336 || !header.Slice(4, 9).SequenceEqual("multak3.3"u8))
+            throw new InvalidDataException("Unsupported MULTAK header; music decoding is not established for this disc.");
+        int count = BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(334, 2));
+        if (count == 0 || header.Length < TableOffset + count * 4)
+            throw new InvalidDataException("Truncated MULTAK pointer table.");
+        var pointers = new List<MultakPointer>(count);
+        int nulls = 0;
+        for (int i = 0; i < count; i++)
+        {
+            var pointer = header.Slice(TableOffset + i * 4, 4);
+            if (pointer.SequenceEqual(new byte[] { 0xff, 0, 0xff, 0xff })) { nulls++; continue; }
+            int storage = pointer[3] >> 4;
+            if (storage > 1 || pointer[1] >= 60 || pointer[2] >= 75)
+                throw new InvalidDataException($"Unsupported MULTAK pointer at table slot {i}.");
+            long sector = (pointer[0] * 60L + pointer[1]) * 75 + pointer[2];
+            long offset = sector * 2048 + (storage == 0 ? 65536 : 0);
+            long length = storage == 0 ? datBytes : da1Bytes;
+            if (offset < 0 || length < 0 || offset > length - 2)
+                throw new InvalidDataException($"MULTAK pointer {i} extends beyond its storage file.");
+            pointers.Add(new(i, storage, offset, (byte)(pointer[3] & 15)));
+        }
+        return new(count, nulls, pointers);
+    }
+
+    public static MultakIndex ReadIso(string path, DiscInventory inventory)
+    {
+        var dat = inventory.Files.SingleOrDefault(f => f.Name.Equals("MULTAK.DAT", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidDataException("Root MULTAK.DAT not found.");
+        var da1 = inventory.Files.SingleOrDefault(f => f.Name.Equals("MULTAK.DA1", StringComparison.OrdinalIgnoreCase));
+        using var stream = File.OpenRead(path);
+        int bytes = checked((int)Math.Min(dat.Bytes, MaximumHeaderBytes));
+        if (dat.Offset < 0 || dat.Offset > stream.Length - bytes)
+            throw new InvalidDataException("Truncated MULTAK extent.");
+        stream.Position = dat.Offset;
+        var header = new byte[bytes]; stream.ReadExactly(header);
+        return Parse(header, dat.Bytes, da1?.Bytes ?? 0);
+    }
+}

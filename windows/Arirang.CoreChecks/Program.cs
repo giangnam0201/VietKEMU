@@ -6,8 +6,31 @@ if (args.Length == 3 && args[0] == "--index")
 {
     IndexResearch.Export(args[1], args[2]); return;
 }
+if (args.Length == 5 && args[0] == "--multak")
+{
+    MultakResearch.Export(args[1], long.Parse(args[2]), long.Parse(args[3]), args[4]); return;
+}
 
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+byte[] multakHeader = new byte[MultakIndex.TableOffset + 12];
+"multak3.3"u8.CopyTo(multakHeader.AsSpan(4));
+BinaryPrimitives.WriteUInt16LittleEndian(multakHeader.AsSpan(334), 3);
+new byte[] { 0xff, 0, 0xff, 0xff, 0x49, 0x31, 0x2b, 0x09, 0, 3, 0x17, 0x10 }.CopyTo(multakHeader, MultakIndex.TableOffset);
+var multak = MultakIndex.Parse(multakHeader, 700_000_000, 600_000);
+Check(multak.Slots == 3 && multak.NullSlots == 1 && multak.Pointers.Count == 2, "MULTAK null slots and pointer count.");
+Check(multak.Pointers[0].Offset == 680448000 && multak.Pointers[0].Flags == 9, "MULTAK DAT sector calculation preserves flags.");
+Check(multak.Pointers[1].Offset == 507904 && multak.Pointers[1].StorageFile == 1, "MULTAK DA1 uses no DAT base offset.");
+var badSelector = multakHeader.ToArray(); badSelector[MultakIndex.TableOffset + 7] = 0x29;
+var badSector = multakHeader.ToArray(); badSector[MultakIndex.TableOffset + 5] = 60;
+foreach (var invalid in new[] { multakHeader[..^1], badSelector, badSector })
+{
+    bool rejected = false;
+    try { MultakIndex.Parse(invalid, 700_000_000, 600_000); } catch (InvalidDataException) { rejected = true; }
+    Check(rejected, "Truncated/unsupported MULTAK pointers must not be accepted.");
+}
+bool outsideRejected = false;
+try { MultakIndex.Parse(multakHeader, 500, 600_000); } catch (InvalidDataException) { outsideRejected = true; }
+Check(outsideRejected, "MULTAK extents must fit the declared storage file.");
 static byte[] Chunk(string type, byte[] bytes)
 {
     var result = new byte[bytes.Length + 8]; Encoding.ASCII.GetBytes(type).CopyTo(result, 0);
