@@ -48,6 +48,25 @@ def download():
         relative = ((pointer[0] * 60 + pointer[1]) * 75 + pointer[2]) * 2048 + (65536 if storage == 0 else 0)
         extent = 1522703 if storage == 0 else 1195176
         (ROOT / f'{code}.bin').write_bytes(read_range(extent * 2048 + relative, 1024))
+    pointers = []
+    count = int.from_bytes(data[334:336], 'little')
+    for slot in range(count):
+        pointer = data[3360 + slot * 4:3364 + slot * 4]
+        if pointer == b'\xff\0\xff\xff':
+            continue
+        storage = pointer[3] >> 4
+        relative = ((pointer[0] * 60 + pointer[1]) * 75 + pointer[2]) * 2048 + (65536 if storage == 0 else 0)
+        pointers.append((slot, storage, relative))
+    for code, expected_bytes in ((30655, 6144), (32153, 4096)):
+        at = 16 + 2 * (code // 1000)
+        slot = int.from_bytes(data[at:at + 2], 'little') + code % 1000
+        _, storage, relative = next(p for p in pointers if p[0] == slot)
+        end = min(p[2] for p in pointers if p[1] == storage and p[2] > relative)
+        size = end - relative
+        if size != expected_bytes:
+            raise ValueError('Original layout song extent differs from independent inspection')
+        extent = 1522703 if storage == 0 else 1195176
+        (ROOT / f'complete-{code}.bin').write_bytes(read_range(extent * 2048 + relative, size))
 
 
 def report():

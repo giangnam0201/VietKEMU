@@ -46,6 +46,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK pointer parsing failed' }
           dotnet run --project windows/Arirang.CoreChecks -c Release -- --maseco .reference/arirang-multak/index.idx .reference/arirang-multak/header.bin 681682944 670775296 .reference/arirang-multak/catalogue-parsed.json
           if ($LASTEXITCODE -ne 0) { throw 'Original device-code mapping failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --layouts .reference/arirang-multak/complete-30655.bin .reference/arirang-multak/complete-32153.bin artifacts/arirang-verification/song-layout-verification.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original multi-channel song layout decoding failed' }
           python tools/verify_arirang_multak.py report
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK verification failed' }
       - name: Verify two native windows and capture UI

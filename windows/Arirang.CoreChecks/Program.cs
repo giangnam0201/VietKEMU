@@ -36,6 +36,11 @@ bool outsideRejected = false;
 try { MultakIndex.Parse(multakHeader, 500, 600_000); } catch (InvalidDataException) { outsideRejected = true; }
 Check(outsideRejected, "MULTAK extents must fit the declared storage file.");
 MasecoChecks.Run();
+LayoutChecks.Run();
+if (args.Length == 4 && args[0] == "--layouts")
+{
+    LayoutChecks.ExportOriginal(args[1], args[2], args[3]); return;
+}
 static byte[] Chunk(string type, byte[] bytes)
 {
     var result = new byte[bytes.Length + 8]; Encoding.ASCII.GetBytes(type).CopyTo(result, 0);

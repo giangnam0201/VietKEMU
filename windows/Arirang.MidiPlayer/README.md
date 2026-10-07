@@ -26,6 +26,9 @@ For supported MULTAK/MASECOS4 discs, the ISO checker reads actual device codes
 and resolves their music pointers using the container's song-block table. This
 is checked against all 22,900 Volume 40 records and three original song headers.
 It previews English catalogue titles; other title encodings are not yet decoded.
+For a supported simple sample record, the inspector also locates its channel
+streams and lyric/music boundary. Original five- and eight-channel Happy Birthday
+records verify this structural reader. Their musical events are not yet decoded.
 The player does not yet decode ARVNKR/MULTAK proprietary song data. Background video reels
 are not offered as selectable music. No full original-disc playback, Arirang
 hardware sound equivalence, legacy lyric encoding equivalence, UDF-only disc

@@ -209,6 +209,18 @@ internal sealed class Panel : Window
                             "Tên tiếng Anh (100 mục đầu; chữ Việt và sự kiện MIDI vẫn đang giải mã):\n" +
                             string.Join("\n", catalogue.Where(s => s.EnglishTitle is not null).Take(100)
                                 .Select(s => $"{s.DeviceCode}: {s.EnglishTitle}"));
+                        var sample = catalogue.FirstOrDefault(s => s.EnglishTitle is not null && table.FindSong(s.DeviceCode) is not null);
+                        if (sample is not null)
+                        {
+                            try
+                            {
+                                var layout = await Task.Run(() => MultakSongLayout.Parse(table.ReadSongRecordIso(picker.FileName, inventory, sample.DeviceCode)));
+                                musicIndex += $"\n\nBản ghi mẫu {sample.DeviceCode}: {layout.Tracks.Count} luồng kênh, " +
+                                    $"vị trí nhạc {layout.MusicOffset:N0} byte.\nKênh: " + string.Join(", ", layout.Tracks.Select(t => t.Channel + 1)) +
+                                    "\nĐã đọc cấu trúc gốc; nốt nhạc và thời gian chưa được giải mã.";
+                            }
+                            catch (InvalidDataException error) { musicIndex += "\n\nCấu trúc bản ghi mẫu: " + error.Message; }
+                        }
                     }
                 }
                 catch (InvalidDataException error) { musicIndex = "\n\nMULTAK: " + error.Message; }

@@ -133,3 +133,28 @@ original song headers. The separate player report confirms two native windows,
 queue selection and standard MIDI/KAR parsing; original music playback and
 hardware audio remain unverified. Only verification assets were downloaded;
 the application ZIP remains on GitHub for the user to download.
+
+## Original channel layout reader
+
+Complete bounded Volume 40 records for device codes 30655 (6,144 bytes) and
+32153 (4,096 bytes) both contain the original Happy Birthday arrangements.
+The latter's title/music/padding bytes match 4,054 bytes of the historical
+research sample exactly, after accounting for its extra 10-byte cut prefix.
+This establishes an actual device code for that sample rather than relying
+on its misleading filename.
+
+The new `MultakSongLayout` reader validates the simple `00 00 OK` header, title
+mask, lyric/music boundary and channel table. Seven-byte track descriptors
+contain a channel and a 24-bit relative offset; all 14 previously inspected
+samples have unique channels and increasing offsets. The two complete original
+records resolve to five and eight channel streams, including channel 9.
+Unknown flags, values and header fields remain uninterpreted. The field at
+byte 34 is deliberately not called a music length: bytes beyond that apparent
+length still contain music structures.
+
+`ReadSongRecordIso` resolves the code, storage file and next physical extent,
+then reads only that bounded record. Tests cover exact bytes and truncation.
+The Windows ISO inspection uses it for one English catalogue sample and
+reports channel structure without offering undecoded bytes as playable music.
+Vocal/MP3 records and compact event semantics require further readers. This
+step does not claim notes, tempo, instruments or original song playback.

@@ -21,6 +21,25 @@ public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakP
         return bySlot.GetValueOrDefault(slot);
     }
 
+    public byte[] ReadSongRecordIso(string path, DiscInventory inventory, int deviceCode)
+    {
+        var pointer = FindSong(deviceCode) ?? throw new InvalidDataException("Device song code has no music pointer.");
+        string name = pointer.StorageFile == 0 ? "MULTAK.DAT" : "MULTAK.DA1";
+        var file = inventory.Files.SingleOrDefault(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidDataException("Music storage file not found.");
+        long end = Pointers.Where(p => p.StorageFile == pointer.StorageFile && p.Offset > pointer.Offset)
+            .Select(p => p.Offset).DefaultIfEmpty(file.Bytes).Min();
+        long size = end - pointer.Offset;
+        if (pointer.Offset < 0 || end > file.Bytes || size is <= 0 or > MultakSongLayout.MaximumBytes)
+            throw new InvalidDataException("Song record exceeds supported bounded size.");
+        using var stream = File.OpenRead(path);
+        long offset = checked(file.Offset + pointer.Offset);
+        if (offset < 0 || offset > stream.Length - size)
+            throw new InvalidDataException("Truncated music record extent.");
+        stream.Position = offset;
+        var raw = new byte[(int)size]; stream.ReadExactly(raw); return raw;
+    }
+
     public static MultakIndex Parse(ReadOnlySpan<byte> header, long datBytes, long da1Bytes)
     {
         if (header.Length < 336 || !header.Slice(4, 9).SequenceEqual("multak3.3"u8))
