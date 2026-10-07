@@ -52,7 +52,10 @@ public sealed class CloudMusicClient(string tools,Func<string?>? cookiesFile=nul
             var json=await YouTubeMusicClient.Run(Tool(),Arguments().Concat(["--flat-playlist","--dump-single-json","--","scsearch48:"+term]),null,token,TimeSpan.FromMinutes(2));
             return ParseExtractor(json,provider);
         }
-        var endpoint=string.IsNullOrWhiteSpace(query)?"popular/?limit=48":"search/?type=cloudcast&limit=48&q="+Uri.EscapeDataString(query);
+        // The legacy popular route currently resolves to a user profile, not a
+        // chart. Use an explicitly named discovery search rather than fake TOP.
+        var termMix=string.IsNullOrWhiteSpace(query)?"Nhạc Việt":query;
+        var endpoint="search/?type=cloudcast&limit=48&q="+Uri.EscapeDataString(termMix);
         using var response=await http.GetAsync("https://api.mixcloud.com/"+endpoint,HttpCompletionOption.ResponseHeadersRead,token);
         response.EnsureSuccessStatusCode();
         await using var stream=await response.Content.ReadAsStreamAsync(token);

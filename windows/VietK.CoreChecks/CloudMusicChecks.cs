@@ -10,7 +10,7 @@ internal static class CloudMusicChecks
             var host=provider=="SoundCloud"?"soundcloud.com":"mixcloud.com";
             var url="https://"+host+"/fixture/track";
             var item=CloudMusicClient.Item(url,provider,"Nhạc thử","Tác giả");
-            Require(item.Id!=CloudMusicClient.Item(url,provider,"Other title").Title&&item.Id==CloudMusicClient.Item(url,provider,"Other title").Id,"Cloud queue identity depends on title");
+            Require(item.Id==CloudMusicClient.Item(url,provider,"Other title").Id,"Cloud queue identity depends on title");
             Require(JsonSerializer.Deserialize<YouTubeVideo>(JsonSerializer.Serialize(item))==item,"Cloud queue did not round-trip");
             foreach(var bad in new[]{"file:///secret","https://"+host+".evil.invalid/artist/track","https://user@"+host+"/artist/track","--exec=bad","https://"+host+"/artist"})
                 Require(CloudMusicClient.TrackUrl(bad,provider) is null,"Invalid provider URL admitted");

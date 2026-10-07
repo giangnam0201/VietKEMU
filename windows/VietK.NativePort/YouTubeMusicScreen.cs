@@ -142,7 +142,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         searching?.Cancel();var cancellation=new CancellationTokenSource();searching=cancellation;
         var target=results;var query=input.Text.Trim();
         if(YouTubeMusicClient.VideoId(query) is null && CloudMusicClient.TrackUrl(query,provider) is null && category!="All")query=(query+" "+category).Trim();
-        SetStatus("Đang tìm trên "+provider+(provider=="SoundCloud"&&query.Length==0?" — Nhạc Việt":"")+"…");
+        SetStatus("Đang tìm trên "+provider+(provider!="YouTube"&&query.Length==0?" — Nhạc Việt":"")+"…");
         try
         {
             var found=await (SearchFixture?.Invoke(query,cancellation.Token)??RemoteSearch(query,cancellation.Token,provider));
@@ -371,7 +371,7 @@ public sealed class YouTubeMusicScreen : IDisposable
                 if(queue.Any(item=>item.Id==video.Id))name.Foreground=new SolidColorBrush(Color.FromRgb(255,231,97));
                 texts.Children.Add(name);var creator=Label(video.Channel,18);creator.Foreground=Brushes.LightGray;creator.Margin=new(0);texts.Children.Add(creator);row.Children.Add(texts);
                 var top=Button("⇧",()=>Add(video,true));Grid.SetColumn(top,2);row.Children.Add(top);
-                row.MouseLeftButtonUp+=(_,e)=> { if(e.OriginalSource is not Button)Add(video,false); };
+                row.MouseLeftButtonUp+=(_,e)=> { if(e.OriginalSource is not System.Windows.Controls.Button)Add(video,false); };
                 target.Children.Add(row);continue;
             }
             // fragment_youtube_recycler_item.xml and YouTubeAdapter.java:

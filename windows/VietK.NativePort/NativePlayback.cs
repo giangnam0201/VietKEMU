@@ -307,10 +307,11 @@ public sealed class NativePlayback : IDisposable
         videoPlayer = new OriginalVideoPlayer(Decoder, Television.SetBlack);
         Decoder.Original = Player;
         videoDecoder.Started=()=> { if(!playingIdle&&audioPlayer is null)Television.Overlay.SetLoading(); };
-        Decoder.ConfirmedPause = paused => { bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
+        Decoder.ConfirmedPause = paused => { if(audioPlayer is not null)return;bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
             Television.Overlay.SetPaused(paused); };
         Decoder.ConfirmedTrack = original =>
         {
+            if(audioPlayer is not null)return;
             bottom.SetConfirmedPlaybackState(Player.State==OriginalVideoState.Pause,original);
             if(!Decoder.PreserveStereo && pendingTrackFeedback==(original?OriginalSingMode.Original:OriginalSingMode.Accompaniment))
             {
