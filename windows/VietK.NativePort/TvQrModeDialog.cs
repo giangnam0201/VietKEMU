@@ -12,15 +12,16 @@ public sealed class TvQrModeDialog
 {
     public Canvas Overlay { get; }=new() { Width=1280,Height=800,Background=new SolidColorBrush(Color.FromArgb(128,0,0,0)) };
     public int Pending { get; private set; }
+    public int PendingSize { get; private set; }
     private readonly Canvas host;
     private readonly TelevisionQr qr;
     private readonly TextBlock[] labels=new TextBlock[3];
     private readonly FrameworkElement[] markers=new FrameworkElement[3];
     public TvQrModeDialog(Canvas host,TelevisionQr qr)
     {
-        this.host=host;this.qr=qr;Pending=qr.State.Mode;
-        var content=new Canvas { Width=418,Height=398 };
-        var box=new Border { Width=418,Height=398,CornerRadius=new(10),Background=new SolidColorBrush(Color.FromRgb(72,23,64)),Child=content };
+        this.host=host;this.qr=qr;Pending=qr.State.Mode;PendingSize=qr.SizePercent;
+        var content=new Canvas { Width=418,Height=480 };
+        var box=new Border { Width=418,Height=480,CornerRadius=new(10),Background=new SolidColorBrush(Color.FromRgb(72,23,64)),Child=content };
         Put(Overlay,box,431,156);
         Put(content,Label("Chế độ hiển thị mã QR lên TV",418,60,24,true),0,0);
         var close=new Border { Width=60,Height=60,Background=Brushes.Transparent,Tag="qr-mode:close" };
@@ -42,10 +43,17 @@ public sealed class TvQrModeDialog
             option.MouseLeftButtonUp+=(_,e)=> { Select(index);e.Handled=true; };Put(content,option,0,60+i*62);
             if(i<2)Put(content,new Border { Width=418,Height=2,Background=new SolidColorBrush(Color.FromArgb(48,255,255,255)) },0,120+i*62);
         }
+        var sizeLabel=Label($"Kích thước QR: {PendingSize}%",362,40,22);
+        Put(content,sizeLabel,28,252);
+        var size=new Slider { Minimum=25,Maximum=200,Value=PendingSize,TickFrequency=5,IsSnapToTickEnabled=true,
+            Width=362,Height=42,Tag="qr-mode:size" };
+        size.ValueChanged+=(_,_)=> { PendingSize=(int)Math.Round(size.Value);sizeLabel.Text=$"Kích thước QR: {PendingSize}%"; };
+        Put(content,size,28,297);
+        Put(content,Label("50% mặc định • 100% kích thước trước",362,32,16),28,341);
         var background=new LinearGradientBrush { StartPoint=new(0,1),EndPoint=new(0,0) };
         background.GradientStops.Add(new(Color.FromRgb(4,160,227),0));background.GradientStops.Add(new(Color.FromRgb(0,250,246),1));
         var confirm=new Border { Width=140,Height=46,CornerRadius=new(26),Background=background,Child=Label("Xác nhận",140,46,24,true),Tag="qr-mode:confirm" };
-        OriginalPressFeedback.Bind(confirm,.9);confirm.MouseLeftButtonUp+=(_,e)=> { Confirm();e.Handled=true; };Put(content,confirm,139,290);
+        OriginalPressFeedback.Bind(confirm,.9);confirm.MouseLeftButtonUp+=(_,e)=> { Confirm();e.Handled=true; };Put(content,confirm,139,398);
         Select(Pending);
         Overlay.MouseLeftButtonDown+=(_,e)=> { if(e.OriginalSource==Overlay)Close(); };
         Overlay.PreviewKeyDown+=(_,e)=> { if(e.Key==Key.Escape) { Close();e.Handled=true; } };
@@ -56,7 +64,7 @@ public sealed class TvQrModeDialog
         if(mode is <0 or >2)throw new ArgumentOutOfRangeException(nameof(mode));Pending=mode;
         for(var i=0;i<labels.Length;i++) { labels[i].Foreground=i==mode?new SolidColorBrush(Color.FromRgb(238,156,63)):Brushes.White;markers[i].Visibility=i==mode?Visibility.Visible:Visibility.Hidden; }
     }
-    public void Confirm(bool persist=true) { qr.SetMode(Pending,persist);Close(); }
+    public void Confirm(bool persist=true) { qr.SetMode(Pending,persist);qr.SetSizePercent(PendingSize,persist);Close(); }
     public void Close()=>host.Children.Remove(Overlay);
     private static TextBlock Label(string text,double width,double height,double size,bool centered=false)=>new() {
         Text=text,Width=width,Height=height,FontSize=size,FontFamily=OriginalFont.Family,Foreground=Brushes.White,

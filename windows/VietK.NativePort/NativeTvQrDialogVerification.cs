@@ -17,21 +17,32 @@ internal static class NativeTvQrDialogVerification
         var panel=new Canvas { Width=1280,Height=800,Background=Brushes.Black };host.Content=new Viewbox { Child=panel };
         try
         {
+            Require(qr.SizePercent==50,"QR default must be half the previous size");
+            qr.ConfigureLocalRemote("http://192.168.1.2:8080/?pair=synthetic");
+            var image=qr.Canvas.Children.OfType<Image>().Single();
+            double halfWidth=image.Width;
+            qr.SetSizePercent(100,false);Require(Math.Abs(image.Width-halfWidth*2)<.001,"QR dimensions did not scale proportionally");
+            qr.SetSizePercent(50,false);
             var dialog=new TvQrModeDialog(panel,qr);host.UpdateLayout();
+            var slider=(Slider)Descendants(dialog.Overlay).Single(x=>Equals(x.Tag,"qr-mode:size"));
+            slider.Value=125;Require(dialog.PendingSize==125&&qr.SizePercent==50,"QR size draft applied before confirmation");
             Require(Marker(dialog,0).Visibility==Visibility.Visible&&Marker(dialog,1).Visibility==Visibility.Hidden,"Initial QR row marker did not follow saved mode");
             Click(dialog,"option:2");Require(dialog.Pending==2&&qr.State.Mode==0&&Marker(dialog,2).Visibility==Visibility.Visible&&Marker(dialog,0).Visibility==Visibility.Hidden,"QR row selection was not staged or markers stale");
-            Click(dialog,"close");Require(qr.State.Mode==0&&!panel.Children.Contains(dialog.Overlay),"Close committed the QR draft");
+            Click(dialog,"close");Require(qr.State.Mode==0&&qr.SizePercent==50&&!panel.Children.Contains(dialog.Overlay),"Close committed the QR draft");
             dialog=new TvQrModeDialog(panel,qr);Click(dialog,"option:1");host.UpdateLayout();
+            ((Slider)Descendants(dialog.Overlay).Single(x=>Equals(x.Tag,"qr-mode:size"))).Value=75;
             var frame=new RenderTargetBitmap(1280,800,96,96,PixelFormats.Pbgra32);frame.Render(panel);
             var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(frame));using(var file=File.Create(Path.Combine(output,"synthetic-tv-qr-mode-dialog.png")))encoder.Save(file);
             Click(dialog,"confirm");Require(qr.State.Mode==1&&!qr.State.ImageVisible&&!panel.Children.Contains(dialog.Overlay),"Confirmation failed original mode-one branch or dismissal");
             Require(JsonSerializer.Deserialize<int>(File.ReadAllText(Path.Combine(state,"tv-qr-mode.json")))==1,"QR confirmation did not persist");
+            Require(qr.SizePercent==75&&new TelevisionQr(state).SizePercent==75,"QR size did not persist across restart");
             dialog=new TvQrModeDialog(panel,qr);Click(dialog,"option:0");
             dialog.Overlay.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left) { RoutedEvent=UIElement.MouseLeftButtonDownEvent });
             Require(qr.State.Mode==1&&!panel.Children.Contains(dialog.Overlay),"Outside dismissal saved QR draft");
             File.WriteAllText(Path.Combine(output,"tv-qr-dialog-verification.json"),JsonSerializer.Serialize(new {
                 savedSelectionMarker=true,rowSelectionStagesOnly=true,markerFollowsSelection=true,closeDiscardsDraft=true,
                 confirmPersistsAndDismisses=true,originalModeOneVisibilityPreserved=true,outsideDismissDiscardsDraft=true,
+                defaultHalfSize=true,sizeScalesProportionally=true,sizeDraftDiscarded=true,sizePersistsAcrossRestart=true,
                 originalSelectedArtworkPresent=File.Exists(Path.Combine(OriginalSupplement.Root,"ambience","settings","setting_general_language_selected.png"))
             },new JsonSerializerOptions { WriteIndented=true }));
         }

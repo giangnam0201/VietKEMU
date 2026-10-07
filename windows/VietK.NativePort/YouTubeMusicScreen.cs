@@ -211,7 +211,7 @@ public sealed class YouTubeMusicScreen : IDisposable
         Add("Chữ chạy trên TV…",EditMarquee);
         Add("Kết nối điều khiển bằng điện thoại",()=> { SetStatus(MobileConnectionInfo?.Invoke()??"Điều khiển điện thoại chưa khởi động.");OpenMobilePairing?.Invoke(); });
         Add("Ngắt điện thoại cũ / tạo QR mới",()=> { RePairMobile?.Invoke();SetStatus("Đã đổi mã kết nối. Quét lại QR trên TV."); });
-        Add("Chế độ hiển thị mã QR lên TV…",()=>
+        Add("Hiển thị / kích thước mã QR lên TV…",()=>
         {
             if(Application.Current.MainWindow?.Content is Viewbox { Child:Canvas panel })new TvQrModeDialog(panel,playback.Television.Overlay.Qr);
         });
