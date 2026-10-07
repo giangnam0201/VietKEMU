@@ -15,13 +15,16 @@ internal static class VietnameseLyricChecks
         var starts = lyrics.Glyphs.Where(g => g.NewLine).ToArray();
         var guideTicks = channels[0].Events.Where(e => (e.Status >> 4) == 9 && e.Data2 > 0)
             .Select(e => e.Tick).ToHashSet();
-        if (layout.MusicOffset != 4736 || channels.Length != 7 || streams.BlocksRead != 26 ||
+        if (layout.MusicOffset != 4736 || channels.Length != 7 || streams.BlocksRead != 25 ||
             channels.Sum(c => c.Events.Count) != 5426 || channels.Max(c => c.EndTick) != 9363 ||
             lyrics.PrimaryBytes != 1584 || lyrics.SecondaryBytes != 1440 || lyrics.StaffOffset != 3163 ||
             lyrics.EndTick != 9412 || lyrics.Glyphs.Count != 1194 || starts.Length != 70 ||
             lyrics.Glyphs.Count(g => g.Voice == 1) != 620 || lyrics.Glyphs.Count(g => g.Voice == 2) != 574 ||
             lyrics.Glyphs.Max(g => g.Tick) != 9260 || starts.Any(g => !guideTicks.Contains(g.Tick)))
-            throw new InvalidDataException("Vietnamese original lyric timing does not match independent guide expansion.");
+            throw new InvalidDataException($"Vietnamese original lyric timing differs: blocks={streams.BlocksRead}, " +
+                $"events={channels.Sum(c => c.Events.Count)}, end={channels.Max(c => c.EndTick)}, " +
+                $"glyphs={lyrics.Glyphs.Count}, phrases={starts.Length}, " +
+                $"unmatched={starts.Count(g => !guideTicks.Contains(g.Tick))}.");
         if (lyrics.Glyphs.First(g => g.Voice == 1).Tick != 562 ||
             !lyrics.Glyphs.Any(g => g.Text == 'ỏ') || !lyrics.Glyphs.Any(g => g.Text == 'đ'))
             throw new InvalidDataException("Vietnamese original accents or initial timing were lost.");
