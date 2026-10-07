@@ -7,7 +7,14 @@ independent executable, settings directory and official logo. Its initial
 passed parser/scheduler/disc checks and native two-window rendering. Panel and
 TV screenshots were inspected; the preview displays the TV visual directly.
 The build report explicitly does not verify audible hardware output or original
-proprietary song playback. The subsequent build adds control and index checks.
+proprietary song playback.
+
+The final [development build](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37572148588)
+passed [run 37572148588](https://github.com/giangnam0201/VietKEMU/actions/runs/37572148588),
+including the real 3,795-record index check, selected-queue interaction,
+additional timing checks and both native windows. Its final panel screenshot
+and JSON reports were inspected. Only verification assets were downloaded
+locally; the Windows app ZIP remains available for the user to download.
 
 The standard MIDI engine supports merged format-0/1 tracks, tempo maps, SMPTE
 timing, channel events, full system-exclusive packets and embedded KAR lyrics.
