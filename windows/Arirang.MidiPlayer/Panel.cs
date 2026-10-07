@@ -10,7 +10,7 @@ using Microsoft.Win32;
 
 namespace Arirang.MidiPlayer;
 
-internal sealed record LibraryItem(string Path, string Title) { public override string ToString() => Title; }
+internal sealed record LibraryItem(string Path, string Title, int? DiscSongCode = null) { public override string ToString() => Title; }
 internal sealed class Panel : Window
 {
     private readonly Television tv = new();
@@ -38,6 +38,7 @@ internal sealed class Panel : Window
         top.Children.Add(new TextBlock { Text = "MIDI KARAOKE", FontSize = 25, Margin = new Thickness(25, 15, 25, 0) });
         top.Children.Add(Button("Nhập MIDI / KAR", async () => await Import()));
         top.Children.Add(Button("Kiểm tra đĩa ISO", async () => await InspectDisc()));
+        top.Children.Add(Button("Nhập MULTAK ISO (thử nghiệm)", async () => await ImportMultak()));
         top.Children.Add(Button("Danh mục INFO.DAT", async () => await InspectIndex()));
         top.Children.Add(Button("Màn hình TV", () => { tv.Show(); tv.Activate(); }));
         DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
@@ -158,10 +159,17 @@ internal sealed class Panel : Window
         try
         {
             status.Text = "Đang mở " + item.Title;
-            var song = await Task.Run(() => MidiSong.Read(item.Path));
+            var song = await Task.Run(() =>
+            {
+                if (item.DiscSongCode is not int code) return MidiSong.Read(item.Path);
+                var inventory = DiscInventory.Read(item.Path);
+                var index = MultakIndex.ReadIso(item.Path, inventory);
+                return MultakPlaybackSong.Parse(index.ReadSongRecordIso(item.Path, inventory, code), item.Title);
+            });
             playback ??= new MidiPlayback(new WindowsMidiOutput());
             playback.Load(song); playback.SetKey(pitch); playback.SetVolume(gain); playback.SetSpeed(rate); playback.Play(); started = true;
             seek.Maximum = Math.Max(1, song.Duration); status.Text = "Đang phát: " + song.Title;
+            if (item.DiscSongCode is not null) status.Text += " • Thử nghiệm: âm sắc Windows, lời gốc chưa giải mã";
         }
         catch (Exception error) { status.Text = error.Message; }
         finally { loading = false; }
@@ -200,13 +208,13 @@ internal sealed class Panel : Window
                     musicIndex = $"\n\nMULTAK: {table.Slots:N0} vị trí, {table.NullSlots:N0} vị trí trống; " +
                         $"{table.Pointers.Count(p => p.StorageFile == 0):N0} bản ghi DAT, " +
                         $"{table.Pointers.Count(p => p.StorageFile == 1):N0} bản ghi DA1.\n" +
-                        "Đã xác định vị trí dữ liệu. Sự kiện nhạc chưa được giải mã.";
+                        "Đã xác định vị trí dữ liệu. Có thể thử bộ đọc MIDI với định dạng bản ghi hỗ trợ.";
                     if (inventory.Files.Any(f => f.Name.Equals("MASECOS4.IDX", StringComparison.OrdinalIgnoreCase)))
                     {
                         var catalogue = await Task.Run(() => MasecoIndex.ReadIso(picker.FileName, inventory));
                         int mapped = catalogue.Count(s => table.FindSong(s.DeviceCode) is not null);
                         musicIndex += $"\nMASECOS4: {catalogue.Count:N0} mã bài, {mapped:N0} mã tìm được dữ liệu nhạc.\n" +
-                            "Tên tiếng Anh (100 mục đầu; chữ Việt và sự kiện MIDI vẫn đang giải mã):\n" +
+                            "Tên tiếng Anh (100 mục đầu; chữ Việt vẫn đang giải mã):\n" +
                             string.Join("\n", catalogue.Where(s => s.EnglishTitle is not null).Take(100)
                                 .Select(s => $"{s.DeviceCode}: {s.EnglishTitle}"));
                         var sample = catalogue.FirstOrDefault(s => s.EnglishTitle is not null && table.FindSong(s.DeviceCode) is not null);
@@ -221,7 +229,8 @@ internal sealed class Panel : Window
                                     "\nSố bit cao độ: " + string.Join(", ", layout.Tracks.Select(t => t.PitchBits));
                                 var expanded = await Task.Run(() => MultakSongStreams.Parse(raw).Channels.Select(MultakCompactNotes.Parse).ToArray());
                                 musicIndex += $"\nĐã đọc {expanded.Sum(n => n.Events.Count):N0} sự kiện nhạc; " +
-                                    "thời gian phát, lời và âm sắc gốc vẫn cần xác minh.";
+                                    $"thời lượng tính theo tempo {MultakPlaybackSong.FromChannels(expanded, sample.EnglishTitle!).Duration:F2} giây. " +
+                                    "Thời gian trên thiết bị, lời và âm sắc gốc vẫn cần xác minh.";
                             }
                             catch (InvalidDataException error) { musicIndex += "\n\nCấu trúc bản ghi mẫu: " + error.Message; }
                         }
@@ -230,8 +239,30 @@ internal sealed class Panel : Window
                 catch (InvalidDataException error) { musicIndex = "\n\nMULTAK: " + error.Message; }
             }
             ShowReport("Đĩa Arirang — " + inventory.Format, string.Join("\n", inventory.Files.Select(f => $"{f.Name}   ({f.Bytes:N0} bytes)")) +
-                musicIndex + "\n\nARVNKR / MULTAK cần bộ giải mã riêng. Video nền không được thêm như một bài hát.");
+                musicIndex + "\n\nMULTAK có trình phát MIDI thử nghiệm; ARVNKR chưa hỗ trợ. Video nền không được thêm như một bài hát.");
             status.Text = $"{inventory.Format}: {inventory.Files.Count} tệp";
+        }
+        catch (Exception error) { status.Text = error.Message; }
+    }
+    private async Task ImportMultak()
+    {
+        var picker = new OpenFileDialog { Filter = "MULTAK disc image (*.iso;*.img)|*.iso;*.img" };
+        if (picker.ShowDialog(this) != true) return;
+        status.Text = "Đang đọc danh mục MULTAK…";
+        try
+        {
+            var items = await Task.Run(() =>
+            {
+                var inventory = DiscInventory.Read(picker.FileName);
+                var index = MultakIndex.ReadIso(picker.FileName, inventory);
+                return MasecoIndex.ReadIso(picker.FileName, inventory)
+                    .Where(s => s.EnglishTitle is not null && index.FindSong(s.DeviceCode) is not null)
+                    .Select(s => new LibraryItem(picker.FileName, $"{s.DeviceCode}: {s.EnglishTitle} — MULTAK thử nghiệm", s.DeviceCode)).ToArray();
+            });
+            foreach (var item in items)
+                if (!library.Any(s => s.Path == item.Path && s.DiscSongCode == item.DiscSongCode)) library.Add(item);
+            SaveLibrary(); RefreshLibrary();
+            status.Text = $"Đã nhập {items.Length:N0} tên bài tiếng Anh. Chọn bài để thử phát MIDI; lời và âm sắc gốc chưa giải mã. Một số định dạng bài chưa hỗ trợ.";
         }
         catch (Exception error) { status.Text = error.Message; }
     }

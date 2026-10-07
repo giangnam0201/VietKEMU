@@ -166,3 +166,34 @@ Ticks are not yet verified wall-clock time. Tempo commands, lyric timing,
 instrument fidelity and audible original playback remain unfinished. The ISO
 inspection can report recovered event counts and header pitch widths but does
 not offer them as finished original song playback.
+
+The [corrected note-reader Windows release](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37581986939)
+passed [run 37581986939](https://github.com/giangnam0201/VietKEMU/actions/runs/37581986939).
+The inspected small verification report confirms header-derived pitch widths,
+both melody prefixes, 1,692/1,001 events, all channel endings and ticks.
+`timingDecoded` and `playbackVerified` remain false. Only verification assets
+were downloaded; the application ZIP remains on GitHub.
+
+### Tempo clock and experimental ISO playback
+
+Static reference `Cmd_Zhu` at `0x34ef2c` sends custom command one as an
+`F9` packet with parameter plus 38. `MIDI_DataBase_GetBuf` takes the low
+byte, clamps values below ten, and advances ticks as milliseconds multiplied
+by tempo and divided by 2,500 (`0x34d55c..0x34d5c4`). This is 24 ticks per
+beat. Initialization sets its tempo byte to 120 (`0x34cdc4..0x34cdd8`).
+These targeted static observations do not require executing or distributing
+the reference binary.
+
+`MultakPlaybackSong` independently integrates that tempo map, preserves
+expanded MIDI messages and rejects unknown playback commands, conflicting
+simultaneous tempos and malformed timelines. Synthetic checks cover a change
+from 120 to 60, default tempo, wrapped/clamped tempo and rejection cases.
+Both complete Happy Birthday records use tempo 120, giving calculated lengths
+62.604166667 and 43.1875 seconds. Original interleaved block scheduling and
+audible timing have not been compared against a device, so full timing and
+playback verification remain false.
+
+The branch adds an explicitly experimental local ISO import for mapped English
+MASECOS4 titles. Selecting a song reads its bounded original record, expands it
+and uses the existing Windows MIDI scheduler and queue. It uses Windows
+instruments; original lyrics and the native wave bank remain unimplemented.

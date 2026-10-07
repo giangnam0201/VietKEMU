@@ -28,9 +28,21 @@ is checked against all 22,900 Volume 40 records and three original song headers.
 It previews English catalogue titles; other title encodings are not yet decoded.
 For a supported simple sample record, the inspector also locates its channel
 streams and lyric/music boundary. Original five- and eight-channel Happy Birthday
-records verify this structural reader. Their musical events are not yet decoded.
-The player does not yet decode ARVNKR/MULTAK proprietary song data. Background video reels
-are not offered as selectable music. No full original-disc playback, Arirang
+records verify this structural reader. Corrected descriptors supply pitch widths
+and base pitches. The inspector can reassemble compact streams and expand
+supported events into ticks; complete records verify 1,692/1,001 events and
+their opening melody pitches.
+
+Use `Nhập MULTAK ISO (thử nghiệm)` to add mapped English songs from a local
+supported MULTAK/MASECOS4 ISO to the same library and queue. Songs are decoded
+on playback rather than copying a whole disc. The experimental clock uses the
+reference's tempo commands and 24 ticks per beat. The two complete-record checks
+calculate 62.604167 and 43.1875 seconds; timing on original hardware remains
+unverified. Unsupported record formats and playback commands produce an error.
+This preview uses Windows MIDI instruments and has no decoded original lyrics;
+Vietnamese catalogue names and the original wave bank remain unfinished.
+ARVNKR proprietary songs are not playable. Background video reels
+are not offered as selectable music. No full original-disc equivalence, Arirang
 hardware sound equivalence, legacy lyric encoding equivalence, UDF-only disc
 support, automatic disc downloads or mobile control is claimed in this build.
 

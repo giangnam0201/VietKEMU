@@ -60,6 +60,25 @@ internal static class LayoutChecks
         var drums = MultakCompactNotes.Parse(noteStream with { Track = new(4, 9, 1, 0, 36) });
         if (!drums.Events.Any(e => e.Status == 0x99 && e.Data1 == 40 && e.Data2 == 0))
             throw new Exception("Percussion must release the packed note immediately.");
+        var timed = MultakPlaybackSong.FromChannels([new(
+            [new(0, 0x90, 60, 100), new(24, 0x80, 60, 64), new(48, 0xc0, 0, null)],
+            [new(0, 1, [82]), new(24, 1, [22])], 48)], "Synthetic MULTAK tempo changes");
+        if (Math.Abs(timed.Duration - 1.5) > .000001 || Math.Abs(timed.Messages[1].Seconds - .5) > .000001 ||
+            Math.Abs(timed.Messages[2].Seconds - 1.5) > .000001)
+            throw new Exception("MULTAK tempo changes must integrate 24 ticks per beat with the previous tempo up to the change.");
+        var defaultClock = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [], 48)], "Default clock");
+        var wrappedClock = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [new(0, 1, [218])], 24)], "Clamped clock");
+        if (Math.Abs(defaultClock.Duration - 1) > .000001 || Math.Abs(wrappedClock.Duration - 6) > .000001)
+            throw new Exception("MULTAK default tempo and byte-wrapped minimum tempo must follow the packet consumer.");
+        foreach (var invalid in new MultakCompactNotes[] {
+            new([new(0, 0xc0, 0, null)], [new(0, 2, [1, 2])], 48),
+            new([new(0, 0xc0, 0, null)], [new(0, 1, [82]), new(0, 1, [22])], 48),
+            new([new(49, 0xc0, 0, null)], [], 48) })
+        {
+            bool rejected = false;
+            try { MultakPlaybackSong.FromChannels([invalid], "Invalid clock"); } catch (InvalidDataException) { rejected = true; }
+            if (!rejected) throw new Exception("Unsupported, conflicting or out-of-bounds MULTAK timelines must be rejected.");
+        }
         foreach (var invalid in new[] { compact[..^1], compact.Concat(new byte[] { 0 }).ToArray(), new byte[] { 0, 0x8b, 255, 128 } })
         {
             bool rejected = false;
@@ -107,6 +126,11 @@ internal static class LayoutChecks
             throw new InvalidDataException("Original compact channel reassembly does not match independent block inspection.");
         var notesA = streamsA.Channels.Select(MultakCompactNotes.Parse).ToArray();
         var notesB = streamsB.Channels.Select(MultakCompactNotes.Parse).ToArray();
+        var playbackA = MultakPlaybackSong.FromChannels(notesA, "Original timing check A");
+        var playbackB = MultakPlaybackSong.FromChannels(notesB, "Original timing check B");
+        if (Math.Abs(playbackA.Duration - 62.6041666666667) > .000001 || Math.Abs(playbackB.Duration - 43.1875) > .000001 ||
+            playbackA.Messages.Count != 1692 || playbackB.Messages.Count != 1001)
+            throw new InvalidDataException("Original tempo conversion must match independent clock calculation.");
         byte[] openingA = [80, 80, 82, 80, 85, 84, 80, 80, 82, 80, 87, 85, 80, 80, 92, 89];
         byte[] openingB = [71, 71, 73, 71, 76, 75, 71, 71, 73, 71, 78, 76, 71, 71, 83, 80];
         byte[] FirstNotes(MultakCompactNotes channel) => channel.Events.Where(e => (e.Status >> 4) == 9 && e.Data2 > 0)
@@ -128,6 +152,8 @@ internal static class LayoutChecks
             firstNoteEvents = notesA.Sum(n => n.Events.Count), secondNoteEvents = notesB.Sum(n => n.Events.Count),
             firstEndTick = notesA.Max(n => n.EndTick), secondEndTick = notesB.Max(n => n.EndTick),
             pitchWidthsReadFromHeader = true, melodyPrefixesVerified = true,
+            tempoClockConverted = true, firstCalculatedSeconds = playbackA.Duration, secondCalculatedSeconds = playbackB.Duration,
+            nativeTimingVerified = false, originalLyricsDecoded = false, originalInstrumentsDecoded = false,
             notesDecoded = true, ticksParsed = true, timingDecoded = false, playbackVerified = false
         }, new JsonSerializerOptions { WriteIndented = true }));
     }

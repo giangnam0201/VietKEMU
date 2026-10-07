@@ -168,3 +168,27 @@ verification confirms two windows, the official Arirang logo and queue selection
 Notes, timing and original disc playback remain explicitly unverified. Only the
 small verification ZIP was downloaded; the Windows application ZIP stays on
 GitHub. Both main refs remain at `e8f0bef7d2376c21e409dc046d9527923d54bd09`.
+
+## Corrected pitch widths and compact events
+
+The channel table starts at title terminator plus nine, correcting an earlier
+one-byte offset. Each descriptor's final byte supplies its pitch width;
+the preceding byte supplies its base pitch. The reader reassembles 336-byte
+blocks and independently expands compact note/control events into ticks.
+The ISO sample inspection reports recovered event counts.
+
+The [latest Windows release](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37581986939)
+passed its complete GitHub build and original-record checks. Its inspected
+report verifies 1,692/1,001 events from two Happy Birthday records and matches
+their known melody openings, including octave leaps. Raw notes and ticks are
+decoded for these supported records; accurate seconds, original lyrics and
+instruments, and audible original playback remain unfinished. The earlier
+timing exception and inferred pitch widths are not used. See
+`arirang-multak-decoder-research.md` for the corrected format evidence.
+
+Experimental ISO playback now integrates the statically traced tempo command
+at 24 ticks per beat, with a default tempo of 120. Mapped English titles from
+a local supported MULTAK ISO can enter the library and queue; decoding occurs
+when selected. This path uses Windows MIDI instruments and has no original
+lyrics yet. Two record clocks calculate 62.604167 and 43.1875 seconds, but
+original-device scheduling and audible output remain unverified.

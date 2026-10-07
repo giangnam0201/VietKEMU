@@ -43,7 +43,7 @@ internal sealed class Television : Window
         progress.Text = song is null ? "" : $"{TimeSpan.FromSeconds(seconds):mm\\:ss} / {TimeSpan.FromSeconds(song.Duration):mm\\:ss}  •  {(playing ? "Đang phát" : "Dừng")}";
         lyrics.Inlines.Clear(); upcoming.Text = "";
         if (song is null) { lyrics.Text = "Chọn bài hát để bắt đầu"; lyrics.Foreground = Brushes.White; return; }
-        if (song.Lyrics.Count == 0) { lyrics.Text = "♫"; lyrics.Foreground = Brushes.Gold; upcoming.Text = "Bài MIDI này không có lời nhúng"; return; }
+        if (song.Lyrics.Count == 0) { lyrics.Text = "♫"; lyrics.Foreground = Brushes.Gold; upcoming.Text = "Chưa có lời hiển thị"; return; }
         lyrics.Foreground = Brushes.White;
         int current = -1;
         for (int i = 0; i < song.Lyrics.Count && song.Lyrics[i].Seconds <= seconds; i++) current = i;
