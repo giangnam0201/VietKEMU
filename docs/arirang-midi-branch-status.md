@@ -207,3 +207,11 @@ The player uses the same tempo map for notes and lyrics; the TV highlights
 both rows independently. Non-ASCII formats, original fonts/countdown graphics
 and instrument fidelity remain unfinished. Original record checks and native
 synthetic dual-voice rendering verify different parts of this change.
+
+The [original ASCII lyric build](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37624741449)
+passed run 37624741449 at `df0ae3c`. The inspected small verification bundle
+confirms 264/182 glyphs, all 34 phrase alignments and independent native voice
+row highlighting. Its TV and live panel-preview screenshots show the same
+two rows with independently colored characters. Only verification assets were
+downloaded; original-device timing, audio hardware and original instruments
+remain unverified.

@@ -240,3 +240,11 @@ lanes independently, and the panel continues to mirror that same visual.
 Unsupported lyric encoding leaves audio available with a visible notice.
 Vietnamese encoding, exact original fonts/countdown graphics and original
 instrument sounds remain unfinished.
+
+The [lyric Windows verification](https://github.com/giangnam0201/VietKEMU/actions/runs/37624741449)
+completed successfully at `df0ae3c`. The inspected report confirms
+`originalLyricsDecoded=true`, `twoOriginalLyricVoices=true` and
+`lyricPhraseTicksMatchGuide=true`. Native synthetic rendering separately has
+`independentLyricVoiceRowsVerified=true`; its two screenshots were visually
+inspected for both rows and shared preview. Original device timing, instruments
+and audible playback remain false/unverified. The app ZIP was not downloaded.
