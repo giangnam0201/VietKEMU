@@ -64,3 +64,30 @@ two complete original Happy Birthday arrangements (device codes 30655 and
 32153). Check the actual melody, channel events, note lifetimes and timing;
 successful static extraction alone does not prove correct music playback.
 Private scripts, native library and disassembly remain under `.reference`.
+
+## Original block reassembly
+
+Independent range samples now establish 336-byte music blocks for both complete
+original arrangements. Initial channel offsets address block zero. At a channel
+boundary, three bytes encode a 12-bit next-block number and a 12-bit offset:
+`block = a | ((b >> 4) << 8)`, `offset = ((b & 15) << 8) | c`.
+Channel starts in the same block determine preceding channel boundaries. The
+last channel uses the block's final `FF` marker, accounting for the special
+`8F FF 2F FF FF FF` end marker. Reference bytes are removed from the resulting
+compact command streams, while `8F FF 2F` remains as end-of-track.
+
+`MultakSongStreams` implements this independently with bounded source reads,
+forward references, offset checks, aggregate output limits and exact-byte tests.
+Device 30655 occupies nine music blocks and five complete channel streams;
+device 32153 occupies six blocks and eight complete streams. Every stream reaches
+its end-of-track marker. This proves reassembly for these records, not universal
+compatibility with all MULTAK formats or valid event timing.
+
+A private independent command-expansion experiment reproduces the known
+opening melody and octave leaps of Happy Birthday from both original guide
+streams. It uses candidate pitch widths of five and four bits respectively;
+their source in the header still requires validation. Some accompaniment
+timestamps are inconsistent, so the experimental note conversion is not added
+to the playback path. Opaque commands, timing, guide width selection and
+instrument fidelity remain outstanding. No manufacturer library is required
+by the independent block reader.
