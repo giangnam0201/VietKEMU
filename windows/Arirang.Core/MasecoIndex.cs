@@ -3,11 +3,13 @@ using System.Text;
 
 namespace Arirang.Core;
 
-// Preserve non-English bytes until their disc-specific font encoding is known.
+// Preserve every original title; decode only established language encodings.
 public sealed record MasecoSong(int DeviceCode, byte LanguageId, byte[] TitleBytes)
 {
     public string? EnglishTitle => LanguageId == 4 && TitleBytes.All(b => b is >= 32 and < 127)
         ? Encoding.ASCII.GetString(TitleBytes) : null;
+    public string? VietnameseTitle => LanguageId == 7 ? MultakVietnameseText.Decode(TitleBytes) : null;
+    public string? SupportedTitle => EnglishTitle ?? VietnameseTitle;
 }
 
 public static class MasecoIndex

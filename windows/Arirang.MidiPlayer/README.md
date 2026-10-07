@@ -25,7 +25,10 @@ Song numbers and playable music extents are not inferred from title records.
 For supported MULTAK/MASECOS4 discs, the ISO checker reads actual device codes
 and resolves their music pointers using the container's song-block table. This
 is checked against all 22,900 Volume 40 records and three original song headers.
-It previews English catalogue titles; other title encodings are not yet decoded.
+It previews English and Vietnamese catalogue titles. Vietnamese character
+identities were checked against the original Volume 40 font bank; verification
+decodes all 4,861 Vietnamese entries, including accented characters the historical
+converter misidentified. Other language encodings are not yet decoded.
 For a supported simple sample record, the inspector also locates its channel
 streams and lyric/music boundary. Original five- and eight-channel Happy Birthday
 records verify this structural reader. Corrected descriptors supply pitch widths
@@ -33,7 +36,7 @@ and base pitches. The inspector can reassemble compact streams and expand
 supported events into ticks; complete records verify 1,692/1,001 events and
 their opening melody pitches.
 
-Use `Nhập MULTAK ISO (thử nghiệm)` to add mapped English songs from a local
+Use `Nhập MULTAK ISO (thử nghiệm)` to add mapped English and Vietnamese songs from a local
 supported MULTAK/MASECOS4 ISO to the same library and queue. Songs are decoded
 on playback rather than copying a whole disc. The experimental clock uses the
 reference's tempo commands and 24 ticks per beat. The two complete-record checks
@@ -44,7 +47,7 @@ now appear in two independently highlighted TV rows using the note tempo map.
 The two original records verify 264/182 lyric characters and all 34 phrase
 starts against their melody notes. Voice and formatting bytes do not add delays.
 Unsupported lyric encodings keep audio playback available with a visible notice.
-Vietnamese lyric/catalogue encodings, original fonts, countdown graphics and
+Vietnamese lyric encoding, rendering original fonts, countdown graphics and
 the original wave bank remain unfinished.
 ARVNKR proprietary songs are not playable. Background video reels
 are not offered as selectable music. No full original-disc equivalence, Arirang

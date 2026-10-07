@@ -14,6 +14,12 @@ internal static class MasecoResearch
         bool complete = mapped.Select(p => p.TableIndex).ToHashSet().SetEquals(table.Pointers.Select(p => p.TableIndex))
             && mapped.Select(p => p.TableIndex).Distinct().Count() == songs.Count;
         if (!complete) throw new InvalidDataException("Catalogue mapping is not one-to-one and complete.");
+        var vietnamese = songs.Where(s => s.LanguageId == 7).ToArray();
+        if (vietnamese.Length != 4861 || vietnamese.Any(s => s.VietnameseTitle is null) ||
+            songs.Single(s => s.DeviceCode == 50001).VietnameseTitle != "LỆ ĐÁ" ||
+            songs.Single(s => s.DeviceCode == 50350).VietnameseTitle != "Tiễn Em Lần Cuối" ||
+            songs.Single(s => s.DeviceCode == 53098).VietnameseTitle != "1000 LÝ DO ANH ĐẶT RA")
+            throw new InvalidDataException("Vietnamese catalogue character verification failed.");
         int checkedHeaders = 0;
         foreach (int code in new[] { 30001, 30093, 50001 })
         {
@@ -38,7 +44,8 @@ internal static class MasecoResearch
             catalogueRecords = songs.Count, englishTitles = songs.Count(s => s.EnglishTitle is not null),
             mappedMusicPointers = mapped.Length, uniqueMappedSlots = mapped.Select(p => p.TableIndex).Distinct().Count(),
             originalSongHeadersMatched = checkedHeaders, completeOneToOneMapping = complete,
-            deviceCodeMappingVerified = true, vietnameseTextEncodingVerified = false,
+            deviceCodeMappingVerified = true, vietnameseCatalogueTitlesDecoded = vietnamese.Length,
+            vietnameseCatalogueEncodingVerified = true, vietnameseLyricsVerified = false,
             musicEventsDecoded = false, playbackVerified = false
         };
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);

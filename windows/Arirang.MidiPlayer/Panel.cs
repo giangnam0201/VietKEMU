@@ -215,9 +215,9 @@ internal sealed class Panel : Window
                         var catalogue = await Task.Run(() => MasecoIndex.ReadIso(picker.FileName, inventory));
                         int mapped = catalogue.Count(s => table.FindSong(s.DeviceCode) is not null);
                         musicIndex += $"\nMASECOS4: {catalogue.Count:N0} mã bài, {mapped:N0} mã tìm được dữ liệu nhạc.\n" +
-                            "Tên tiếng Anh (100 mục đầu; chữ Việt vẫn đang giải mã):\n" +
-                            string.Join("\n", catalogue.Where(s => s.EnglishTitle is not null).Take(100)
-                                .Select(s => $"{s.DeviceCode}: {s.EnglishTitle}"));
+                            "Tên tiếng Việt / Anh (100 mục đầu):\n" +
+                            string.Join("\n", catalogue.Where(s => s.SupportedTitle is not null).Take(100)
+                                .Select(s => $"{s.DeviceCode}: {s.SupportedTitle}"));
                         var sample = catalogue.FirstOrDefault(s => s.EnglishTitle is not null && table.FindSong(s.DeviceCode) is not null);
                         if (sample is not null)
                         {
@@ -257,13 +257,13 @@ internal sealed class Panel : Window
                 var inventory = DiscInventory.Read(picker.FileName);
                 var index = MultakIndex.ReadIso(picker.FileName, inventory);
                 return MasecoIndex.ReadIso(picker.FileName, inventory)
-                    .Where(s => s.EnglishTitle is not null && index.FindSong(s.DeviceCode) is not null)
-                    .Select(s => new LibraryItem(picker.FileName, $"{s.DeviceCode}: {s.EnglishTitle} — MULTAK thử nghiệm", s.DeviceCode)).ToArray();
+                    .Where(s => s.SupportedTitle is not null && index.FindSong(s.DeviceCode) is not null)
+                    .Select(s => new LibraryItem(picker.FileName, $"{s.DeviceCode}: {s.SupportedTitle} — MULTAK thử nghiệm", s.DeviceCode)).ToArray();
             });
             foreach (var item in items)
                 if (!library.Any(s => s.Path == item.Path && s.DiscSongCode == item.DiscSongCode)) library.Add(item);
             SaveLibrary(); RefreshLibrary();
-            status.Text = $"Đã nhập {items.Length:N0} tên bài tiếng Anh. Chọn bài để thử phát MIDI và lời gốc hỗ trợ. Âm sắc Windows; một số định dạng bài / lời chưa hỗ trợ.";
+            status.Text = $"Đã nhập {items.Length:N0} tên bài tiếng Việt / Anh. Chọn bài để thử phát MIDI và lời gốc hỗ trợ. Âm sắc Windows; một số định dạng bài / lời chưa hỗ trợ.";
         }
         catch (Exception error) { status.Text = error.Message; }
     }

@@ -5,6 +5,20 @@ internal static class MasecoChecks
 {
     internal static void Run()
     {
+        // Accents and identity bytes previously misidentified by the legacy
+        // conversion table. These are synthetic words, not bundled disc data.
+        if (MultakVietnameseText.Decode([0x4c, 0xbd, 0x20, 0xae, 0x5e, 32]) != "LỆ ĐÁ" ||
+            MultakVietnameseText.Decode([0x4d, 0x7b, 0x54]) != "MẶT" ||
+            MultakVietnameseText.Decode([0x54, 0x69, 0x8f, 0x6e]) != "Tiễn" ||
+            MultakVietnameseText.Decode([0x80, 0x81, 0xb4, 0xa1, 0xa2, 0xfc, 0xfd, 0xfe]) != "ẤẻÉíóĂÂÊ" ||
+            MultakVietnameseText.Decode([0x96, 0xa2, 0x93]) != "ốóô")
+            throw new Exception("Vietnamese original-font character identities.");
+        foreach (byte invalid in new byte[] { 0, 31, 127, 255 })
+            if (MultakVietnameseText.Decode([65, invalid]) is not null)
+                throw new Exception("Unsupported Vietnamese glyph must not become invented text.");
+        if (new MasecoSong(50001, 7, [0xae, 0x5e]).SupportedTitle != "ĐÁ" ||
+            new MasecoSong(50001, 6, [0xae, 0x5e]).SupportedTitle is not null)
+            throw new Exception("Vietnamese title decoding must be language-specific.");
         var bytes = new byte[4106];
         "Multak MID10"u8.CopyTo(bytes.AsSpan(0x7d0));
         BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(0x800), 21);

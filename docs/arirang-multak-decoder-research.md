@@ -267,5 +267,17 @@ font investigation; they do not justify silently guessing glyphs in the app.
 The bounded original FONT1 resource was read privately for bitmap analysis.
 Its font descriptors and variable glyph layout still need verification.
 Neither font bytes nor the historical executable are bundled or executed.
-Vietnamese titles and lyrics remain unsupported in playback until the map
-can be checked reliably.
+The next inspection established the fixed-width bitmap bank: FONT1 sector
+699 contains 24-by-48 Vietnamese glyphs, two bits per pixel and 288 bytes per
+cell, beginning with character `20`. Sector 619 has a separate Latin bank;
+using it for Vietnamese was the cause of earlier unreadable probes.
+
+Visually checking the Vietnamese bank establishes `7B=Ặ`, `8F=ễ`, `81=ẻ`
+and the remaining accented characters. `7F` is a placeholder and `FF` is blank;
+the decoder rejects those and control bytes. The independent Unicode identity
+table contains no original bitmap data. Catalogue language seven now uses
+this map, while other unsupported languages retain their original bytes.
+The importer offers Vietnamese and English titles from a user's local ISO.
+CI checks every Vietnamese catalogue entry and specific previously incorrect
+titles. Vietnamese lyric bytecode remains a separate unverified format;
+this change does not enable it or claim original-font rendering in the app.
