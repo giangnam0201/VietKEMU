@@ -1,0 +1,50 @@
+name: Build Arirang MIDI Windows branch
+on:
+  push:
+    branches: [codex/arirang-midi]
+    paths:
+      - 'windows/Arirang.Core/**'
+      - 'windows/Arirang.CoreChecks/**'
+      - 'windows/Arirang.MidiPlayer/**'
+      - '.github/workflows/arirang-midi.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    if: startsWith(github.ref, 'refs/heads/codex/arirang-')
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Verify MIDI parser, playback timing and disc inventory
+        run: dotnet run --project windows/Arirang.CoreChecks -c Release -- --fixture artifacts/arirang-verification/synthetic-test.kar
+      - name: Publish Windows app
+        run: dotnet publish windows/Arirang.MidiPlayer -c Release -r win-x64 --self-contained true -o artifacts/arirang-windows
+      - name: Verify two native windows and capture UI
+        run: |
+          $process = Start-Process artifacts/arirang-windows/Arirang.MidiPlayer.exe -ArgumentList '--verify', 'artifacts/arirang-verification/synthetic-test.kar', 'artifacts/arirang-verification' -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(30000)) { $process.Kill(); throw 'Arirang UI verification timed out' }
+          if ($process.ExitCode -ne 0) { Get-Content artifacts/arirang-verification/error.txt -ErrorAction SilentlyContinue; throw 'Arirang UI verification failed' }
+          Get-Content artifacts/arirang-verification/verification.json
+      - name: Package branch test build
+        run: |
+          Copy-Item windows/Arirang.MidiPlayer/README.md artifacts/arirang-windows/README.md
+          Copy-Item windows/Arirang.MidiPlayer/Assets/SOURCE.md artifacts/arirang-windows/BRAND-SOURCE.md
+          Copy-Item artifacts/arirang-verification/synthetic-test.kar artifacts/arirang-windows/synthetic-audio-test.kar
+          Compress-Archive artifacts/arirang-windows/* artifacts/Arirang-MIDI-Windows.zip
+          Compress-Archive artifacts/arirang-verification/* artifacts/arirang-verification.zip
+          $tag = 'arirang-midi-test-${{ github.run_id }}'
+          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR playback, TV lyrics and disc inventory. Proprietary ARVNKR/MULTAK song decoding remains under development; background videos are not songs. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Arirang release failed' }
+          "Download: https://github.com/${{ github.repository }}/releases/tag/$tag" | Add-Content $env:GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arirang-verification
+          path: artifacts/arirang-verification

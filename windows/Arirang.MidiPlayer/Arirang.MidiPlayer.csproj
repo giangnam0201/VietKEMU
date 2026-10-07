@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
+    <StartupObject>Arirang.MidiPlayer.Program</StartupObject>
+    <AssemblyName>Arirang.MidiPlayer</AssemblyName><Product>Arirang MIDI Player</Product>
+    <Description>Independent Windows MIDI karaoke development player</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Arirang.Core\Arirang.Core.csproj" />
+    <Resource Include="Assets\arirang-logo.png" />
+  </ItemGroup>
+</Project>
