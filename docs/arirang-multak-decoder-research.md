@@ -340,3 +340,32 @@ and 29,783 fill pixels; Vietnamese has 124,700, 75,555 and 57,793 respectively.
 Public native screenshots use independently generated toy glyphs, never copied
 original font pixels. Original fonts are read from the user's local ISO at
 runtime and are not extracted into the app or uploaded as build assets.
+
+## On-demand archived-disc playback
+
+The same ISO9660, catalogue, pointer, song-record and font readers now accept
+a caller-owned seekable stream. Existing local-file wrappers preserve their
+ownership behavior. A bounded HTTP stream exposes a remote ISO through exact
+range requests: status 206, start/end/total size, content length and unencoded
+content are checked before accepting bytes. Status 200/full-file responses are
+rejected without reading their bodies. Short, oversized and encoded responses
+are rejected. Reads are capped at one MiB and each operation at 16 MiB; repeated
+identical ranges use an in-memory cache. Network operations are canceled when
+the app closes and run on worker threads.
+
+The archive tab consumes the Internet Archive catalogue and file JSON, offers
+ISO filenames with their metadata sizes and imports supported mapped Vietnamese
+and English titles. Saved entries retain their URL, source size and device song
+code. Playback reads the chosen record and language from that same ISO, decodes
+music/lyrics and reads its font bank. Unsupported formats remain explicit
+errors; background video files are not treated as songs. Import deduplication
+uses a hash set so large catalogues do not require quadratic scanning.
+
+Synthetic HTTP checks cover seek, cache reuse, EOF, cancellation, request and
+transfer bounds, wrong response ranges/totals, incorrect content lengths,
+truncated/oversized bodies and encoding. The separate live source gate reads
+Volume 40 through the actual stream and requires 9,001 mapped English/Vietnamese
+entries, selected song 50001's 14,336-byte record, 5,426 note events, 1,194 lyric
+glyphs and its original font, with less than two MiB transferred. It separately
+checks that reading the selected song again adds no transfer. This is source
+and decode verification, not an original-device audio/timing measurement.
