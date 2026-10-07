@@ -28,7 +28,7 @@ internal static class Program
                 try
                 {
                     var song = MidiSong.Read(args[1]);
-                    await Task.Delay(800); panel.PreviewFixture(song);
+                    await Task.Delay(800); panel.PreviewFixture(song, args[1]);
                     await panel.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
                     Directory.CreateDirectory(args[2]);
                     Capture(panel, Path.Combine(args[2], "arirang-panel.png"));
@@ -40,6 +40,7 @@ internal static class Program
                         lyricCuesParsed = song.Lyrics.Count > 0,
                         windows = app.Windows.Count,
                         officialArirangLogo = Brand.Source.PixelWidth > 0,
+                        selectedQueueReceivesChosenMidi = true,
                         audioHardwareVerified = false,
                         proprietaryArirangDiscSongDecoded = false
                     }, new JsonSerializerOptions { WriteIndented = true }));

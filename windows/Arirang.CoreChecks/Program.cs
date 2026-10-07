@@ -21,6 +21,12 @@ var song = MidiSong.Parse(fixture, "Synthetic timing fixture");
 Check(Math.Abs(song.Duration - 1.5) < .00001, "Multi-track tempo map must use 0.5 s + 1 s.");
 Check(song.Messages.Count == 5 && Math.Abs(song.Messages[2].Seconds - .5) < .00001, "Running status / merged notes.");
 Check(song.Lyrics.Count == 2 && song.Lyrics[0].NewLine && song.Lyrics[1].Seconds == .5, "Timed KAR lyrics.");
+var acrossMeta = MidiSong.Parse(Midi([0, 0x90, 60, 100, 0, 0xff, 1, 1, (byte)'a', 0, 60, 0, 0, 0xff, 0x2f, 0]), "running");
+Check(acrossMeta.Messages.Count == 2, "Meta events do not cancel SMF running status.");
+var smpte = fixture.ToArray(); smpte[12] = 0xe7; smpte[13] = 40;
+Check(Math.Abs(MidiSong.Parse(smpte, "SMPTE").Duration - .96) < .00001, "SMPTE timing ignores tempo map.");
+var exclusive = MidiSong.Parse(Midi([0, 0xf0, 5, 0x7e, 0x7f, 9, 1, 0xf7, 0, 0xff, 0x2f, 0]), "GM reset");
+Check(exclusive.Messages[0].SystemExclusive!.SequenceEqual(new byte[] { 0xf0, 0x7e, 0x7f, 9, 1, 0xf7 }), "Preserve full system-exclusive packet.");
 Check((MidiPlayback.Transform(0x643c99, 4, 100) >> 8 & 127) == 60, "Drums must not transpose.");
 Check((MidiPlayback.Transform(0x643c90, 4, 100) >> 8 & 127) == 64, "Melody transposition.");
 Check((MidiPlayback.Transform(0x6407b0, 0, 50) >> 16 & 127) == 50, "Channel gain scaling.");
@@ -38,6 +44,9 @@ using (var player = new MidiPlayback(output))
     Check(Math.Abs(paused - player.Position) < .01 && output.Messages.Any(m => (m & 0xf0) == 0x90), "Pause freezes clock after sending notes.");
     player.Seek(.7); player.SetKey(2); player.Play();
     Check(output.Messages.Any(m => (m & 0xff) == 0x90 && (m >> 8 & 127) == 66), "Seek/resume restores held note with transposition.");
+    int beforeGain = output.Messages.Count(m => (m & 0xf0) == 0x90);
+    player.SetVolume(30);
+    Check(output.Messages.Count(m => (m & 0xf0) == 0x90) == beforeGain, "Gain change must not retrigger held notes.");
     player.SetSpeed(2); player.Seek(1.4); await Task.Delay(200);
     Check(!player.Playing && player.Position == song.Duration, "Completion silences output and stops clock.");
 }

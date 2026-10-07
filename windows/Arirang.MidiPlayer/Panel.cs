@@ -25,6 +25,8 @@ internal sealed class Panel : Window
     private readonly string stateDirectory = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ArirangMidiPlayer");
     private bool updating, started, loading;
     private int pitch;
+    private int gain = 80;
+    private double rate = 1;
     public Panel()
     {
         Title = "Arirang MIDI — Điều khiển"; Width = 1280; Height = 820; MinWidth = 900; MinHeight = 600;
@@ -41,16 +43,16 @@ internal sealed class Panel : Window
         var footer = new StackPanel(); footer.Children.Add(status); footer.Children.Add(seek);
         var controls = new WrapPanel();
         controls.Children.Add(Button("▶ Phát / Dừng", Toggle));
-        controls.Children.Add(Button("↻ Phát lại", () => { playback?.Seek(0); playback?.Play(); }));
+        controls.Children.Add(Button("↻ Phát lại", () => { playback?.Seek(0); playback?.Play(); started = playback?.Playing == true; }));
         controls.Children.Add(Button("⏭ Qua bài", Next));
         controls.Children.Add(Button("♭ Giảm tông", () => SetPitch(pitch - 1)));
         controls.Children.Add(Button("♯ Tăng tông", () => SetPitch(pitch + 1)));
         controls.Children.Add(new TextBlock { Text = "Âm lượng", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(15, 0, 10, 0) });
         var volume = new Slider { Minimum = 0, Maximum = 100, Value = 80, Width = 130, VerticalAlignment = VerticalAlignment.Center };
-        volume.ValueChanged += (_, _) => Safe(() => playback?.SetVolume((int)volume.Value)); controls.Children.Add(volume);
+        volume.ValueChanged += (_, _) => { gain = (int)volume.Value; Safe(() => playback?.SetVolume(gain)); }; controls.Children.Add(volume);
         controls.Children.Add(new TextBlock { Text = "Tốc độ", Margin = new Thickness(15, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center });
         var speed = new Slider { Minimum = .5, Maximum = 1.5, Value = 1, Width = 100, VerticalAlignment = VerticalAlignment.Center };
-        speed.ValueChanged += (_, _) => playback?.SetSpeed(speed.Value); controls.Children.Add(speed);
+        speed.ValueChanged += (_, _) => { rate = speed.Value; playback?.SetSpeed(rate); }; controls.Children.Add(speed);
         footer.Children.Add(controls); DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
         var columns = new Grid(); columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(3, GridUnitType.Star) });
         columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
@@ -99,12 +101,12 @@ internal sealed class Panel : Window
         var preview = new Rectangle { Fill = new VisualBrush(tv.Scene) { Stretch = Stretch.Uniform }, Margin = new Thickness(0, 0, 0, 15) }; right.Children.Add(preview);
         var queuePanel = new DockPanel();
         var heading = new TextBlock { Text = "Đã chọn", FontSize = 24, Margin = new Thickness(0, 5, 0, 10) }; DockPanel.SetDock(heading, Dock.Top); queuePanel.Children.Add(heading);
-        var remove = Button("Xoá khỏi hàng chờ", () => { if (selected.SelectedItem is LibraryItem item) { queue.Remove(item); RefreshQueue(); } });
+        var remove = Button("Xoá khỏi hàng chờ", () => { if (selected.SelectedIndex >= 0) { queue.RemoveAt(selected.SelectedIndex); RefreshQueue(); } });
         DockPanel.SetDock(remove, Dock.Bottom); queuePanel.Children.Add(remove); selected.FontSize = 18; queuePanel.Children.Add(selected);
         Grid.SetRow(queuePanel, 1); right.Children.Add(queuePanel); Grid.SetColumn(right, 1); columns.Children.Add(right); root.Children.Add(columns); Content = root;
         search.TextChanged += (_, _) => RefreshLibrary();
         songs.MouseDoubleClick += async (_, _) => { if (songs.SelectedItem is LibraryItem item) await Start(item); };
-        selected.MouseDoubleClick += async (_, _) => { if (selected.SelectedItem is LibraryItem item) { queue.Remove(item); RefreshQueue(); await Start(item); } };
+        selected.MouseDoubleClick += async (_, _) => { if (selected.SelectedItem is LibraryItem item) { queue.RemoveAt(selected.SelectedIndex); RefreshQueue(); await Start(item); } };
         seek.ValueChanged += (_, _) => { if (!updating && playback?.Song is not null) Safe(() => playback.Seek(seek.Value)); };
         timer.Tick += (_, _) => Tick();
         Loaded += (_, _) => { LoadLibrary(); tv.Show(); timer.Start(); };
@@ -157,13 +159,13 @@ internal sealed class Panel : Window
             status.Text = "Đang mở " + item.Title;
             var song = await Task.Run(() => MidiSong.Read(item.Path));
             playback ??= new MidiPlayback(new WindowsMidiOutput());
-            playback.Load(song); playback.SetKey(pitch); playback.Play(); started = true;
+            playback.Load(song); playback.SetKey(pitch); playback.SetVolume(gain); playback.SetSpeed(rate); playback.Play(); started = true;
             seek.Maximum = Math.Max(1, song.Duration); status.Text = "Đang phát: " + song.Title;
         }
         catch (Exception error) { status.Text = error.Message; }
         finally { loading = false; }
     }
-    private void Toggle() { Safe(() => { if (playback?.Playing == true) playback.Pause(); else if (playback?.Song is not null) playback.Play(); else if (songs.SelectedItem is LibraryItem item) _ = Start(item); }); }
+    private void Toggle() { Safe(() => { if (playback?.Playing == true) playback.Pause(); else if (playback?.Song is not null) { playback.Play(); started = true; } else if (songs.SelectedItem is LibraryItem item) _ = Start(item); }); }
     private async void Next()
     {
         playback?.Pause(); started = false;
@@ -200,6 +202,12 @@ internal sealed class Panel : Window
             Content = new TextBox { Text = report, IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontSize = 16, Padding = new Thickness(20) } }.Show();
     }
-    internal void PreviewFixture(MidiSong song) { tv.Update(song, .55, true); status.Text = "Kiểm tra hiển thị bằng MIDI tổng hợp"; }
+    internal void PreviewFixture(MidiSong song, string path)
+    {
+        library.Clear(); queue.Clear(); library.Add(new(path, "Mẫu MIDI tổng hợp — " + song.Title)); RefreshLibrary();
+        songs.SelectedIndex = 0; AddSelected();
+        if (queue.Count != 1) throw new InvalidOperationException("Selected queue did not receive the chosen MIDI.");
+        tv.Update(song, .55, true); status.Text = "Kiểm tra hiển thị bằng MIDI tổng hợp";
+    }
     internal void CloseForVerification() { tv.AllowClose = true; Close(); }
 }
