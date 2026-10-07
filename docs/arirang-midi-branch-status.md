@@ -45,3 +45,23 @@ never silently turned into fake playable songs.
 The next original-format work is to map an actual song number to its music
 extent in `ARVNKR` or `MULTAK`, then decode notes, timing, instruments and lyric
 cues. A volume/background MP4 is not a replacement for those musical events.
+
+## MULTAK original-sample investigation
+
+The original researcher's [raw song attachment](http://karaoke-engineering.44.s1.nabble.com/file/n297/30093_raw.zip)
+contains a 4,148-byte raw/unmasked pair. A new independent, bounded research
+tool (`tools/arirang_multak_research.py`) recovered its 33-byte title field at
+header offset `0x30`. The mask byte is `0xE2`; applying the historical XOR
+operation after the four-byte prefix reproduces the supplied comparison file
+exactly. Three local checks passed, including malformed boundaries and a
+reference mismatch. Inputs and decoded text remain in ignored private storage;
+the tool's report contains only counts and verification flags.
+
+This confirms the title-header transformation for that sample only. Neither
+member contains a Standard MIDI `MThd` header. The remaining header bytes,
+compact music event structure, timing, instruments and actual song-number
+mapping are not established. In particular the attachment filename must not
+be assumed to be a playable device song ID: the researcher's cutting routine
+selects sequential records. The title mask must not silently be treated as a
+verified music mask. This research tool is separate from the Windows player
+and cannot import the proprietary song as playable music yet.
