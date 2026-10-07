@@ -158,3 +158,13 @@ The Windows ISO inspection uses it for one English catalogue sample and
 reports channel structure without offering undecoded bytes as playable music.
 Vocal/MP3 records and compact event semantics require further readers. This
 step does not claim notes, tempo, instruments or original song playback.
+
+The [channel-reader Windows release](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37576013384)
+passed [run 37576013384](https://github.com/giangnam0201/VietKEMU/actions/runs/37576013384).
+Its inspected verification reports confirm both complete record sizes, five
+and eight channel streams, their music offsets and percussion channels. The
+catalogue mapping still covers all 22,900 non-null song pointers. Native player
+verification confirms two windows, the official Arirang logo and queue selection.
+Notes, timing and original disc playback remain explicitly unverified. Only the
+small verification ZIP was downloaded; the Windows application ZIP stays on
+GitHub. Both main refs remain at `e8f0bef7d2376c21e409dc046d9527923d54bd09`.
