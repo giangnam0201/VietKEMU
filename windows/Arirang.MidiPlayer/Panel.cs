@@ -33,11 +33,12 @@ internal sealed class Panel : Window
         Background = new SolidColorBrush(Color.FromRgb(10, 18, 34)); Foreground = Brushes.White;
         Icon = Brand.Source;
         var root = new DockPanel { Margin = new Thickness(24) };
-        var top = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 20) };
+        var top = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 20) };
         top.Children.Add(Brand.Logo(200));
         top.Children.Add(new TextBlock { Text = "MIDI KARAOKE", FontSize = 25, Margin = new Thickness(25, 15, 25, 0) });
         top.Children.Add(Button("Nhập MIDI / KAR", async () => await Import()));
         top.Children.Add(Button("Kiểm tra đĩa ISO", async () => await InspectDisc()));
+        top.Children.Add(Button("Danh mục INFO.DAT", async () => await InspectIndex()));
         top.Children.Add(Button("Màn hình TV", () => { tv.Show(); tv.Activate(); }));
         DockPanel.SetDock(top, Dock.Top); root.Children.Add(top);
         var footer = new StackPanel(); footer.Children.Add(status); footer.Children.Add(seek);
@@ -193,6 +194,20 @@ internal sealed class Panel : Window
             ShowReport("Đĩa Arirang — " + inventory.Format, string.Join("\n", inventory.Files.Select(f => $"{f.Name}   ({f.Bytes:N0} bytes)")) +
                 "\n\nARVNKR / MULTAK cần bộ giải mã riêng. Video nền không được thêm như một bài hát.");
             status.Text = $"{inventory.Format}: {inventory.Files.Count} tệp";
+        }
+        catch (Exception error) { status.Text = error.Message; }
+    }
+    private async Task InspectIndex()
+    {
+        var picker = new OpenFileDialog { Filter = "Arirang song index (INFO.DAT)|INFO.DAT|Data index (*.dat)|*.dat" };
+        if (picker.ShowDialog(this) != true) return;
+        status.Text = "Đang đọc danh mục đĩa…";
+        try
+        {
+            var records = await Task.Run(() => InfoDatIndex.ReadEnglish(File.ReadAllBytes(picker.FileName)));
+            ShowReport($"INFO.DAT — {records.Count} bài tiếng Anh", string.Join("\n", records.Select(r => $"{r.Title} — {r.Artist}")) +
+                "\n\nĐã đọc tên bài. Mã bài và dữ liệu MIDI chưa được giải mã; các mục này chưa thể phát.");
+            status.Text = $"Đọc được {records.Count} tên bài tiếng Anh; chưa có ánh xạ đến dữ liệu nhạc.";
         }
         catch (Exception error) { status.Text = error.Message; }
     }

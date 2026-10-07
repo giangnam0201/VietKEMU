@@ -26,6 +26,17 @@ jobs:
         run: dotnet run --project windows/Arirang.CoreChecks -c Release -- --fixture artifacts/arirang-verification/synthetic-test.kar
       - name: Publish Windows app
         run: dotnet publish windows/Arirang.MidiPlayer -c Release -r win-x64 --self-contained true -o artifacts/arirang-windows
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify reader against archived Arirang Volume 48 index
+        run: |
+          python tools/verify_arirang_index.py download
+          if ($LASTEXITCODE -ne 0) { throw 'Public index download failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --index .reference/arirang-index/INFO.DAT .reference/arirang-index/parsed.json
+          if ($LASTEXITCODE -ne 0) { throw 'Real Arirang index parsing failed' }
+          python tools/verify_arirang_index.py report
+          if ($LASTEXITCODE -ne 0) { throw 'Real Arirang index verification failed' }
       - name: Verify two native windows and capture UI
         run: |
           $process = Start-Process artifacts/arirang-windows/Arirang.MidiPlayer.exe -ArgumentList '--verify', 'artifacts/arirang-verification/synthetic-test.kar', 'artifacts/arirang-verification' -WindowStyle Hidden -PassThru

@@ -2,6 +2,11 @@ using Arirang.Core;
 using System.Buffers.Binary;
 using System.Text;
 
+if (args.Length == 3 && args[0] == "--index")
+{
+    IndexResearch.Export(args[1], args[2]); return;
+}
+
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 static byte[] Chunk(string type, byte[] bytes)
 {
@@ -70,11 +75,20 @@ try
     Check(DiscInventory.Read(temporary).Format.StartsWith("RAR"), "Mislabeled RAR is not treated as ISO.");
 }
 finally { File.Delete(temporary); }
+var index = new List<byte>(new byte[100]);
+for (int n = 0; n < 20; n++)
+{
+    byte[] title = Encoding.ASCII.GetBytes("SONG " + n);
+    index.AddRange(new byte[] { 0, 12, 1, 0, 1, 5, 0, (byte)title.Length });
+    index.AddRange(title); index.AddRange(new byte[] { 0, 0, 0, 0 });
+}
+var records = InfoDatIndex.ReadEnglish(index.ToArray());
+Check(records.Count == 20 && records[19].Title == "SONG 19" && records.All(s => s.SongNumber is null && !s.PlaybackVerified), "Disc text records must not invent music/song IDs.");
 if (args.Length == 2 && args[0] == "--fixture")
 {
     Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(args[1]))!); File.WriteAllBytes(args[1], fixture);
 }
-Console.WriteLine("PASS: MIDI tempo, running status, lyrics, transpose, gain, malformed input, pause/seek/completion, ISO inventory and RAR detection.");
+Console.WriteLine("PASS: MIDI tempo, running status, lyrics, transpose, gain, malformed input, pause/seek/completion, ISO inventory, RAR detection and disc index metadata.");
 
 sealed class RecordingOutput : IMidiOutput
 {
