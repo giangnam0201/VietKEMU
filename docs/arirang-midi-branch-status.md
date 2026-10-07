@@ -99,3 +99,28 @@ is preceded by `1A FF` and followed nearby by a repeated `8B 07` command pattern
 in all six. This is a research lead, not a universal container offset or a
 decoded MIDI event stream. It requires validation against complete original
 records before being used for playback.
+
+## Device codes now connect to the original music records
+
+The MULTAK header's 16-bit table at byte 16 gives a base slot for each group
+of 1,000 device codes. The music-table slot is `base[code / 1000] + code % 1000`;
+`FFFF` bases and null song pointers remain unsupported. Cross-checking the real
+Volume 40 MASECOS4.IDX gave 22,900 unique device codes and 22,900 unique slots,
+covering every non-null music pointer exactly. Its 21-byte records store a BCD
+device code, language and relative title pointer. A zero end record and sector
+alignment locate the text storage without hardcoding the older researcher's
+volume-specific text offset.
+
+The new bounded `MasecoIndex` reader preserves title bytes and decodes the 4,140
+ASCII English titles. Other languages retain original bytes until their exact
+font encoding is established. In particular the older Vietnamese conversion
+table does not match this disc's bytes and is not silently applied. The Windows
+ISO inspection lists counts, mapped codes and the first 100 English entries.
+
+Independent public range reads verified catalogue titles against actual music
+headers for English codes 30001 and 30093 and Vietnamese code 50001 (raw bytes,
+without pretending its font encoding is solved). Volume 40 code 30093 is a
+different song from the historical `30093_raw.dat` attachment, confirming that
+old sample filenames must not be used as device song codes. The lyric/music
+boundary also matched eight Volume 40 samples. Notes, timing, instrument
+parameters and proprietary playback still remain unfinished.

@@ -12,18 +12,42 @@ TOTAL = 3800203264
 ROOT = Path('.reference/arirang-multak')
 
 
-def download():
+def read_range(offset, size):
+    if offset < 0 or size <= 0 or size > 2 * 1024 * 1024 or offset + size > TOTAL:
+        raise ValueError('Range exceeds bounded public input')
     request = urllib.request.Request(URL, headers={
-        'Range': f'bytes={OFFSET}-{OFFSET + SIZE - 1}', 'Accept-Encoding': 'identity'})
+        'Range': f'bytes={offset}-{offset + size - 1}', 'Accept-Encoding': 'identity'})
     with urllib.request.urlopen(request, timeout=45) as response:
         match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', response.headers.get('Content-Range', ''))
-        if response.status != 206 or not match or tuple(map(int, match.groups())) != (OFFSET, OFFSET + SIZE - 1, TOTAL):
+        if response.status != 206 or not match or tuple(map(int, match.groups())) != (offset, offset + size - 1, TOTAL):
             raise ValueError('Public server did not return the exact bounded ISO range')
-        data = response.read(SIZE + 1)
+        data = response.read(size + 1)
+    if len(data) != size:
+        raise ValueError('Truncated public ISO range')
+    return data
+
+
+def download():
+    data = read_range(OFFSET, SIZE)
     if len(data) != SIZE or data[4:13] != b'multak3.3':
         raise ValueError('Unexpected Volume 40 music-container header')
     ROOT.mkdir(parents=True, exist_ok=True)
     (ROOT / 'header.bin').write_bytes(data)
+    index = read_range(1174375 * 2048, 1044480)
+    if index[0x7d0:0x7dc] != b'Multak MID10':
+        raise ValueError('Unexpected Volume 40 song-index header')
+    (ROOT / 'index.idx').write_bytes(index)
+    for code in (30001, 30093, 50001):
+        base_at = 16 + 2 * (code // 1000)
+        base = int.from_bytes(data[base_at:base_at + 2], 'little')
+        slot = base + code % 1000
+        pointer = data[3360 + slot * 4:3364 + slot * 4]
+        if len(pointer) != 4 or pointer == b'\xff\0\xff\xff' or pointer[3] >> 4 > 1:
+            raise ValueError('Invalid sample song pointer')
+        storage = pointer[3] >> 4
+        relative = ((pointer[0] * 60 + pointer[1]) * 75 + pointer[2]) * 2048 + (65536 if storage == 0 else 0)
+        extent = 1522703 if storage == 0 else 1195176
+        (ROOT / f'{code}.bin').write_bytes(read_range(extent * 2048 + relative, 1024))
 
 
 def report():
@@ -36,6 +60,12 @@ def report():
     output = Path('artifacts/arirang-verification/multak-verification.json')
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(parsed, indent=2), encoding='utf-8')
+    catalogue = json.loads((ROOT / 'catalogue-parsed.json').read_text(encoding='utf-8'))
+    assert (catalogue['catalogueRecords'], catalogue['englishTitles'], catalogue['mappedMusicPointers'], catalogue['uniqueMappedSlots']) == (22900, 4140, 22900, 22900)
+    assert catalogue['originalSongHeadersMatched'] == 3 and catalogue['completeOneToOneMapping'] and catalogue['deviceCodeMappingVerified']
+    assert not catalogue['musicEventsDecoded'] and not catalogue['playbackVerified']
+    catalogue.update(sourceUrl=URL, rangeBytesFetched=SIZE + 1044480 + 3 * 1024)
+    (output.parent / 'song-mapping-verification.json').write_text(json.dumps(catalogue, indent=2), encoding='utf-8')
     print(f"Verified {parsed['datPointers'] + parsed['da1Pointers']} storage pointers; MIDI decoding remains unfinished.")
 
 

@@ -10,6 +10,10 @@ if (args.Length == 5 && args[0] == "--multak")
 {
     MultakResearch.Export(args[1], long.Parse(args[2]), long.Parse(args[3]), args[4]); return;
 }
+if (args.Length == 6 && args[0] == "--maseco")
+{
+    MasecoResearch.Export(args[1], args[2], long.Parse(args[3]), long.Parse(args[4]), args[5]); return;
+}
 
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 byte[] multakHeader = new byte[MultakIndex.TableOffset + 12];
@@ -31,6 +35,7 @@ foreach (var invalid in new[] { multakHeader[..^1], badSelector, badSector })
 bool outsideRejected = false;
 try { MultakIndex.Parse(multakHeader, 500, 600_000); } catch (InvalidDataException) { outsideRejected = true; }
 Check(outsideRejected, "MULTAK extents must fit the declared storage file.");
+MasecoChecks.Run();
 static byte[] Chunk(string type, byte[] bytes)
 {
     var result = new byte[bytes.Length + 8]; Encoding.ASCII.GetBytes(type).CopyTo(result, 0);

@@ -2,13 +2,24 @@ using System.Buffers.Binary;
 
 namespace Arirang.Core;
 
-// Pointer-table positions are not device song numbers. Low flags are retained
+// Song-block bases map device codes to table positions. Low flags are retained
 // without guessing their meaning; a valid extent is not proof of playable MIDI.
 public sealed record MultakPointer(int TableIndex, int StorageFile, long Offset, byte Flags);
-public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakPointer> Pointers)
+public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakPointer> Pointers,
+    IReadOnlyList<int> SongBlockBases)
 {
     public const int TableOffset = 0xd20;
     public const int MaximumHeaderBytes = TableOffset + ushort.MaxValue * 4;
+    private readonly Dictionary<int, MultakPointer> bySlot = Pointers.ToDictionary(p => p.TableIndex);
+
+    public MultakPointer? FindSong(int deviceCode)
+    {
+        if (deviceCode <= 0 || deviceCode / 1000 >= SongBlockBases.Count) return null;
+        int blockBase = SongBlockBases[deviceCode / 1000];
+        if (blockBase < 0) return null;
+        int slot = blockBase + deviceCode % 1000;
+        return bySlot.GetValueOrDefault(slot);
+    }
 
     public static MultakIndex Parse(ReadOnlySpan<byte> header, long datBytes, long da1Bytes)
     {
@@ -33,7 +44,13 @@ public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakP
                 throw new InvalidDataException($"MULTAK pointer {i} extends beyond its storage file.");
             pointers.Add(new(i, storage, offset, (byte)(pointer[3] & 15)));
         }
-        return new(count, nulls, pointers);
+        var bases = new List<int>();
+        for (int offset = 16; offset < 334; offset += 2)
+        {
+            int value = BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(offset, 2));
+            bases.Add(value == ushort.MaxValue ? -1 : value);
+        }
+        return new(count, nulls, pointers, bases);
     }
 
     public static MultakIndex ReadIso(string path, DiscInventory inventory)

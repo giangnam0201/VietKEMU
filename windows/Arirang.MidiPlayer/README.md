@@ -22,6 +22,10 @@ multi-gigabyte image into memory, and detects mislabeled RAR files. These tools
 also support reading the English metadata block in extracted `hk2/INFO.DAT` files;
 the reader is checked against 3,795 records in the archived Volume 48 index.
 Song numbers and playable music extents are not inferred from title records.
+For supported MULTAK/MASECOS4 discs, the ISO checker reads actual device codes
+and resolves their music pointers using the container's song-block table. This
+is checked against all 22,900 Volume 40 records and three original song headers.
+It previews English catalogue titles; other title encodings are not yet decoded.
 The player does not yet decode ARVNKR/MULTAK proprietary song data. Background video reels
 are not offered as selectable music. No full original-disc playback, Arirang
 hardware sound equivalence, legacy lyric encoding equivalence, UDF-only disc

@@ -44,6 +44,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Public bounded TOC download failed' }
           dotnet run --project windows/Arirang.CoreChecks -c Release -- --multak .reference/arirang-multak/header.bin 681682944 670775296 .reference/arirang-multak/parsed.json
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK pointer parsing failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --maseco .reference/arirang-multak/index.idx .reference/arirang-multak/header.bin 681682944 670775296 .reference/arirang-multak/catalogue-parsed.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original device-code mapping failed' }
           python tools/verify_arirang_multak.py report
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK verification failed' }
       - name: Verify two native windows and capture UI

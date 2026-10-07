@@ -200,7 +200,16 @@ internal sealed class Panel : Window
                     musicIndex = $"\n\nMULTAK: {table.Slots:N0} vị trí, {table.NullSlots:N0} vị trí trống; " +
                         $"{table.Pointers.Count(p => p.StorageFile == 0):N0} bản ghi DAT, " +
                         $"{table.Pointers.Count(p => p.StorageFile == 1):N0} bản ghi DA1.\n" +
-                        "Đã xác định vị trí dữ liệu. Mã bài và sự kiện nhạc chưa được giải mã.";
+                        "Đã xác định vị trí dữ liệu. Sự kiện nhạc chưa được giải mã.";
+                    if (inventory.Files.Any(f => f.Name.Equals("MASECOS4.IDX", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var catalogue = await Task.Run(() => MasecoIndex.ReadIso(picker.FileName, inventory));
+                        int mapped = catalogue.Count(s => table.FindSong(s.DeviceCode) is not null);
+                        musicIndex += $"\nMASECOS4: {catalogue.Count:N0} mã bài, {mapped:N0} mã tìm được dữ liệu nhạc.\n" +
+                            "Tên tiếng Anh (100 mục đầu; chữ Việt và sự kiện MIDI vẫn đang giải mã):\n" +
+                            string.Join("\n", catalogue.Where(s => s.EnglishTitle is not null).Take(100)
+                                .Select(s => $"{s.DeviceCode}: {s.EnglishTitle}"));
+                    }
                 }
                 catch (InvalidDataException error) { musicIndex = "\n\nMULTAK: " + error.Message; }
             }
