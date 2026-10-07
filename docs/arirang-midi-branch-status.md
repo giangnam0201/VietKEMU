@@ -124,3 +124,12 @@ different song from the historical `30093_raw.dat` attachment, confirming that
 old sample filenames must not be used as device song codes. The lyric/music
 boundary also matched eight Volume 40 samples. Notes, timing, instrument
 parameters and proprietary playback still remain unfinished.
+
+The [updated Windows release](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37574666200)
+passed [run 37574666200](https://github.com/giangnam0201/VietKEMU/actions/runs/37574666200).
+Its inspected mapping report confirms 22,900 catalogue entries, 4,140 English
+titles, one-to-one coverage of all 22,900 music pointers and three matching
+original song headers. The separate player report confirms two native windows,
+queue selection and standard MIDI/KAR parsing; original music playback and
+hardware audio remain unverified. Only verification assets were downloaded;
+the application ZIP remains on GitHub for the user to download.
