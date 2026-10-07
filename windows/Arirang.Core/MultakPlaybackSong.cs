@@ -1,7 +1,7 @@
 namespace Arirang.Core;
 
 // Independent compact-disc timing conversion. Audio uses the caller's MIDI output;
-// Original wave banks remain unimplemented; supported ASCII lyric lanes retain
+// Original wave banks remain unimplemented; supported lyric lanes retain
 // their original ticks and are converted with the same tempo map as the notes.
 public static class MultakPlaybackSong
 {
@@ -60,7 +60,7 @@ public static class MultakPlaybackSong
                 (uint)(e.Status | e.Data1 << 8 | (e.Data2 ?? 0) << 16))).ToArray();
         double duration = Seconds(end);
         if (glyphs is not null && (glyphs.Count > 500_000 || glyphs.Any(g => g.Tick < 0 || g.Tick > end ||
-            g.Text is < (char)32 or > (char)126 || g.Voice is not (1 or 2))))
+            !MultakVietnameseText.IsDisplayCharacter(g.Text) || g.Voice is not (1 or 2))))
             throw new InvalidDataException("Invalid MULTAK lyric timeline.");
         nextTempo = 0; bpm = 120; anchorTick = 0; anchorSeconds = 0;
         var lyrics = (glyphs ?? []).OrderBy(g => g.Tick)

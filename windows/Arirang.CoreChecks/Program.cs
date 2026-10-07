@@ -14,6 +14,10 @@ if (args.Length == 6 && args[0] == "--maseco")
 {
     MasecoResearch.Export(args[1], args[2], long.Parse(args[3]), long.Parse(args[4]), args[5]); return;
 }
+if (args.Length == 3 && args[0] == "--vnlyrics")
+{
+    VietnameseLyricChecks.ExportOriginal(args[1], args[2]); return;
+}
 
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 byte[] multakHeader = new byte[MultakIndex.TableOffset + 12];

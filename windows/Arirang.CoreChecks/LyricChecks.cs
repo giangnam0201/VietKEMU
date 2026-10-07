@@ -23,6 +23,17 @@ internal static class LyricChecks
         var song = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [new(24, 1, [22])], 100)], "Lyric clock", lyrics.Glyphs);
         if (Math.Abs(song.Lyrics[0].Seconds - (0.5 + 2.5 / 60)) > .000001 || song.Lyrics[2].Voice != 2)
             throw new Exception("Lyric ticks must share the changing note tempo map and preserve voices.");
+        var vietnamese = raw.ToArray();
+        vietnamese[69] = (byte)(12 ^ mask); vietnamese[70] = (byte)(0x0f ^ mask);
+        vietnamese[76] = (byte)(0xae ^ mask); vietnamese[78] = (byte)(0xa0 ^ mask);
+        vietnamese[82] = (byte)(3 ^ mask); // Replace a primary delay control; same timing.
+        var vn = MultakLyrics.Parse(vietnamese);
+        if (vn.Glyphs[0] != new MultakLyricGlyph(25, 'Đ', true, 1) ||
+            vn.Glyphs[1] != new MultakLyricGlyph(37, 'á', false, 1) || vn.EndTick != lyrics.EndTick)
+            throw new Exception("Vietnamese glyphs and intro controls must preserve lyric timing.");
+        var vnSong = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [], 100)], "Synthetic Vietnamese", vn.Glyphs);
+        if (vnSong.Lyrics[0].Text != "Đ" || vnSong.Lyrics[1].Text != "á")
+            throw new Exception("Vietnamese Unicode glyphs must survive playback conversion.");
         var wrongMode = raw.ToArray(); wrongMode[69] = (byte)(4 ^ mask);
         var wrongVoice = raw.ToArray(); wrongVoice[73] = (byte)(3 ^ mask);
         var wrongLength = raw.ToArray(); wrongLength[53] = (byte)(255 ^ mask);

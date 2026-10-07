@@ -21,18 +21,26 @@ public static class MultakVietnameseText
         var text = new char[bytes.Length];
         for (int i = 0; i < bytes.Length; i++)
         {
-            byte value = bytes[i];
-            // 7F is a placeholder glyph; FF is blank in this bank. Neither
-            // supplies a reliable character identity. Reject control bytes.
-            if (value is < 32 or 127 or 255) return null;
-            text[i] = value switch
-            {
-                0x5e => 'Á', 0x60 => 'À',
-                0x7b => 'Ặ', 0x7c => 'Ả', 0x7d => 'Ã', 0x7e => 'Ạ',
-                >= 0x80 => Extended[value - 0x80],
-                _ => (char)value
-            };
+            if (!TryDecodeGlyph(bytes[i], out text[i])) return null;
         }
         return new string(text).TrimEnd(' ');
     }
+
+    public static bool TryDecodeGlyph(byte value, out char text)
+    {
+        text = default;
+        // 7F is a placeholder and FF is blank in the original bank.
+        if (value is < 32 or 127 or 255) return false;
+        text = value switch
+        {
+            0x5e => 'Á', 0x60 => 'À',
+            0x7b => 'Ặ', 0x7c => 'Ả', 0x7d => 'Ã', 0x7e => 'Ạ',
+            >= 0x80 => Extended[value - 0x80],
+            _ => (char)value
+        };
+        return true;
+    }
+
+    public static bool IsDisplayCharacter(char text) =>
+        text is >= (char)32 and <= (char)126 || Extended.Contains(text) || "ÁÀẶẢÃẠ".Contains(text);
 }

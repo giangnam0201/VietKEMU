@@ -15,7 +15,9 @@ public sealed record MultakLyrics(IReadOnlyList<MultakLyricGlyph> Glyphs,
         byte At(int offset) => (byte)(raw[offset] ^ mask);
         int relativeMusic = At(links) << 8 | At(links + 1);
         int relativeStaff = At(links + 3) << 8 | At(links + 4);
-        if (At(links + 2) != 0 || At(links + 5) != 0 || At(links + 6) is not (2 or 3) ||
+        byte format = At(links + 6);
+        bool vietnamese = format == 12;
+        if (At(links + 2) != 0 || At(links + 5) != 0 || format is not (2 or 3 or 12) ||
             titleEnd + 1 + relativeMusic != layout.MusicOffset)
             throw new InvalidDataException("Unsupported MULTAK lyric-link layout.");
         long primaryEnd = (long)start + layout.UninterpretedHeaderValue + 1;
@@ -41,7 +43,7 @@ public sealed record MultakLyrics(IReadOnlyList<MultakLyricGlyph> Glyphs,
             byte voice = 0;
             bool newLine = false;
             int lineLength = 0;
-            if (!absolutePrefix && At(begin) != 0x29)
+            if (!absolutePrefix && At(begin) != (vietnamese ? 0x0f : 0x29))
                 throw new InvalidDataException("Unsupported MULTAK primary lyric prefix.");
             for (int operations = 0; operations < 500_000; operations++)
             {
@@ -60,7 +62,7 @@ public sealed record MultakLyrics(IReadOnlyList<MultakLyricGlyph> Glyphs,
                     else if (voice != lane) throw new InvalidDataException("MULTAK lyric voice ending does not match.");
                     continue; // Voice/format parameters are not delays.
                 }
-                if (op is 0 or 1 or 2 or 4 or 5 or 7 or 9 or 0x29)
+                if (op is 0 or 1 or 2 or 4 or 5 or 7 or 9 or 0x29 || vietnamese && op is 3 or 0x0f)
                 {
                     tick = checked(tick + ReadTime());
                 }
@@ -70,11 +72,14 @@ public sealed record MultakLyrics(IReadOnlyList<MultakLyricGlyph> Glyphs,
                 }
                 else
                 {
-                    if (op is < 32 or > 126 || voice == 0)
+                    char text = (char)op;
+                    if (voice == 0 || (vietnamese
+                        ? !MultakVietnameseText.TryDecodeGlyph(op, out text)
+                        : op is < 32 or > 126))
                         throw new InvalidDataException("This MULTAK lyric encoding is not supported yet.");
                     if (glyphs.Count >= 500_000) throw new InvalidDataException("MULTAK lyric glyph limit exceeded.");
                     if (++lineLength > 1024) throw new InvalidDataException("MULTAK lyric line exceeds display limit.");
-                    glyphs.Add(new(tick, (char)op, newLine, voice)); newLine = false;
+                    glyphs.Add(new(tick, text, newLine, voice)); newLine = false;
                     tick = checked(tick + ReadTime());
                 }
                 if (tick > int.MaxValue) throw new InvalidDataException("MULTAK lyric tick limit exceeded.");

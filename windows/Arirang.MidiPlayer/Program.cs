@@ -33,6 +33,7 @@ internal static class Program
                     Directory.CreateDirectory(args[2]);
                     Capture(panel, Path.Combine(args[2], "arirang-panel.png"));
                     bool dualVoicesVerified = false;
+                    bool vietnameseRowsVerified = false;
                     foreach (Window window in app.Windows)
                         if (window is Television tv)
                         {
@@ -50,6 +51,21 @@ internal static class Program
                             rows = tv.RenderedVoiceRows;
                             if (rows.FirstHighlighted != 2 || rows.SecondHighlighted != 2)
                                 throw new InvalidDataException("Both lyric voices must advance independently.");
+                            var vietnamese = new MidiSong("Synthetic Vietnamese voice fixture", 2, [], [
+                                new(0, "Đ", true, 1), new(.5, "T", true, 2),
+                                new(1, "á", false, 1), new(1, "i", false, 2),
+                                new(1.2, "ễ", false, 2), new(1.4, "n", false, 2)]);
+                            tv.Update(vietnamese, .75, true); tv.UpdateLayout();
+                            rows = tv.RenderedVoiceRows;
+                            if (rows.First != "Đá" || rows.Second != "Tiễn" || rows.FirstHighlighted != 1 || rows.SecondHighlighted != 1)
+                                throw new InvalidDataException("Vietnamese accents or independent voice highlighting failed.");
+                            Capture(tv, Path.Combine(args[2], "synthetic-vietnamese-voice-tv.png"));
+                            Capture(panel, Path.Combine(args[2], "synthetic-vietnamese-voice-preview.png"));
+                            tv.Update(vietnamese, 1.75, true);
+                            rows = tv.RenderedVoiceRows;
+                            if (rows.FirstHighlighted != 2 || rows.SecondHighlighted != 4)
+                                throw new InvalidDataException("Vietnamese lyric rows must finish highlighting independently.");
+                            vietnameseRowsVerified = true;
                             tv.Update(song, .55, true);
                             dualVoicesVerified = true;
                         }
@@ -62,6 +78,7 @@ internal static class Program
                         selectedQueueReceivesChosenMidi = true,
                         audioHardwareVerified = false,
                         independentLyricVoiceRowsVerified = dualVoicesVerified,
+                        vietnameseLyricVoiceRowsVerified = vietnameseRowsVerified,
                         originalDiscPlaybackVerified = false
                     }, new JsonSerializerOptions { WriteIndented = true }));
                     panel.CloseForVerification();

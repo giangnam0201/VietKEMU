@@ -48,6 +48,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Original device-code mapping failed' }
           dotnet run --project windows/Arirang.CoreChecks -c Release -- --layouts .reference/arirang-multak/complete-30655.bin .reference/arirang-multak/complete-32153.bin artifacts/arirang-verification/song-layout-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Original multi-channel song layout decoding failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --vnlyrics .reference/arirang-multak/complete-50001.bin artifacts/arirang-verification/vietnamese-lyric-verification.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original Vietnamese lyric timing verification failed' }
           python tools/verify_arirang_multak.py report
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK verification failed' }
       - name: Verify two native windows and capture UI
@@ -64,7 +66,7 @@ jobs:
           Compress-Archive artifacts/arirang-windows/* artifacts/Arirang-MIDI-Windows.zip
           Compress-Archive artifacts/arirang-verification/* artifacts/arirang-verification.zip
           $tag = 'arirang-midi-test-${{ github.run_id }}'
-          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR playback and experimental MULTAK ISO songs with Vietnamese/English catalogue titles and original ASCII lyrics in two TV rows. Windows instruments; original wave bank, Vietnamese lyrics and hardware fidelity remain unfinished. ARVNKR remains unsupported. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
+          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR playback and experimental MULTAK ISO songs with Vietnamese/English catalogue titles and supported original ASCII/Vietnamese lyrics in two TV rows. Windows instruments; original wave bank, complete format coverage and hardware fidelity remain unfinished. ARVNKR remains unsupported. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
           if ($LASTEXITCODE -ne 0) { throw 'Arirang release failed' }
           "Download: https://github.com/${{ github.repository }}/releases/tag/$tag" | Add-Content $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4

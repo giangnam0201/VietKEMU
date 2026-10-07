@@ -57,7 +57,7 @@ def download():
         storage = pointer[3] >> 4
         relative = ((pointer[0] * 60 + pointer[1]) * 75 + pointer[2]) * 2048 + (65536 if storage == 0 else 0)
         pointers.append((slot, storage, relative))
-    for code, expected_bytes in ((30655, 6144), (32153, 4096)):
+    for code, expected_bytes in ((30655, 6144), (32153, 4096), (50001, 14336)):
         at = 16 + 2 * (code // 1000)
         slot = int.from_bytes(data[at:at + 2], 'little') + code % 1000
         _, storage, relative = next(p for p in pointers if p[0] == slot)

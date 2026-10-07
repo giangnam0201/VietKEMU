@@ -42,12 +42,16 @@ on playback rather than copying a whole disc. The experimental clock uses the
 reference's tempo commands and 24 ticks per beat. The two complete-record checks
 calculate 62.604167 and 43.1875 seconds; timing on original hardware remains
 unverified. Unsupported record formats and playback commands produce an error.
-This preview uses Windows MIDI instruments. Supported ASCII original lyrics
+This preview uses Windows MIDI instruments. Supported ASCII and Vietnamese original lyrics
 now appear in two independently highlighted TV rows using the note tempo map.
 The two original records verify 264/182 lyric characters and all 34 phrase
 starts against their melody notes. Voice and formatting bytes do not add delays.
-Unsupported lyric encodings keep audio playback available with a visible notice.
-Vietnamese lyric encoding, rendering original fonts, countdown graphics and
+The Vietnamese lyric format 12 is checked against original code 50001:
+1,194 glyphs in two voices, with all 70 phrase starts matching guide notes.
+The lyrics use the same tempo clock as the music. Native synthetic checks also
+verify accented characters and separate highlighting in both rows and preview.
+Other unsupported lyric encodings keep audio playback available with a visible notice.
+Rendering original fonts, countdown graphics and
 the original wave bank remain unfinished.
 ARVNKR proprietary songs are not playable. Background video reels
 are not offered as selectable music. No full original-disc equivalence, Arirang
