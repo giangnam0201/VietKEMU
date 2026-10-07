@@ -84,3 +84,18 @@ valid pointer arithmetic alone is not treated as proof of a playable song.
 Music decoding and song-number mapping remain unverified. GitHub checks fetch
 only a 128 KiB public TOC range and publish aggregate verification results;
 original music bytes remain excluded from releases.
+
+This change passed the [Windows build and real-data checks in run 37573331056](https://github.com/giangnam0201/VietKEMU/actions/runs/37573331056).
+The [updated Windows test build](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37573331056)
+includes the supported MULTAK ISO inspection. Its downloaded verification report
+matches all four expected table counts and the independently observed first
+and last storage offsets. Standard MIDI parsing, selected queue and two native
+windows also passed; hardware audio and proprietary music playback remain
+explicitly unverified.
+
+A separate six-sample comparison of historical unmasked records found a
+consistent candidate music boundary: `44 + littleEndianUInt32(sample[48..52])`
+is preceded by `1A FF` and followed nearby by a repeated `8B 07` command pattern
+in all six. This is a research lead, not a universal container offset or a
+decoded MIDI event stream. It requires validation against complete original
+records before being used for playback.
