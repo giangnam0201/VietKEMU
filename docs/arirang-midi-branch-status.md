@@ -112,11 +112,11 @@ alignment locate the text storage without hardcoding the older researcher's
 volume-specific text offset.
 
 The new bounded `MasecoIndex` reader preserves title bytes and decodes the 4,140
-ASCII English titles. Other languages retain original bytes until their exact
-font encoding is established. The older Vietnamese conversion table produces
-readable titles when its actual C++ indexing is used, but has unresolved glyph
-errors and is not silently applied. The Windows
-ISO inspection lists counts, mapped codes and the first 100 English entries.
+ASCII English titles. Vietnamese catalogue character identities were subsequently
+verified against the original font bank; the independent decoder corrects
+errors in the historical conversion table. Other unsupported languages retain
+original bytes. The ISO inspection lists counts, mapped codes and the first
+100 supported entries. Local ISO import now includes Vietnamese and English.
 
 Independent public range reads verified catalogue titles against actual music
 headers for English codes 30001 and 30093 and Vietnamese code 50001 (raw bytes,
@@ -216,3 +216,9 @@ row highlighting. Its TV and live panel-preview screenshots show the same
 two rows with independently colored characters. Only verification assets were
 downloaded; original-device timing, audio hardware and original instruments
 remain unverified.
+
+## Verified Vietnamese catalogue build
+
+Windows run [37628749784](https://github.com/giangnam0201/VietKEMU/actions/runs/37628749784) completed successfully at `c808142`. The downloaded small verification package confirms all 4,861 Vietnamese catalogue titles decode, all 22,900 device codes still map to music pointers, and both native TV lyric rows pass their existing checks. Original Vietnamese lyric playback and hardware sound are not verified. No Windows app ZIP was downloaded locally.
+
+A private structural probe of code 50001 found lyric mode 12, streams of 1,584/1,440 bytes, 620/574 glyphs and 36/34 phrase starts. Both provisional clocks end at tick 9,412. Controls `03` and `0F` and alignment against the complete music record still need verification before enabling that format. The complete bounded record is 14,336 bytes; no full ISO was downloaded.
