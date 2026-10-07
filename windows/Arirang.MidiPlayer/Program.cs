@@ -32,8 +32,27 @@ internal static class Program
                     await panel.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
                     Directory.CreateDirectory(args[2]);
                     Capture(panel, Path.Combine(args[2], "arirang-panel.png"));
+                    bool dualVoicesVerified = false;
                     foreach (Window window in app.Windows)
-                        if (window is Television tv) Capture(tv, Path.Combine(args[2], "arirang-tv.png"));
+                        if (window is Television tv)
+                        {
+                            Capture(tv, Path.Combine(args[2], "arirang-tv.png"));
+                            var dual = new MidiSong("Synthetic dual voice fixture", 2, [], [
+                                new(0, "L", true, 1), new(.5, "l", true, 2),
+                                new(1, "a", false, 1), new(1.5, "a", false, 2)]);
+                            tv.Update(dual, .75, true); tv.UpdateLayout();
+                            var rows = tv.RenderedVoiceRows;
+                            if (rows.First != "La" || rows.Second != "la" || rows.FirstHighlighted != 1 || rows.SecondHighlighted != 1)
+                                throw new InvalidDataException("Independent lyric voice rows or highlighting failed.");
+                            Capture(tv, Path.Combine(args[2], "synthetic-dual-voice-tv.png"));
+                            Capture(panel, Path.Combine(args[2], "synthetic-dual-voice-preview.png"));
+                            tv.Update(dual, 1.75, true);
+                            rows = tv.RenderedVoiceRows;
+                            if (rows.FirstHighlighted != 2 || rows.SecondHighlighted != 2)
+                                throw new InvalidDataException("Both lyric voices must advance independently.");
+                            tv.Update(song, .55, true);
+                            dualVoicesVerified = true;
+                        }
                     File.WriteAllText(Path.Combine(args[2], "verification.json"), JsonSerializer.Serialize(new
                     {
                         standardMidiParsed = song.Messages.Count > 0,
@@ -42,7 +61,8 @@ internal static class Program
                         officialArirangLogo = Brand.Source.PixelWidth > 0,
                         selectedQueueReceivesChosenMidi = true,
                         audioHardwareVerified = false,
-                        proprietaryArirangDiscSongDecoded = false
+                        independentLyricVoiceRowsVerified = dualVoicesVerified,
+                        originalDiscPlaybackVerified = false
                     }, new JsonSerializerOptions { WriteIndented = true }));
                     panel.CloseForVerification();
                 }

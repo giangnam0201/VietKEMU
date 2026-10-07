@@ -1,0 +1,39 @@
+using Arirang.Core;
+
+internal static class LyricChecks
+{
+    internal static void Run()
+    {
+        byte mask = 166;
+        var raw = new byte[240];
+        raw[2] = 0x4f; raw[3] = 0x4b; raw[38] = mask; // music = 34 + 166
+        for (int i = 42; i < raw.Length; i++) raw[i] = mask;
+        void Put(int at, byte[] value) { for (int i = 0; i < value.Length; i++) raw[at + i] = (byte)(value[i] ^ mask); }
+        Put(42, "TEST/\0"u8.ToArray());
+        byte[] first = [0x29, 24, 0x26, 1, 0x5c, 0, (byte)'L', 12, (byte)'a', 12, 0x5e, 1, 0, 24, 0x1a, 255];
+        byte[] second = [48, 0x26, 2, (byte)'l', 6, (byte)'a', 6, 0x5e, 2, 0, 24, 0x1a, 255];
+        Put(48, [0, 0, 23, 0, 0, (byte)(first.Length - 1), 1, 0, 0, 1, 0, 0, 0, 60, 4]);
+        Put(63, [0, 152, 0, 0, 43, 0, 2]);
+        Put(70, first); Put(86, second); Put(198, [0x1a, 255]);
+        var lyrics = MultakLyrics.Parse(raw);
+        if (lyrics.PrimaryBytes != 16 || lyrics.SecondaryBytes != 13 || lyrics.StaffOffset != 99 || lyrics.EndTick != 85 ||
+            !lyrics.Glyphs.SequenceEqual(new MultakLyricGlyph[] {
+                new(25, 'L', true, 1), new(37, 'a', false, 1), new(49, 'l', true, 2), new(55, 'a', false, 2) }))
+            throw new Exception("Original lyric voices, formatting parameters and absolute secondary time.");
+        var song = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [new(24, 1, [22])], 100)], "Lyric clock", lyrics.Glyphs);
+        if (Math.Abs(song.Lyrics[0].Seconds - (0.5 + 2.5 / 60)) > .000001 || song.Lyrics[2].Voice != 2)
+            throw new Exception("Lyric ticks must share the changing note tempo map and preserve voices.");
+        var wrongMode = raw.ToArray(); wrongMode[69] = (byte)(4 ^ mask);
+        var wrongVoice = raw.ToArray(); wrongVoice[73] = (byte)(3 ^ mask);
+        var wrongLength = raw.ToArray(); wrongLength[53] = (byte)(255 ^ mask);
+        var badTerminator = raw.ToArray(); badTerminator[85] = mask;
+        var mismatchedEnd = raw.ToArray(); mismatchedEnd[81] = (byte)(2 ^ mask);
+        var unsupportedGlyph = raw.ToArray(); unsupportedGlyph[76] = (byte)(128 ^ mask);
+        foreach (var invalid in new[] { wrongMode, wrongVoice, wrongLength, badTerminator, mismatchedEnd, unsupportedGlyph, raw[..199] })
+        {
+            bool rejected = false;
+            try { MultakLyrics.Parse(invalid); } catch (InvalidDataException) { rejected = true; }
+            if (!rejected) throw new Exception("Malformed or unsupported original lyric structures must be rejected.");
+        }
+    }
+}

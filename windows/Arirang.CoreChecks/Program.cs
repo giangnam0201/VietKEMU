@@ -37,6 +37,7 @@ try { MultakIndex.Parse(multakHeader, 500, 600_000); } catch (InvalidDataExcepti
 Check(outsideRejected, "MULTAK extents must fit the declared storage file.");
 MasecoChecks.Run();
 LayoutChecks.Run();
+LyricChecks.Run();
 if (args.Length == 4 && args[0] == "--layouts")
 {
     LayoutChecks.ExportOriginal(args[1], args[2], args[3]); return;

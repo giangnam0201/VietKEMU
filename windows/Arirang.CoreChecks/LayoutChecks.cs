@@ -128,6 +128,21 @@ internal static class LayoutChecks
         var notesB = streamsB.Channels.Select(MultakCompactNotes.Parse).ToArray();
         var playbackA = MultakPlaybackSong.FromChannels(notesA, "Original timing check A");
         var playbackB = MultakPlaybackSong.FromChannels(notesB, "Original timing check B");
+        var lyricsA = MultakLyrics.Parse(File.ReadAllBytes(first));
+        var lyricsB = MultakLyrics.Parse(File.ReadAllBytes(second));
+        bool PhrasesMatch(MultakLyrics lyrics, MultakCompactNotes guide) =>
+            lyrics.Glyphs.Where(g => g.NewLine).All(g => guide.Events.Any(e => e.Tick == g.Tick && (e.Status >> 4) == 9 && e.Data2 > 0));
+        if (lyricsA.Glyphs.Count != 264 || lyricsB.Glyphs.Count != 182 ||
+            lyricsA.Glyphs.Count(g => g.NewLine) != 24 || lyricsB.Glyphs.Count(g => g.NewLine) != 10 ||
+            lyricsA.PrimaryBytes != 458 || lyricsB.PrimaryBytes != 251 ||
+            lyricsA.SecondaryBytes != 299 || lyricsB.SecondaryBytes != 232 ||
+            lyricsA.StaffOffset != 883 || lyricsB.StaffOffset != 630 ||
+            !PhrasesMatch(lyricsA, notesA[0]) || !PhrasesMatch(lyricsB, notesB[0]))
+            throw new InvalidDataException("Original lyric phrase ticks must match the independent guide-note stream.");
+        var completeA = MultakPlaybackSong.Parse(File.ReadAllBytes(first), "Original lyric timing A");
+        var completeB = MultakPlaybackSong.Parse(File.ReadAllBytes(second), "Original lyric timing B");
+        if (completeA.Lyrics.Count != 264 || completeB.Lyrics.Count != 182 || completeA.Notice is not null || completeB.Notice is not null)
+            throw new InvalidDataException("Original record playback must retain its decoded lyrics.");
         if (Math.Abs(playbackA.Duration - 62.6041666666667) > .000001 || Math.Abs(playbackB.Duration - 43.1875) > .000001 ||
             playbackA.Messages.Count != 1692 || playbackB.Messages.Count != 1001)
             throw new InvalidDataException("Original tempo conversion must match independent clock calculation.");
@@ -153,7 +168,9 @@ internal static class LayoutChecks
             firstEndTick = notesA.Max(n => n.EndTick), secondEndTick = notesB.Max(n => n.EndTick),
             pitchWidthsReadFromHeader = true, melodyPrefixesVerified = true,
             tempoClockConverted = true, firstCalculatedSeconds = playbackA.Duration, secondCalculatedSeconds = playbackB.Duration,
-            nativeTimingVerified = false, originalLyricsDecoded = false, originalInstrumentsDecoded = false,
+            firstLyricGlyphs = lyricsA.Glyphs.Count, secondLyricGlyphs = lyricsB.Glyphs.Count,
+            firstLyricPhrases = 24, secondLyricPhrases = 10, lyricPhraseTicksMatchGuide = true, twoOriginalLyricVoices = true,
+            nativeTimingVerified = false, originalLyricsDecoded = true, originalInstrumentsDecoded = false,
             notesDecoded = true, ticksParsed = true, timingDecoded = false, playbackVerified = false
         }, new JsonSerializerOptions { WriteIndented = true }));
     }

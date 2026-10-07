@@ -64,7 +64,7 @@ jobs:
           Compress-Archive artifacts/arirang-windows/* artifacts/Arirang-MIDI-Windows.zip
           Compress-Archive artifacts/arirang-verification/* artifacts/arirang-verification.zip
           $tag = 'arirang-midi-test-${{ github.run_id }}'
-          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR playback and experimental local MULTAK ISO song playback with Windows instruments. Original lyrics, wave bank and hardware timing remain unverified; ARVNKR remains unsupported. Background videos are not songs. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
+          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR playback and experimental MULTAK ISO songs with original ASCII lyrics in two TV rows. Windows instruments; original wave bank, Vietnamese encodings and hardware fidelity remain unfinished. ARVNKR remains unsupported. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
           if ($LASTEXITCODE -ne 0) { throw 'Arirang release failed' }
           "Download: https://github.com/${{ github.repository }}/releases/tag/$tag" | Add-Content $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4

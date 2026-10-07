@@ -204,3 +204,39 @@ passed at `f161ad6`. The inspected verification report has
 1,692/1,001 event counts. Native timing, original lyrics/instruments and playback
 verification remain false. Only the 108 KiB verification ZIP was retrieved;
 the Windows application ZIP was not downloaded.
+
+### Original ASCII lyric streams
+
+Independent byte inspection of both complete records identifies seven link
+bytes after the channel descriptors. Their first BE16 value, added to title
+terminator plus one, equals the music offset. The second BE16 plus that base
+and eight locates the staff stream. Zero link separators and the observed
+format tags two/three are checked; other layouts remain unsupported.
+The earlier uninterpreted BE24 field supplies the primary lyric byte count
+minus one. These checks delimit primary and secondary lyric streams exactly:
+458/299 bytes for 30655 and 251/232 bytes for 32153, ending at staff offsets
+883/630. Each lyric stream terminates in `1A FF`.
+
+Primary opcode `29` precedes the initial delay; the secondary stream starts
+with an absolute 15-bit delay. Their clock starts at one. Glyphs carry delays
+in the same one/two-byte encoding as music. Opcodes `26` and `5E` carry a
+voice/format byte one or two, which must not advance time. Control opcodes
+zero, one, two, four, five, seven and nine carry delays; backslash marks a
+line boundary. This bounded reader supports ASCII glyphs and preserves both
+voices. It rejects unknown encoding, broken endings, oversized lines and
+out-of-range timelines.
+
+An independent Python experiment recovers 264/182 glyphs, with 24/10 phrase
+starts. Every one of these 34 starts equals a positive note-on tick in the
+independently expanded guide melody. Both lyric lanes finish at 3,048/2,088
+ticks; their final visible glyphs occur before the music's end. This supports
+the lyric timing interpretation without claiming original-hardware fidelity.
+The C# reader and full-record playback checks now verify those counts and
+alignments. Native UI verification separately checks two synthetic voice rows
+and their independent highlighting; no original lyric bytes enter the bundle.
+
+Supported lyrics share the music tempo map. The TV displays the two voice
+lanes independently, and the panel continues to mirror that same visual.
+Unsupported lyric encoding leaves audio available with a visible notice.
+Vietnamese encoding, exact original fonts/countdown graphics and original
+instrument sounds remain unfinished.

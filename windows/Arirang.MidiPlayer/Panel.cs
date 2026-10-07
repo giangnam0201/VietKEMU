@@ -169,7 +169,8 @@ internal sealed class Panel : Window
             playback ??= new MidiPlayback(new WindowsMidiOutput());
             playback.Load(song); playback.SetKey(pitch); playback.SetVolume(gain); playback.SetSpeed(rate); playback.Play(); started = true;
             seek.Maximum = Math.Max(1, song.Duration); status.Text = "Đang phát: " + song.Title;
-            if (item.DiscSongCode is not null) status.Text += " • Thử nghiệm: âm sắc Windows, lời gốc chưa giải mã";
+            if (item.DiscSongCode is not null) status.Text += " • Thử nghiệm: âm sắc Windows";
+            if (song.Notice is not null) status.Text += " • " + song.Notice;
         }
         catch (Exception error) { status.Text = error.Message; }
         finally { loading = false; }
@@ -262,7 +263,7 @@ internal sealed class Panel : Window
             foreach (var item in items)
                 if (!library.Any(s => s.Path == item.Path && s.DiscSongCode == item.DiscSongCode)) library.Add(item);
             SaveLibrary(); RefreshLibrary();
-            status.Text = $"Đã nhập {items.Length:N0} tên bài tiếng Anh. Chọn bài để thử phát MIDI; lời và âm sắc gốc chưa giải mã. Một số định dạng bài chưa hỗ trợ.";
+            status.Text = $"Đã nhập {items.Length:N0} tên bài tiếng Anh. Chọn bài để thử phát MIDI và lời gốc hỗ trợ. Âm sắc Windows; một số định dạng bài / lời chưa hỗ trợ.";
         }
         catch (Exception error) { status.Text = error.Message; }
     }

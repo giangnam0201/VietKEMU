@@ -1,13 +1,22 @@
 namespace Arirang.Core;
 
 // Independent compact-disc timing conversion. Audio uses the caller's MIDI output;
-// original wave banks and lyric data are not decoded by this reader.
+// Original wave banks remain unimplemented; supported ASCII lyric lanes retain
+// their original ticks and are converted with the same tempo map as the notes.
 public static class MultakPlaybackSong
 {
-    public static MidiSong Parse(byte[] record, string title) => FromChannels(
-        MultakSongStreams.Parse(record).Channels.Select(MultakCompactNotes.Parse).ToArray(), title);
+    public static MidiSong Parse(byte[] record, string title)
+    {
+        var channels = MultakSongStreams.Parse(record).Channels.Select(MultakCompactNotes.Parse).ToArray();
+        try { return FromChannels(channels, title, MultakLyrics.Parse(record).Glyphs); }
+        catch (InvalidDataException error)
+        {
+            return FromChannels(channels, title) with { Notice = "Lời gốc chưa hỗ trợ: " + error.Message };
+        }
+    }
 
-    public static MidiSong FromChannels(IReadOnlyList<MultakCompactNotes> channels, string title)
+    public static MidiSong FromChannels(IReadOnlyList<MultakCompactNotes> channels, string title,
+        IReadOnlyList<MultakLyricGlyph>? glyphs = null)
     {
         if (channels.Count is < 1 or > 16 || channels.Sum(c => (long)c.Events.Count + c.Commands.Count) > 2_000_000)
             throw new InvalidDataException("MULTAK playback event limit exceeded.");
@@ -49,6 +58,13 @@ public static class MultakPlaybackSong
         var messages = channels.SelectMany(c => c.Events).OrderBy(e => e.Tick)
             .Select(e => new MidiMessage(Seconds(e.Tick),
                 (uint)(e.Status | e.Data1 << 8 | (e.Data2 ?? 0) << 16))).ToArray();
-        return new(title, Seconds(end), messages, []);
+        double duration = Seconds(end);
+        if (glyphs is not null && (glyphs.Count > 500_000 || glyphs.Any(g => g.Tick < 0 || g.Tick > end ||
+            g.Text is < (char)32 or > (char)126 || g.Voice is not (1 or 2))))
+            throw new InvalidDataException("Invalid MULTAK lyric timeline.");
+        nextTempo = 0; bpm = 120; anchorTick = 0; anchorSeconds = 0;
+        var lyrics = (glyphs ?? []).OrderBy(g => g.Tick)
+            .Select(g => new LyricCue(Seconds(g.Tick), g.Text.ToString(), g.NewLine, g.Voice)).ToArray();
+        return new(title, duration, messages, lyrics);
     }
 }

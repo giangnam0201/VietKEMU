@@ -200,3 +200,10 @@ the panel screenshot shows the ISO import control and separate live TV preview.
 Native-device timing, original lyrics/instruments and audible original playback
 remain explicitly unverified. VietK `main` separately contains the verified
 half-size default QR and persistent size slider at `4119282`.
+
+The next change adds original ASCII lyrics, independently recovering 264/182
+glyphs across two voice lanes. All 34 phrase starts match guide melody ticks.
+The player uses the same tempo map for notes and lyrics; the TV highlights
+both rows independently. Non-ASCII formats, original fonts/countdown graphics
+and instrument fidelity remain unfinished. Original record checks and native
+synthetic dual-voice rendering verify different parts of this change.
