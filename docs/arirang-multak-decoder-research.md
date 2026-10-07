@@ -248,3 +248,24 @@ completed successfully at `df0ae3c`. The inspected report confirms
 `independentLyricVoiceRowsVerified=true`; its two screenshots were visually
 inspected for both rows and shared preview. Original device timing, instruments
 and audible playback remain false/unverified. The app ZIP was not downloaded.
+
+## Vietnamese encoding audit
+
+Rechecking the historical converter's actual byte indexing corrects an earlier
+claim that its table does not match Volume 40. Bytes `5E` through `60` use
+`byte - 5E`; bytes at least `7B` use `byte - 7B + 2`. Table comments alone are
+not an accurate byte map. With those indexes, catalogue code 50001 decodes as
+`LỆ ĐÁ`, including a trailing space. Its record header also gives readable
+composer text. Language seven contains 4,861 catalogue records.
+
+This is not yet a reliable complete decoder. Byte `7B` occurs 56 times and the
+legacy table renders it as `À` where title context repeatedly suggests `Ặ`.
+Byte `8F` occurs once and becomes a NUL in code 50350. The catalogue never uses
+`7F`, another relevant legacy-table entry. These observations narrow the
+font investigation; they do not justify silently guessing glyphs in the app.
+
+The bounded original FONT1 resource was read privately for bitmap analysis.
+Its font descriptors and variable glyph layout still need verification.
+Neither font bytes nor the historical executable are bundled or executed.
+Vietnamese titles and lyrics remain unsupported in playback until the map
+can be checked reliably.

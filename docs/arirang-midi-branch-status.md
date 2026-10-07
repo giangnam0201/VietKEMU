@@ -113,8 +113,9 @@ volume-specific text offset.
 
 The new bounded `MasecoIndex` reader preserves title bytes and decodes the 4,140
 ASCII English titles. Other languages retain original bytes until their exact
-font encoding is established. In particular the older Vietnamese conversion
-table does not match this disc's bytes and is not silently applied. The Windows
+font encoding is established. The older Vietnamese conversion table produces
+readable titles when its actual C++ indexing is used, but has unresolved glyph
+errors and is not silently applied. The Windows
 ISO inspection lists counts, mapped codes and the first 100 English entries.
 
 Independent public range reads verified catalogue titles against actual music
