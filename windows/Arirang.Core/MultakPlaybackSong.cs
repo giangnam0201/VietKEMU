@@ -5,10 +5,10 @@ namespace Arirang.Core;
 // their original ticks and are converted with the same tempo map as the notes.
 public static class MultakPlaybackSong
 {
-    public static MidiSong Parse(byte[] record, string title)
+    public static MidiSong Parse(byte[] record, string title, byte lyricLanguageId = 4)
     {
         var channels = MultakSongStreams.Parse(record).Channels.Select(MultakCompactNotes.Parse).ToArray();
-        try { return FromChannels(channels, title, MultakLyrics.Parse(record).Glyphs); }
+        try { return FromChannels(channels, title, MultakLyrics.Parse(record, lyricLanguageId).Glyphs); }
         catch (InvalidDataException error)
         {
             return FromChannels(channels, title) with { Notice = "Lời gốc chưa hỗ trợ: " + error.Message };

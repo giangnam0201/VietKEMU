@@ -164,7 +164,8 @@ internal sealed class Panel : Window
                 if (item.DiscSongCode is not int code) return MidiSong.Read(item.Path);
                 var inventory = DiscInventory.Read(item.Path);
                 var index = MultakIndex.ReadIso(item.Path, inventory);
-                return MultakPlaybackSong.Parse(index.ReadSongRecordIso(item.Path, inventory, code), item.Title);
+                var entry = MasecoIndex.ReadIso(item.Path, inventory).Single(s => s.DeviceCode == code);
+                return MultakPlaybackSong.Parse(index.ReadSongRecordIso(item.Path, inventory, code), item.Title, entry.LanguageId);
             });
             playback ??= new MidiPlayback(new WindowsMidiOutput());
             playback.Load(song); playback.SetKey(pitch); playback.SetVolume(gain); playback.SetSpeed(rate); playback.Play(); started = true;

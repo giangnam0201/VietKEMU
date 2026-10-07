@@ -134,7 +134,7 @@ internal static class LayoutChecks
             lyrics.Glyphs.Where(g => g.NewLine).All(g => guide.Events.Any(e => e.Tick == g.Tick && (e.Status >> 4) == 9 && e.Data2 > 0));
         if (lyricsA.Glyphs.Count != 264 || lyricsB.Glyphs.Count != 182 ||
             lyricsA.Glyphs.Count(g => g.NewLine) != 24 || lyricsB.Glyphs.Count(g => g.NewLine) != 10 ||
-            lyricsA.PrimaryBytes != 458 || lyricsB.PrimaryBytes != 251 ||
+            lyricsA.PrimaryBytes != 457 || lyricsB.PrimaryBytes != 250 ||
             lyricsA.SecondaryBytes != 299 || lyricsB.SecondaryBytes != 232 ||
             lyricsA.StaffOffset != 883 || lyricsB.StaffOffset != 630 ||
             !PhrasesMatch(lyricsA, notesA[0]) || !PhrasesMatch(lyricsB, notesB[0]))

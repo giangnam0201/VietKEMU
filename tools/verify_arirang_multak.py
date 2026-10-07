@@ -57,7 +57,7 @@ def download():
         storage = pointer[3] >> 4
         relative = ((pointer[0] * 60 + pointer[1]) * 75 + pointer[2]) * 2048 + (65536 if storage == 0 else 0)
         pointers.append((slot, storage, relative))
-    for code, expected_bytes in ((30655, 6144), (32153, 4096), (50001, 14336)):
+    for code, expected_bytes in ((30655, 6144), (32153, 4096), (50001, 14336), (50350, 14336)):
         at = 16 + 2 * (code // 1000)
         slot = int.from_bytes(data[at:at + 2], 'little') + code % 1000
         _, storage, relative = next(p for p in pointers if p[0] == slot)
@@ -83,6 +83,12 @@ def report():
     assert (catalogue['catalogueRecords'], catalogue['englishTitles'], catalogue['mappedMusicPointers'], catalogue['uniqueMappedSlots']) == (22900, 4140, 22900, 22900)
     assert catalogue['originalSongHeadersMatched'] == 3 and catalogue['completeOneToOneMapping'] and catalogue['deviceCodeMappingVerified']
     assert not catalogue['musicEventsDecoded'] and not catalogue['playbackVerified']
+    assert catalogue['vietnameseCatalogueTitlesDecoded'] == 4861 and catalogue['vietnameseCatalogueEncodingVerified']
+    lyrics = json.loads((output.parent / 'vietnamese-lyric-verification.json').read_text(encoding='utf-8'))
+    assert lyrics['originalVietnameseRecords'] == 2 and lyrics['catalogueLanguageId'] == 7
+    assert lyrics['allPhraseStartsMatchGuide'] and lyrics['vietnameseGlyphsDecoded'] and lyrics['lyricsRetainedInPlayback']
+    assert sum(record['lyricPhraseStarts'] for record in lyrics['records']) == 119
+    assert not lyrics['nativeDeviceTimingVerified'] and not lyrics['originalInstrumentsVerified'] and not lyrics['audiblePlaybackVerified']
     catalogue.update(sourceUrl=URL, rangeBytesFetched=SIZE + 1044480 + 3 * 1024)
     (output.parent / 'song-mapping-verification.json').write_text(json.dumps(catalogue, indent=2), encoding='utf-8')
     print(f"Verified {parsed['datPointers'] + parsed['da1Pointers']} storage pointers; MIDI decoding remains unfinished.")

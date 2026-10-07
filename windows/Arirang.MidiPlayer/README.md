@@ -46,8 +46,9 @@ This preview uses Windows MIDI instruments. Supported ASCII and Vietnamese origi
 now appear in two independently highlighted TV rows using the note tempo map.
 The two original records verify 264/182 lyric characters and all 34 phrase
 starts against their melody notes. Voice and formatting bytes do not add delays.
-The Vietnamese lyric format 12 is checked against original code 50001:
-1,194 glyphs in two voices, with all 70 phrase starts matching guide notes.
+Vietnamese lyrics are selected using the disc catalogue language ID, rather
+than guessed from text bytes. Original codes 50001 and 50350 check 1,194/767
+glyphs in two voices, with all 119 phrase starts matching guide notes.
 The lyrics use the same tempo clock as the music. Native synthetic checks also
 verify accented characters and separate highlighting in both rows and preview.
 Other unsupported lyric encodings keep audio playback available with a visible notice.
