@@ -52,6 +52,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Original Vietnamese lyric timing verification failed' }
           dotnet run --project windows/Arirang.CoreChecks -c Release -- --fonts .reference/arirang-multak/FONT1-private.bin artifacts/arirang-verification/font-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Original font bitmap verification failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --remote artifacts/arirang-verification/remote-disc-verification.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original remote disc range verification failed' }
           python tools/verify_arirang_multak.py report
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK verification failed' }
       - name: Verify two native windows and capture UI
@@ -68,7 +70,7 @@ jobs:
           Compress-Archive artifacts/arirang-windows/* artifacts/Arirang-MIDI-Windows.zip
           Compress-Archive artifacts/arirang-verification/* artifacts/arirang-verification.zip
           $tag = 'arirang-midi-test-${{ github.run_id }}'
-          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR playback and experimental MULTAK ISO songs with Vietnamese/English catalogue titles and supported original ASCII/Vietnamese lyrics in two TV rows. Windows instruments; original wave bank, complete format coverage and hardware fidelity remain unfinished. ARVNKR remains unsupported. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
+          gh release create $tag --target '${{ github.sha }}' --prerelease --title 'Arirang MIDI development build ${{ github.run_number }}' --notes 'Arirang branch only. Extract the Windows ZIP and run Arirang.MidiPlayer.exe. Standard MIDI/KAR and experimental MULTAK songs from local or on-demand archived ISOs, with Vietnamese/English titles, original lyric voices and original disc font support. No complete ISO download. Windows instruments; original wave bank, complete format coverage and hardware fidelity remain unfinished. ARVNKR remains unsupported. See README.' artifacts/Arirang-MIDI-Windows.zip artifacts/arirang-verification.zip
           if ($LASTEXITCODE -ne 0) { throw 'Arirang release failed' }
           "Download: https://github.com/${{ github.repository }}/releases/tag/$tag" | Add-Content $env:GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4

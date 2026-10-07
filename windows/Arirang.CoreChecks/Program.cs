@@ -22,6 +22,10 @@ if (args.Length == 3 && args[0] == "--fonts")
 {
     BitmapFontChecks.ExportOriginal(args[1], args[2]); return;
 }
+if (args.Length == 2 && args[0] == "--remote")
+{
+    HttpRangeChecks.ExportOriginal(args[1]); return;
+}
 
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 byte[] multakHeader = new byte[MultakIndex.TableOffset + 12];
@@ -45,6 +49,7 @@ try { MultakIndex.Parse(multakHeader, 500, 600_000); } catch (InvalidDataExcepti
 Check(outsideRejected, "MULTAK extents must fit the declared storage file.");
 MasecoChecks.Run();
 BitmapFontChecks.Run();
+HttpRangeChecks.Run();
 LayoutChecks.Run();
 LyricChecks.Run();
 if (args.Length == 4 && args[0] == "--layouts")

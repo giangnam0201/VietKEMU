@@ -23,6 +23,12 @@ public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakP
 
     public byte[] ReadSongRecordIso(string path, DiscInventory inventory, int deviceCode)
     {
+        using var stream = File.OpenRead(path);
+        return ReadSongRecordIso(stream, inventory, deviceCode);
+    }
+
+    public byte[] ReadSongRecordIso(Stream stream, DiscInventory inventory, int deviceCode)
+    {
         var pointer = FindSong(deviceCode) ?? throw new InvalidDataException("Device song code has no music pointer.");
         string name = pointer.StorageFile == 0 ? "MULTAK.DAT" : "MULTAK.DA1";
         var file = inventory.Files.SingleOrDefault(f => f.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
@@ -32,7 +38,6 @@ public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakP
         long size = end - pointer.Offset;
         if (pointer.Offset < 0 || end > file.Bytes || size is <= 0 or > MultakSongLayout.MaximumBytes)
             throw new InvalidDataException("Song record exceeds supported bounded size.");
-        using var stream = File.OpenRead(path);
         long offset = checked(file.Offset + pointer.Offset);
         if (offset < 0 || offset > stream.Length - size)
             throw new InvalidDataException("Truncated music record extent.");
@@ -74,10 +79,15 @@ public sealed record MultakIndex(int Slots, int NullSlots, IReadOnlyList<MultakP
 
     public static MultakIndex ReadIso(string path, DiscInventory inventory)
     {
+        using var stream = File.OpenRead(path);
+        return ReadIso(stream, inventory);
+    }
+
+    public static MultakIndex ReadIso(Stream stream, DiscInventory inventory)
+    {
         var dat = inventory.Files.SingleOrDefault(f => f.Name.Equals("MULTAK.DAT", StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidDataException("Root MULTAK.DAT not found.");
         var da1 = inventory.Files.SingleOrDefault(f => f.Name.Equals("MULTAK.DA1", StringComparison.OrdinalIgnoreCase));
-        using var stream = File.OpenRead(path);
         int bytes = checked((int)Math.Min(dat.Bytes, MaximumHeaderBytes));
         if (dat.Offset < 0 || dat.Offset > stream.Length - bytes)
             throw new InvalidDataException("Truncated MULTAK extent.");

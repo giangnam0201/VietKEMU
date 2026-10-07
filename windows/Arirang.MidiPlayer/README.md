@@ -17,7 +17,18 @@ song. Use it to check this PC's MIDI output. Build verification tests scheduler
 messages with a recording output; it does not establish audible sound on your PC.
 
 The Arirang disc tab reads the public Maseco archive catalogue and item file
-lists on demand. The ISO checker reads ISO9660 directories without loading a
+lists on demand. Double-click an archive item, select one of its ISO files and
+press `Nhập bài từ ISO đã chọn`. Supported MULTAK/MASECOS4 discs add Vietnamese
+and English songs to the library and queue; double-click a song to fetch its
+bounded record and font bank and play it. Saved remote entries retain the ISO
+URL and metadata size. The app does not download a complete ISO. Network work
+runs away from the UI thread, with cancellation on close, exact HTTP range
+validation, a 1 MiB request cap and a 16 MiB operation cap. Each operation caches
+repeated ranges in memory; internet access is required for new operations.
+Unsupported disc formats display an error rather than offering background
+videos as songs. The original live Volume 40 range checks verify catalogue,
+selected music, lyrics and fonts; they do not prove audible device playback.
+The ISO checker reads ISO9660 directories without loading a
 multi-gigabyte image into memory, and detects mislabeled RAR files. These tools
 also support reading the English metadata block in extracted `hk2/INFO.DAT` files;
 the reader is checked against 3,795 records in the archived Volume 48 index.
@@ -66,7 +77,7 @@ the original wave bank remain unfinished.
 ARVNKR proprietary songs are not playable. Background video reels
 are not offered as selectable music. No full original-disc equivalence, Arirang
 hardware sound equivalence, legacy lyric encoding equivalence, UDF-only disc
-support, automatic disc downloads or mobile control is claimed in this build.
+support, full ISO downloads or mobile control is claimed in this build.
 
 Library paths and error logs are stored separately in
 `%LOCALAPPDATA%\ArirangMidiPlayer`. VietK settings are not used.

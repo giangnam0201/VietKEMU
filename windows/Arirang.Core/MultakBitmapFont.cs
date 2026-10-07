@@ -52,10 +52,15 @@ public sealed class MultakBitmapFont
 
     public static MultakBitmapFont? ReadIso(string path, DiscInventory inventory, byte languageId)
     {
+        using var stream = File.OpenRead(path);
+        return ReadIso(stream, inventory, languageId);
+    }
+
+    public static MultakBitmapFont? ReadIso(Stream stream, DiscInventory inventory, byte languageId)
+    {
         var file = inventory.Files.SingleOrDefault(f =>
             f.Name.TrimStart('/').Equals("FONT1.BIN", StringComparison.OrdinalIgnoreCase));
         if (file is null) return null;
-        using var stream = File.OpenRead(path);
         if (file.Offset < 0 || file.Bytes < 2048 || file.Bytes > MaximumBytes ||
             file.Offset > stream.Length - file.Bytes)
             throw new InvalidDataException("Invalid FONT1 disc extent.");

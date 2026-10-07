@@ -10,7 +10,7 @@ using Microsoft.Win32;
 
 namespace Arirang.MidiPlayer;
 
-internal sealed record LibraryItem(string Path, string Title, int? DiscSongCode = null) { public override string ToString() => Title; }
+internal sealed record LibraryItem(string Path, string Title, int? DiscSongCode = null, long? RemoteDiscBytes = null) { public override string ToString() => Title; }
 internal sealed class Panel : Window
 {
     private readonly Television tv = new();
@@ -27,6 +27,7 @@ internal sealed class Panel : Window
     private int pitch;
     private int gain = 80;
     private double rate = 1;
+    private readonly CancellationTokenSource networkStop = new();
     public Panel()
     {
         Title = "Arirang MIDI — Điều khiển"; Width = 1280; Height = 820; MinWidth = 900; MinHeight = 600;
@@ -65,8 +66,14 @@ internal sealed class Panel : Window
         songs.FontSize = 20; songs.SelectionMode = SelectionMode.Extended; songContent.Children.Add(songs);
         tabs.Items.Add(new TabItem { Header = "Bài MIDI", Content = songContent });
         var archive = new DockPanel { Margin = new Thickness(12) };
-        var archiveStatus = new TextBlock { Text = "Danh mục đĩa Maseco trên Internet Archive. Đĩa / video nền chưa phải bài hát có thể phát.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
+        var archiveStatus = new TextBlock { Text = "Tải danh mục, chọn đĩa rồi chọn tệp ISO để nhập bài. Đĩa MULTAK hỗ trợ phát trực tuyến từng bài.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 10, 0, 10) };
         var archiveList = new ListBox { FontSize = 17 };
+        var archiveFiles = new ListBox { FontSize = 16, Height = 125 };
+        var remoteImport = Button("Nhập bài từ ISO đã chọn", async () =>
+        {
+            if (archiveFiles.SelectedItem is not ArchiveIso iso) { archiveStatus.Text = "Chọn một tệp ISO trong danh sách."; return; }
+            await ImportRemoteIso(iso, archiveStatus);
+        });
         var refresh = Button("Tải danh mục đĩa", async () =>
         {
             archiveStatus.Text = "Đang đọc danh mục JSON…";
@@ -82,19 +89,32 @@ internal sealed class Panel : Window
             }
             catch (Exception error) { archiveStatus.Text = "Không tải được danh mục: " + error.Message; }
         });
-        DockPanel.SetDock(refresh, Dock.Top); archive.Children.Add(refresh); DockPanel.SetDock(archiveStatus, Dock.Top); archive.Children.Add(archiveStatus); archive.Children.Add(archiveList);
+        DockPanel.SetDock(refresh, Dock.Top); archive.Children.Add(refresh);
+        DockPanel.SetDock(archiveStatus, Dock.Top); archive.Children.Add(archiveStatus);
+        DockPanel.SetDock(remoteImport, Dock.Bottom); archive.Children.Add(remoteImport);
+        DockPanel.SetDock(archiveFiles, Dock.Bottom); archive.Children.Add(archiveFiles); archive.Children.Add(archiveList);
         archiveList.MouseDoubleClick += async (_, _) =>
         {
             if (archiveList.SelectedItem is not ArchiveItem item) return;
+            archiveFiles.Items.Clear();
             archiveStatus.Text = "Đang đọc danh sách tệp…";
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
                 using var data = JsonDocument.Parse(await http.GetStringAsync("https://archive.org/metadata/" + Uri.EscapeDataString(item.Id)));
-                var lines = data.RootElement.GetProperty("files").EnumerateArray().Where(f => f.TryGetProperty("name", out _))
-                    .Select(f => f.GetProperty("name").GetString()!).Where(n => n.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) || n.EndsWith(".dat", StringComparison.OrdinalIgnoreCase) || n.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase) || n.Contains("/midi", StringComparison.OrdinalIgnoreCase)).ToArray();
-                ShowReport(item.Title, string.Join("\n", lines) + "\n\nĐây là tệp đĩa / dữ liệu, chưa phải danh sách bài hát đã giải mã.");
-                archiveStatus.Text = "Đã đọc danh sách tệp. Không tải đĩa lớn tự động.";
+                archiveFiles.Items.Clear();
+                foreach (var file in data.RootElement.GetProperty("files").EnumerateArray())
+                {
+                    if (!file.TryGetProperty("name", out var nameValue) || !file.TryGetProperty("size", out var sizeValue)) continue;
+                    string? name = nameValue.GetString();
+                    if (name is null || !name.EndsWith(".iso", StringComparison.OrdinalIgnoreCase) ||
+                        !long.TryParse(sizeValue.ToString(), out long bytes) || bytes <= 0) continue;
+                    var uri = new Uri("https://archive.org/download/" + Uri.EscapeDataString(item.Id) + "/" + Uri.EscapeDataString(name));
+                    archiveFiles.Items.Add(new ArchiveIso(name, uri, bytes));
+                }
+                if (archiveFiles.Items.Count > 0) archiveFiles.SelectedIndex = 0;
+                archiveStatus.Text = archiveFiles.Items.Count == 0 ? "Mục này không có ISO để đọc trực tuyến." :
+                    $"{archiveFiles.Items.Count} tệp ISO. Chọn tệp rồi nhập danh sách bài; không tải toàn bộ đĩa.";
             }
             catch (Exception error) { archiveStatus.Text = error.Message; }
         };
@@ -112,9 +132,10 @@ internal sealed class Panel : Window
         seek.ValueChanged += (_, _) => { if (!updating && playback?.Song is not null) Safe(() => playback.Seek(seek.Value)); };
         timer.Tick += (_, _) => Tick();
         Loaded += (_, _) => { LoadLibrary(); tv.Show(); timer.Start(); };
-        Closed += (_, _) => { timer.Stop(); playback?.Dispose(); tv.AllowClose = true; tv.Close(); };
+        Closed += (_, _) => { networkStop.Cancel(); timer.Stop(); playback?.Dispose(); tv.AllowClose = true; tv.Close(); };
     }
     private sealed record ArchiveItem(string Id, string Title) { public override string ToString() => Title; }
+    private sealed record ArchiveIso(string Name, Uri Url, long Bytes) { public override string ToString() => Name; }
     private static Button Button(string label, Action click)
     {
         var button = new Button { Content = label, Padding = new Thickness(14, 10, 14, 10), Margin = new Thickness(4), FontSize = 16 };
@@ -143,12 +164,41 @@ internal sealed class Panel : Window
         try
         {
             string path = System.IO.Path.Combine(stateDirectory, "library.json");
-            if (File.Exists(path)) library.AddRange((JsonSerializer.Deserialize<List<LibraryItem>>(File.ReadAllText(path)) ?? []).Where(s => File.Exists(s.Path)));
+            if (File.Exists(path)) library.AddRange((JsonSerializer.Deserialize<List<LibraryItem>>(File.ReadAllText(path)) ?? [])
+                .Where(s => File.Exists(s.Path) || s.RemoteDiscBytes > 0 && Uri.TryCreate(s.Path, UriKind.Absolute, out var uri) &&
+                    uri.Scheme == "https" && uri.Host == "archive.org"));
             RefreshLibrary();
         }
         catch (Exception error) { status.Text = error.Message; }
     }
     private void SaveLibrary() { Directory.CreateDirectory(stateDirectory); File.WriteAllText(System.IO.Path.Combine(stateDirectory, "library.json"), JsonSerializer.Serialize(library)); }
+    private async Task ImportRemoteIso(ArchiveIso iso, TextBlock archiveStatus)
+    {
+        if (loading) return;
+        loading = true; archiveStatus.Text = "Đang đọc danh mục bài bằng các phần nhỏ của ISO…";
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                using var http = new HttpClient();
+                using var stream = new HttpRangeStream(http, iso.Url, iso.Bytes, networkStop.Token);
+                var inventory = DiscInventory.Read(stream);
+                var table = MultakIndex.ReadIso(stream, inventory);
+                var catalogue = MasecoIndex.ReadIso(stream, inventory);
+                var items = catalogue.Where(s => s.SupportedTitle is not null && table.FindSong(s.DeviceCode) is not null)
+                    .Select(s => new LibraryItem(iso.Url.AbsoluteUri, $"{s.DeviceCode}: {s.SupportedTitle} — {iso.Name}", s.DeviceCode, iso.Bytes)).ToArray();
+                return (Items: items, Fetched: stream.BytesFetched);
+            });
+            var existing = library.Select(item => (item.Path, item.DiscSongCode)).ToHashSet();
+            foreach (var item in result.Items)
+                if (existing.Add((item.Path, item.DiscSongCode))) library.Add(item);
+            SaveLibrary(); RefreshLibrary();
+            archiveStatus.Text = $"Đã nhập {result.Items.Length:N0} bài Việt / Anh; đọc {result.Fetched / 1024d:N0} KiB dữ liệu danh mục. Chọn bài trong thư viện để phát trực tuyến.";
+            status.Text = "Đã nhập bài trực tuyến; chọn bài để phát hoặc thêm vào hàng chờ.";
+        }
+        catch (Exception error) { archiveStatus.Text = "Không đọc được đĩa trực tuyến: " + error.Message; }
+        finally { loading = false; }
+    }
     private void RefreshLibrary() { songs.ItemsSource = library.Where(s => s.Title.Contains(search.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray(); }
     private void RefreshQueue() { selected.ItemsSource = queue.ToArray(); }
     private void AddSelected() { foreach (LibraryItem item in songs.SelectedItems) queue.Add(item); RefreshQueue(); status.Text = $"Đã chọn {queue.Count} bài"; }
@@ -162,14 +212,17 @@ internal sealed class Panel : Window
             var song = await Task.Run(() =>
             {
                 if (item.DiscSongCode is not int code) return MidiSong.Read(item.Path);
-                var inventory = DiscInventory.Read(item.Path);
-                var index = MultakIndex.ReadIso(item.Path, inventory);
-                var entry = MasecoIndex.ReadIso(item.Path, inventory).Single(s => s.DeviceCode == code);
-                var decoded = MultakPlaybackSong.Parse(index.ReadSongRecordIso(item.Path, inventory, code), item.Title, entry.LanguageId);
+                using var http = item.RemoteDiscBytes is not null ? new HttpClient() : null;
+                using Stream stream = item.RemoteDiscBytes is long bytes ?
+                    new HttpRangeStream(http!, new Uri(item.Path), bytes, networkStop.Token) : File.OpenRead(item.Path);
+                var inventory = DiscInventory.Read(stream);
+                var index = MultakIndex.ReadIso(stream, inventory);
+                var entry = MasecoIndex.ReadIso(stream, inventory).Single(s => s.DeviceCode == code);
+                var decoded = MultakPlaybackSong.Parse(index.ReadSongRecordIso(stream, inventory, code), item.Title, entry.LanguageId);
                 if (decoded.Lyrics.Count == 0) return decoded;
                 try
                 {
-                    var font = MultakBitmapFont.ReadIso(item.Path, inventory, entry.LanguageId);
+                    var font = MultakBitmapFont.ReadIso(stream, inventory, entry.LanguageId);
                     return decoded with { LyricFont = font, Notice = font is null ? "Phông chữ gốc không có trên đĩa này." : decoded.Notice };
                 }
                 catch (InvalidDataException)

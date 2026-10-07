@@ -6,6 +6,11 @@ public sealed record DiscInventory(string Format, IReadOnlyList<DiscFile> Files)
     public static DiscInventory Read(string path)
     {
         using var stream = File.OpenRead(path);
+        return Read(stream);
+    }
+
+    public static DiscInventory Read(Stream stream)
+    {
         var header = ReadAt(stream, 0, (int)Math.Min(8, stream.Length));
         if (header.AsSpan().StartsWith("Rar!"u8)) return new("RAR archive (not an ISO image)", []);
         if (header.AsSpan().StartsWith("MThd"u8)) return new("Standard MIDI", []);

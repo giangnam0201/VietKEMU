@@ -69,11 +69,16 @@ public static class MasecoIndex
 
     public static IReadOnlyList<MasecoSong> ReadIso(string path, DiscInventory inventory)
     {
+        using var stream = File.OpenRead(path);
+        return ReadIso(stream, inventory);
+    }
+
+    public static IReadOnlyList<MasecoSong> ReadIso(Stream stream, DiscInventory inventory)
+    {
         var index = inventory.Files.SingleOrDefault(f => f.Name.Equals("MASECOS4.IDX", StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidDataException("Root MASECOS4.IDX not found.");
         if (index.Bytes > MaximumBytes || index.Bytes < 0)
             throw new InvalidDataException("MASECOS4 index exceeds size limit.");
-        using var stream = File.OpenRead(path);
         if (index.Offset < 0 || index.Offset > stream.Length - index.Bytes)
             throw new InvalidDataException("Truncated MASECOS4 extent.");
         stream.Position = index.Offset;
