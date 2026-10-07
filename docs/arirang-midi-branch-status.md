@@ -192,3 +192,11 @@ a local supported MULTAK ISO can enter the library and queue; decoding occurs
 when selected. This path uses Windows MIDI instruments and has no original
 lyrics yet. Two record clocks calculate 62.604167 and 43.1875 seconds, but
 original-device scheduling and audible output remain unverified.
+
+The [experimental ISO playback release](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37621741248)
+passed its complete Windows run at commit `f161ad6`. Its downloaded 108 KiB
+verification bundle confirms both tempo calculations and prior note counts;
+the panel screenshot shows the ISO import control and separate live TV preview.
+Native-device timing, original lyrics/instruments and audible original playback
+remain explicitly unverified. VietK `main` separately contains the verified
+half-size default QR and persistent size slider at `4119282`.

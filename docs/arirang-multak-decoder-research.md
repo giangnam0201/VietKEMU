@@ -197,3 +197,10 @@ The branch adds an explicitly experimental local ISO import for mapped English
 MASECOS4 titles. Selecting a song reads its bounded original record, expands it
 and uses the existing Windows MIDI scheduler and queue. It uses Windows
 instruments; original lyrics and the native wave bank remain unimplemented.
+
+The [experimental playback build](https://github.com/giangnam0201/VietKEMU/actions/runs/37621741248)
+passed at `f161ad6`. The inspected verification report has
+`tempoClockConverted=true`, durations 62.60416666666667/43.1875, and unchanged
+1,692/1,001 event counts. Native timing, original lyrics/instruments and playback
+verification remain false. Only the 108 KiB verification ZIP was retrieved;
+the Windows application ZIP was not downloaded.
