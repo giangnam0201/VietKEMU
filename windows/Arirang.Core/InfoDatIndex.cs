@@ -52,8 +52,10 @@ public static class InfoDatIndex
         if (size > bytes.Length - at) throw new InvalidDataException("Truncated index text.");
         var text = bytes.AsSpan(at, size);
         foreach (byte b in text)
-            if (b < 32 || ascii && b > 126) throw new InvalidDataException("Invalid index text.");
+            if (ascii && (b < 32 || b > 126)) throw new InvalidDataException("Invalid index title.");
         at += size;
-        return Encoding.Latin1.GetString(text);
+        // One real Volume 48 artist field contains a control byte. It is not a
+        // record delimiter; retain the length-prefixed record and display a space.
+        return new string(Encoding.Latin1.GetString(text).Select(c => c < 32 ? ' ' : c).ToArray());
     }
 }
