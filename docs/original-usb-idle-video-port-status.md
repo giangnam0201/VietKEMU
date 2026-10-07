@@ -23,7 +23,11 @@ Windows indeterminate progress control; the original loading GIF is not bundled.
 The remaining linked/cloud editor and mobile USB upload flow are not claimed
 complete by this change.
 
-GitHub verification is pending. File checks cover exact copy, source removal,
+GitHub run [37568936220](https://github.com/giangnam0201/VietKEMU/actions/runs/37568936220)
+passed and published Windows test build 62. Its native editor report confirms
+`originalUsbCopyDeleteDialogPorted`, `usbCancelPreservesFile`,
+`usbRemovalKeepsDecodedPreview` and `usbCopyFailureShown`; the USB result
+screenshot was inspected. File checks cover exact copy, source removal,
 replacement, failed-copy preservation, temporary cleanup and delete scope.
 Native interaction checks use an actual synthetic MP4 and shared decoded preview
 frames after removing its source, copy cancellation/result confirmation,
