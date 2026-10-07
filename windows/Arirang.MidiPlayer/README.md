@@ -52,7 +52,16 @@ glyphs in two voices, with all 119 phrase starts matching guide notes.
 The lyrics use the same tempo clock as the music. Native synthetic checks also
 verify accented characters and separate highlighting in both rows and preview.
 Other unsupported lyric encodings keep audio playback available with a visible notice.
-Rendering original fonts, countdown graphics and
+When a supported local ISO includes `FONT1.BIN`, both TV lyric rows use its
+original 24-by-48 Latin/Vietnamese bitmap glyphs, including their black outlines.
+Original glyph codes survive playback conversion; glyph bitmaps are cached
+across unchanged frames. The panel mirrors that same TV rendering. The bounded
+reader loads one 64 KiB bank and its header, without extracting the disc or
+bundling original fonts in the app. Missing/unsupported fonts use ordinary text
+with a visible notice. Original font pixels are verified against Volume 40;
+native rendering uses independently generated synthetic glyphs for its public
+screenshots. Exact hardware font placement/colors are not verified.
+Countdown graphics and
 the original wave bank remain unfinished.
 ARVNKR proprietary songs are not playable. Background video reels
 are not offered as selectable music. No full original-disc equivalence, Arirang

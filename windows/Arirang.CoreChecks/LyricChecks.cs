@@ -19,7 +19,8 @@ internal static class LyricChecks
         var lyrics = MultakLyrics.Parse(raw);
         if (lyrics.PrimaryBytes != 15 || lyrics.SecondaryBytes != 13 || lyrics.StaffOffset != 99 || lyrics.EndTick != 85 ||
             !lyrics.Glyphs.SequenceEqual(new MultakLyricGlyph[] {
-                new(25, 'L', true, 1), new(37, 'a', false, 1), new(49, 'l', true, 2), new(55, 'a', false, 2) }))
+                new(25, 'L', true, 1, (byte)'L'), new(37, 'a', false, 1, (byte)'a'),
+                new(49, 'l', true, 2, (byte)'l'), new(55, 'a', false, 2, (byte)'a') }))
             throw new Exception("Original lyric voices, formatting parameters and absolute secondary time.");
         var song = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [new(24, 1, [22])], 100)], "Lyric clock", lyrics.Glyphs);
         if (Math.Abs(song.Lyrics[0].Seconds - (0.5 + 2.5 / 60)) > .000001 || song.Lyrics[2].Voice != 2)
@@ -28,11 +29,12 @@ internal static class LyricChecks
         vietnamese[76] = (byte)(0xae ^ mask); vietnamese[78] = (byte)(0xa0 ^ mask);
         vietnamese[82] = (byte)(3 ^ mask); // Replace a primary delay control; same timing.
         var vn = MultakLyrics.Parse(vietnamese, 7);
-        if (vn.Glyphs[0] != new MultakLyricGlyph(25, 'Đ', true, 1) ||
-            vn.Glyphs[1] != new MultakLyricGlyph(37, 'á', false, 1) || vn.EndTick != lyrics.EndTick)
+        if (vn.Glyphs[0] != new MultakLyricGlyph(25, 'Đ', true, 1, 0xae) ||
+            vn.Glyphs[1] != new MultakLyricGlyph(37, 'á', false, 1, 0xa0) || vn.EndTick != lyrics.EndTick)
             throw new Exception("Vietnamese glyphs and intro controls must preserve lyric timing.");
         var vnSong = MultakPlaybackSong.FromChannels([new([new(0, 0xc0, 0, null)], [], 100)], "Synthetic Vietnamese", vn.Glyphs);
-        if (vnSong.Lyrics[0].Text != "Đ" || vnSong.Lyrics[1].Text != "á")
+        if (vnSong.Lyrics[0].Text != "Đ" || vnSong.Lyrics[1].Text != "á" ||
+            vnSong.Lyrics[0].OriginalGlyphCode != 0xae || vnSong.Lyrics[1].OriginalGlyphCode != 0xa0)
             throw new Exception("Vietnamese Unicode glyphs must survive playback conversion.");
         bool unknownLanguageRejected = false;
         try { MultakLyrics.Parse(raw, 1); } catch (InvalidDataException) { unknownLanguageRejected = true; }

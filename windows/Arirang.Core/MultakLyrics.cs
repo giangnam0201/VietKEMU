@@ -1,6 +1,6 @@
 namespace Arirang.Core;
 
-public sealed record MultakLyricGlyph(long Tick, char Text, bool NewLine, byte Voice);
+public sealed record MultakLyricGlyph(long Tick, char Text, bool NewLine, byte Voice, byte? OriginalGlyphCode = null);
 public sealed record MultakLyrics(IReadOnlyList<MultakLyricGlyph> Glyphs,
     int PrimaryBytes, int SecondaryBytes, int StaffOffset, long EndTick)
 {
@@ -80,7 +80,7 @@ public sealed record MultakLyrics(IReadOnlyList<MultakLyricGlyph> Glyphs,
                         throw new InvalidDataException("This MULTAK lyric encoding is not supported yet.");
                     if (glyphs.Count >= 500_000) throw new InvalidDataException("MULTAK lyric glyph limit exceeded.");
                     if (++lineLength > 1024) throw new InvalidDataException("MULTAK lyric line exceeds display limit.");
-                    glyphs.Add(new(tick, text, newLine, voice)); newLine = false;
+                    glyphs.Add(new(tick, text, newLine, voice, op)); newLine = false;
                     tick = checked(tick + ReadTime());
                 }
                 if (tick > int.MaxValue) throw new InvalidDataException("MULTAK lyric tick limit exceeded.");

@@ -34,6 +34,7 @@ internal static class Program
                     Capture(panel, Path.Combine(args[2], "arirang-panel.png"));
                     bool dualVoicesVerified = false;
                     bool vietnameseRowsVerified = false;
+                    bool bitmapFontRowsVerified = false;
                     foreach (Window window in app.Windows)
                         if (window is Television tv)
                         {
@@ -66,7 +67,28 @@ internal static class Program
                             if (rows.FirstHighlighted != 2 || rows.SecondHighlighted != 4)
                                 throw new InvalidDataException("Vietnamese lyric rows must finish highlighting independently.");
                             vietnameseRowsVerified = true;
+                            var bitmap = new MidiSong("Synthetic bitmap font fixture", 2, [], [
+                                new(0, "A", true, 1, 65), new(.5, "B", true, 2, 66),
+                                new(1, "B", false, 1, 66), new(1.5, "A", false, 2, 65)])
+                                { LyricFont = SyntheticFont() };
+                            tv.Update(bitmap, .75, true); tv.UpdateLayout();
+                            rows = tv.RenderedVoiceRows;
+                            if (!tv.OriginalBitmapFontActive || rows.First != "AB" || rows.Second != "BA" ||
+                                rows.FirstHighlighted != 1 || rows.SecondHighlighted != 1)
+                                throw new InvalidDataException("Original bitmap rendering path lost lyric rows or highlighting.");
+                            Capture(tv, Path.Combine(args[2], "synthetic-bitmap-font-tv.png"));
+                            Capture(panel, Path.Combine(args[2], "synthetic-bitmap-font-preview.png"));
+                            int cached = tv.CachedGlyphBitmaps;
+                            for (int repeat = 0; repeat < 10; repeat++) tv.Update(bitmap, .75, true);
+                            if (cached != 4 || tv.CachedGlyphBitmaps != cached)
+                                throw new InvalidDataException("Bitmap glyphs must be cached across unchanged frames.");
+                            tv.Update(bitmap, 1.75, true); tv.UpdateLayout();
+                            rows = tv.RenderedVoiceRows;
+                            if (rows.FirstHighlighted != 2 || rows.SecondHighlighted != 2)
+                                throw new InvalidDataException("Original bitmap rows must advance independently.");
+                            bitmapFontRowsVerified = true;
                             tv.Update(song, .55, true);
+                            if (tv.OriginalBitmapFontActive) throw new InvalidDataException("Standard MIDI must restore its text renderer.");
                             dualVoicesVerified = true;
                         }
                     File.WriteAllText(Path.Combine(args[2], "verification.json"), JsonSerializer.Serialize(new
@@ -79,6 +101,8 @@ internal static class Program
                         audioHardwareVerified = false,
                         independentLyricVoiceRowsVerified = dualVoicesVerified,
                         vietnameseLyricVoiceRowsVerified = vietnameseRowsVerified,
+                        syntheticBitmapFontRowsRendered = bitmapFontRowsVerified,
+                        unchangedBitmapFramesReuseCache = bitmapFontRowsVerified,
                         originalDiscPlaybackVerified = false
                     }, new JsonSerializerOptions { WriteIndented = true }));
                     panel.CloseForVerification();
@@ -96,5 +120,33 @@ internal static class Program
         var image = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
         image.Render(window); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
         using var stream = File.Create(path); encoder.Save(stream);
+    }
+
+    private static MultakBitmapFont SyntheticFont()
+    {
+        // Independently generated toy glyphs; never a copy of original font data.
+        var resource = new byte[4096 + 65536]; resource[24] = 2; resource[28] = 1;
+        resource[72] = 84; resource[107] = 24; resource[108] = 48; resource[109] = 4; resource[110] = 1;
+        string[][] patterns = [
+            ["00100", "01010", "10001", "11111", "10001", "10001", "10001"],
+            ["11110", "10001", "10001", "11110", "10001", "10001", "11110"]];
+        for (int letter = 0; letter < patterns.Length; letter++)
+        {
+            var fill = new bool[24 * 48];
+            for (int y = 0; y < 7; y++) for (int x = 0; x < 5; x++)
+                if (patterns[letter][y][x] == '1')
+                    for (int dy = 0; dy < 3; dy++) for (int dx = 0; dx < 3; dx++)
+                        fill[(12 + y * 3 + dy) * 24 + 4 + x * 3 + dx] = true;
+            for (int y = 0; y < 48; y++) for (int x = 0; x < 24; x++)
+            {
+                int level = fill[y * 24 + x] ? 3 : 0;
+                if (level == 0)
+                    for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++)
+                        if (y + dy is >= 0 and < 48 && x + dx is >= 0 and < 24 && fill[(y + dy) * 24 + x + dx]) level = 1;
+                int pixel = y * 24 + x;
+                resource[4096 + (65 + letter - 32) * 288 + pixel / 4] |= (byte)(level << (6 - pixel % 4 * 2));
+            }
+        }
+        return MultakBitmapFont.Parse(resource, 7);
     }
 }

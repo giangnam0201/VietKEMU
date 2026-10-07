@@ -13,12 +13,18 @@ internal sealed class Television : Window
     private readonly TextBlock lyrics = new() { FontSize = 50, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock upcoming = new() { FontSize = 32, Foreground = Brushes.WhiteSmoke, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock progress = new() { Foreground = Brushes.WhiteSmoke, FontSize = 18 };
+    private readonly BitmapLyricRow bitmapFirst = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 45, 0, 20) };
+    private readonly BitmapLyricRow bitmapSecond = new() { Visibility = Visibility.Collapsed };
     private MidiSong? lyricSong;
     private LyricCue[] voiceOne = [], voiceTwo = [];
     internal (string First, string Second, int FirstHighlighted, int SecondHighlighted) RenderedVoiceRows =>
+        OriginalBitmapFontActive ?
+        (bitmapFirst.Text, bitmapSecond.Text, bitmapFirst.HighlightedCharacters, bitmapSecond.HighlightedCharacters) :
         (lyrics.Text, upcoming.Text,
          lyrics.Inlines.OfType<System.Windows.Documents.Run>().Where(r => r.Foreground == Brushes.Gold).Sum(r => r.Text.Length),
          upcoming.Inlines.OfType<System.Windows.Documents.Run>().Where(r => r.Foreground == Brushes.Gold).Sum(r => r.Text.Length));
+    internal bool OriginalBitmapFontActive => bitmapFirst.Visibility == Visibility.Visible;
+    internal int CachedGlyphBitmaps => bitmapFirst.CachedBitmaps + bitmapSecond.CachedBitmaps;
     public bool AllowClose { get; set; }
     public Television()
     {
@@ -30,7 +36,10 @@ internal sealed class Television : Window
         header.Children.Add(brand); Scene.Children.Add(header);
         var lines = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(60) };
         lines.Children.Add(title); lyrics.Margin = new Thickness(0, 45, 0, 20);
-        lines.Children.Add(lyrics); lines.Children.Add(upcoming); Scene.Children.Add(lines);
+        lines.Children.Add(lyrics); lines.Children.Add(upcoming);
+        lines.Children.Add(bitmapFirst); lines.Children.Add(bitmapSecond); Scene.Children.Add(lines);
+        RenderOptions.SetBitmapScalingMode(bitmapFirst, BitmapScalingMode.NearestNeighbor);
+        RenderOptions.SetBitmapScalingMode(bitmapSecond, BitmapScalingMode.NearestNeighbor);
         progress.HorizontalAlignment = HorizontalAlignment.Right; progress.VerticalAlignment = VerticalAlignment.Bottom;
         progress.Margin = new Thickness(24); Scene.Children.Add(progress);
         Content = Scene; Icon = Brand.Source;
@@ -52,6 +61,16 @@ internal sealed class Television : Window
             voiceTwo = song?.Lyrics.Where(c => c.Voice == 2).ToArray() ?? [];
         }
         title.Text = song?.Title ?? "ARIRANG MIDI KARAOKE";
+        if (song?.LyricFont is MultakBitmapFont font && (voiceOne.Length > 0 || voiceTwo.Length > 0) &&
+            bitmapFirst.Present(font, voiceOne, seconds) && bitmapSecond.Present(font, voiceTwo, seconds))
+        {
+            lyrics.Visibility = upcoming.Visibility = Visibility.Collapsed;
+            bitmapFirst.Visibility = bitmapSecond.Visibility = Visibility.Visible;
+            progress.Text = $"{TimeSpan.FromSeconds(seconds):mm\\:ss} / {TimeSpan.FromSeconds(song.Duration):mm\\:ss}  •  {(playing ? "Đang phát" : "Dừng")}";
+            return;
+        }
+        lyrics.Visibility = upcoming.Visibility = Visibility.Visible;
+        bitmapFirst.Visibility = bitmapSecond.Visibility = Visibility.Collapsed;
         progress.Text = song is null ? "" : $"{TimeSpan.FromSeconds(seconds):mm\\:ss} / {TimeSpan.FromSeconds(song.Duration):mm\\:ss}  •  {(playing ? "Đang phát" : "Dừng")}";
         lyrics.Inlines.Clear(); upcoming.Inlines.Clear(); upcoming.FontSize = 32;
         if (song is null) { lyrics.Text = "Chọn bài hát để bắt đầu"; lyrics.Foreground = Brushes.White; return; }

@@ -165,7 +165,17 @@ internal sealed class Panel : Window
                 var inventory = DiscInventory.Read(item.Path);
                 var index = MultakIndex.ReadIso(item.Path, inventory);
                 var entry = MasecoIndex.ReadIso(item.Path, inventory).Single(s => s.DeviceCode == code);
-                return MultakPlaybackSong.Parse(index.ReadSongRecordIso(item.Path, inventory, code), item.Title, entry.LanguageId);
+                var decoded = MultakPlaybackSong.Parse(index.ReadSongRecordIso(item.Path, inventory, code), item.Title, entry.LanguageId);
+                if (decoded.Lyrics.Count == 0) return decoded;
+                try
+                {
+                    var font = MultakBitmapFont.ReadIso(item.Path, inventory, entry.LanguageId);
+                    return decoded with { LyricFont = font, Notice = font is null ? "Phông chữ gốc không có trên đĩa này." : decoded.Notice };
+                }
+                catch (InvalidDataException)
+                {
+                    return decoded with { Notice = "Phông chữ gốc trên đĩa này chưa hỗ trợ; dùng phông mặc định." };
+                }
             });
             playback ??= new MidiPlayback(new WindowsMidiOutput());
             playback.Load(song); playback.SetKey(pitch); playback.SetVolume(gain); playback.SetSpeed(rate); playback.Play(); started = true;

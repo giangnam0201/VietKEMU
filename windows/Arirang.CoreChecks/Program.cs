@@ -18,6 +18,10 @@ if (args.Length == 3 && args[0] == "--vnlyrics")
 {
     VietnameseLyricChecks.ExportOriginal(args[1], args[2]); return;
 }
+if (args.Length == 3 && args[0] == "--fonts")
+{
+    BitmapFontChecks.ExportOriginal(args[1], args[2]); return;
+}
 
 static void Check(bool value, string message) { if (!value) throw new Exception(message); }
 byte[] multakHeader = new byte[MultakIndex.TableOffset + 12];
@@ -40,6 +44,7 @@ bool outsideRejected = false;
 try { MultakIndex.Parse(multakHeader, 500, 600_000); } catch (InvalidDataException) { outsideRejected = true; }
 Check(outsideRejected, "MULTAK extents must fit the declared storage file.");
 MasecoChecks.Run();
+BitmapFontChecks.Run();
 LayoutChecks.Run();
 LyricChecks.Run();
 if (args.Length == 4 && args[0] == "--layouts")

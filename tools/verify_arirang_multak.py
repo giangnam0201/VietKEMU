@@ -37,6 +37,16 @@ def download():
     if index[0x7d0:0x7dc] != b'Multak MID10':
         raise ValueError('Unexpected Volume 40 song-index header')
     (ROOT / 'index.idx').write_bytes(index)
+    font_header = read_range(1176885 * 2048, 2048)
+    font = bytearray(2574336)
+    font[:2048] = font_header
+    for bank in (2, 4):
+        relative = int.from_bytes(font_header[bank * 6:bank * 6 + 3], 'little') * 2048
+        size = int.from_bytes(font_header[bank * 6 + 3:bank * 6 + 6], 'little') * 256
+        if size != 65536 or relative < 2048 or relative + size > len(font):
+            raise ValueError('Unsupported original font-bank extent')
+        font[relative:relative + size] = read_range(1176885 * 2048 + relative, size)
+    (ROOT / 'FONT1-private.bin').write_bytes(font)
     for code in (30001, 30093, 50001):
         base_at = 16 + 2 * (code // 1000)
         base = int.from_bytes(data[base_at:base_at + 2], 'little')
@@ -89,6 +99,9 @@ def report():
     assert lyrics['allPhraseStartsMatchGuide'] and lyrics['vietnameseGlyphsDecoded'] and lyrics['lyricsRetainedInPlayback']
     assert sum(record['lyricPhraseStarts'] for record in lyrics['records']) == 119
     assert not lyrics['nativeDeviceTimingVerified'] and not lyrics['originalInstrumentsVerified'] and not lyrics['audiblePlaybackVerified']
+    fonts = json.loads((output.parent / 'font-verification.json').read_text(encoding='utf-8'))
+    assert fonts['originalBanksVerified'] == 2 and fonts['bitmapLayoutVerified'] and fonts['pixelLevelsVerified']
+    assert not fonts['originalFontBundled'] and not fonts['originalDeviceRenderingVerified']
     catalogue.update(sourceUrl=URL, rangeBytesFetched=SIZE + 1044480 + 3 * 1024)
     (output.parent / 'song-mapping-verification.json').write_text(json.dumps(catalogue, indent=2), encoding='utf-8')
     print(f"Verified {parsed['datPointers'] + parsed['da1Pointers']} storage pointers; MIDI decoding remains unfinished.")

@@ -4,10 +4,11 @@ using System.Text;
 namespace Arirang.Core;
 
 public sealed record MidiMessage(double Seconds, uint Packed, byte[]? SystemExclusive = null);
-public sealed record LyricCue(double Seconds, string Text, bool NewLine, byte Voice = 0);
+public sealed record LyricCue(double Seconds, string Text, bool NewLine, byte Voice = 0, byte? OriginalGlyphCode = null);
 public sealed record MidiSong(string Title, double Duration, IReadOnlyList<MidiMessage> Messages,
     IReadOnlyList<LyricCue> Lyrics, string? Notice = null)
 {
+    public MultakBitmapFont? LyricFont { get; init; }
     private sealed record Raw(long Tick, int Order, uint Packed = 0, int Tempo = 0,
         byte[]? Text = null, int TextType = 0, byte[]? SystemExclusive = null);
 

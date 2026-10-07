@@ -50,6 +50,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Original multi-channel song layout decoding failed' }
           dotnet run --project windows/Arirang.CoreChecks -c Release -- --vnlyrics .reference/arirang-multak/complete-50001.bin artifacts/arirang-verification/vietnamese-lyric-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Original Vietnamese lyric timing verification failed' }
+          dotnet run --project windows/Arirang.CoreChecks -c Release -- --fonts .reference/arirang-multak/FONT1-private.bin artifacts/arirang-verification/font-verification.json
+          if ($LASTEXITCODE -ne 0) { throw 'Original font bitmap verification failed' }
           python tools/verify_arirang_multak.py report
           if ($LASTEXITCODE -ne 0) { throw 'Original MULTAK verification failed' }
       - name: Verify two native windows and capture UI

@@ -60,11 +60,11 @@ public static class MultakPlaybackSong
                 (uint)(e.Status | e.Data1 << 8 | (e.Data2 ?? 0) << 16))).ToArray();
         double duration = Seconds(end);
         if (glyphs is not null && (glyphs.Count > 500_000 || glyphs.Any(g => g.Tick < 0 || g.Tick > end ||
-            !MultakVietnameseText.IsDisplayCharacter(g.Text) || g.Voice is not (1 or 2))))
+            !MultakVietnameseText.IsDisplayCharacter(g.Text) || g.Voice is not (1 or 2) || g.OriginalGlyphCode is < 32)))
             throw new InvalidDataException("Invalid MULTAK lyric timeline.");
         nextTempo = 0; bpm = 120; anchorTick = 0; anchorSeconds = 0;
         var lyrics = (glyphs ?? []).OrderBy(g => g.Tick)
-            .Select(g => new LyricCue(Seconds(g.Tick), g.Text.ToString(), g.NewLine, g.Voice)).ToArray();
+            .Select(g => new LyricCue(Seconds(g.Tick), g.Text.ToString(), g.NewLine, g.Voice, g.OriginalGlyphCode)).ToArray();
         return new(title, duration, messages, lyrics);
     }
 }
