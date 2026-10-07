@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace VietK.Core;
 
-public sealed record YouTubeVideo(string Id,string Title,string Channel,string Thumbnail);
+public sealed record YouTubeVideo(string Id,string Title,string Channel,string Thumbnail,string Provider="YouTube",string Url="");
 public sealed record YouTubeTransferProgress(long Received,long Total,string State);
 public sealed class YouTubeIncompleteAudioException(string message):IOException(message) { }
 
@@ -101,7 +101,7 @@ public sealed class YouTubeMusicClient(string toolDirectory,string cacheDirector
         File.Move(marker+".tmp",marker,true);
         return destination;
     }
-    private static async Task<string> Run(string executable,IEnumerable<string> arguments,Action<string>? output,
+    internal static async Task<string> Run(string executable,IEnumerable<string> arguments,Action<string>? output,
         CancellationToken cancellation,TimeSpan duration)
     {
         var start=new ProcessStartInfo(executable) { UseShellExecute=false,CreateNoWindow=true,

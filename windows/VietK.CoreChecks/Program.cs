@@ -732,3 +732,5 @@ var youtubeEntries=YouTubeMusicClient.ParseSearch("""{"entries":[null,{"id":"inv
 Require(youtubeEntries.Count==1 && youtubeEntries[0].Title=="Video tiếng Việt" && youtubeEntries[0].Channel=="Public channel",
     "YouTube search dropped real metadata or admitted invalid entries");
 Console.WriteLine("YouTube public video URL normalization, playlist exclusion, untrusted-host rejection and Unicode metadata parsing verified.");
+
+CloudMusicChecks.Run();

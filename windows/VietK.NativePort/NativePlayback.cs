@@ -45,7 +45,7 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
     public int Position => (int)Math.Clamp(Native.Time, 0, int.MaxValue);
     public int Duration => (int)Math.Clamp(Native.Length, 0, int.MaxValue);
 
-    public WindowsVideoDecoder(Dispatcher dispatcher,bool disableAudio=false)
+    public WindowsVideoDecoder(Dispatcher dispatcher,bool disableAudio=false,bool disableVideo=false)
     {
         this.dispatcher = dispatcher;
         var directory = Path.Combine(AppContext.BaseDirectory, "libvlc", "win-x64");
@@ -53,7 +53,9 @@ public sealed class WindowsVideoDecoder : IOriginalVideoDecoder, IDisposable
             throw new FileNotFoundException("Bundled Windows decoder missing", directory);
         LibVLCSharp.Shared.Core.Initialize(directory);
         AudioDisabled=disableAudio;
-        library = new LibVLC(disableAudio?["--no-video-title-show","--no-osd","--no-audio"]:["--no-video-title-show","--no-osd"]);
+        var options=new List<string>{"--no-video-title-show","--no-osd"};
+        if(disableAudio)options.Add("--no-audio");if(disableVideo)options.Add("--no-video");
+        library = new LibVLC(options.ToArray());
         Native = new MediaPlayer(library) { EnableKeyInput = false, EnableMouseInput = false };
         unmuteFade=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(100) };
         unmuteFade.Tick+=(_,_)=>
@@ -239,11 +241,17 @@ public sealed class NativePlayback : IDisposable
     private readonly BottomBar bottom;
     private readonly string stateFile;
     private bool playingIdle;
-    public BitmapSource? PreviewFrame => Television.CompositePreview(Decoder.VideoSurface);
+    public BitmapSource? PreviewFrame => Television.CompositePreview(videoDecoder.VideoSurface);
     public int DecodedPreviewFrames { get; private set; }
     public event Action<BitmapSource>? PreviewFrameChanged;
-    public WindowsVideoDecoder Decoder { get; }
-    public OriginalVideoPlayer Player { get; }
+    private readonly WindowsVideoDecoder videoDecoder;
+    private readonly OriginalVideoPlayer videoPlayer;
+    private WindowsVideoDecoder? audioDecoder;
+    private OriginalVideoPlayer? audioPlayer;
+    public WindowsVideoDecoder Decoder=>audioDecoder??videoDecoder;
+    public OriginalVideoPlayer Player=>audioPlayer??videoPlayer;
+    public bool IsCloudAudio=>audioPlayer is not null;
+    internal Action<WindowsVideoDecoder>? ConfigureCloudDecoder { get; set; }
     public TelevisionWindow Television { get; }
     public event Action? NextRequested;
     public event Action<PlaybackSource>? SourceChanged;
@@ -293,11 +301,12 @@ public sealed class NativePlayback : IDisposable
         IdlePlaylist=new OriginalBroadcastPlaylist(stateDirectory);
         songVolumeStep=DefaultVolumeSettings.Volume;broadcastVolumeStep=BroadcastVolumeSettings.Volume;broadcastMuted=BroadcastVolumeSettings.Muted;
         MarqueeSettings=new OriginalMarqueeSettings(stateDirectory);
-        Decoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
+        videoDecoder = new WindowsVideoDecoder(Dispatcher.CurrentDispatcher);
         Television = new TelevisionWindow(Decoder.VideoSurface,MarqueeSettings);
-        Decoder.VideoFrameChanged+=()=> { DecodedPreviewFrames++;PreviewFrameChanged?.Invoke(Decoder.VideoSurface); };
-        Player = new OriginalVideoPlayer(Decoder, Television.SetBlack);
+        videoDecoder.VideoFrameChanged+=()=> { DecodedPreviewFrames++;PreviewFrameChanged?.Invoke(videoDecoder.VideoSurface); };
+        videoPlayer = new OriginalVideoPlayer(Decoder, Television.SetBlack);
         Decoder.Original = Player;
+        videoDecoder.Started=()=> { if(!playingIdle&&audioPlayer is null)Television.Overlay.SetLoading(); };
         Decoder.ConfirmedPause = paused => { bottom.SetConfirmedPlaybackState(paused, Player.SingMode == OriginalSingMode.Original);
             Television.Overlay.SetPaused(paused); };
         Decoder.ConfirmedTrack = original =>
@@ -310,6 +319,8 @@ public sealed class NativePlayback : IDisposable
         };
         Player.Completed += () => Dispatcher.CurrentDispatcher.BeginInvoke(() =>
         {
+            if(audioPlayer is not null)
+            { if(IdleVideoSource is { } background) { videoPlayer.SetSource(background);videoPlayer.Play(); }return; }
             if(playingIdle) { StartIdleDemo();return; }
             if(CommandOverride?.Invoke("decoder_completed")!=true)NextRequested?.Invoke();
         });
@@ -334,6 +345,8 @@ public sealed class NativePlayback : IDisposable
     }
     public bool StartIdleDemo(bool advance=true)
     {
+        if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
+        StopCloudAudio();Television.Overlay.SetLoading();
         // BroadcastListManager / USBSetBroadcastDialog: Demo.mp4 is a separate
         // idle broadcast, not the APK's grade_video.mp4 scoring animation.
         var paths=new[] { idleVideoPath,UsbBroadcast.DestinationPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
@@ -349,7 +362,6 @@ public sealed class NativePlayback : IDisposable
         else if(!paths.Take(5).Any(File.Exists)&&ResolveIdleSong is not null)
             idleSong=IdlePlaylist.Next(id=> { var candidate=ResolveIdleSong(id);return candidate is not null&&File.Exists(candidate.Path)?candidate:null; },IdleSongExists);
         var demo=!advance&&Source==PlaybackSource.Idle&&IdleVideoSource is { } existing&&File.Exists(existing)?existing:idleSong?.Path??paths.FirstOrDefault(File.Exists);
-        if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
         playingIdle=false;Player.Stop();CurrentMedia=idleSong?.Metadata;IdleSongId=idleSong?.Metadata.SongId;IdleVideoSource=demo;ResetPreview();
         Decoder.SetOutputVolumeStep(broadcastMuted?0:broadcastVolumeStep);
         Source=PlaybackSource.Idle;CurrentFlowId="";SourceChanged?.Invoke(Source);
@@ -416,6 +428,7 @@ public sealed class NativePlayback : IDisposable
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || (uri.IsFile && !File.Exists(uri.LocalPath))) return false;
         if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
+        StopCloudAudio();
         Decoder.SetOutputVolumeStep(songVolumeStep);
         Source=source;CurrentFlowId=flowId;SourceChanged?.Invoke(source);
         playingIdle=false;Player.Stop(); CurrentMedia = metadata;IdleSongId=null;ResetPreview();
@@ -425,6 +438,27 @@ public sealed class NativePlayback : IDisposable
         var gain=(metadata?.DefaultVolume??100)/100f;
         Player.SetVolume(gain <= 0 ? 0.8f : gain);
         return Player.SetSource(path) == 0 && Player.Play() == 0;
+    }
+    // APK PlayMixcloudAndSoundcloudService uses independent audio and looping
+    // background-video players. Only the background decoder feeds TV/preview.
+    public bool PlayCloudAudio(string stream)
+    {
+        if(!Uri.TryCreate(stream,UriKind.Absolute,out var uri)||uri.Scheme is not ("https" or "http" or "file")||uri.IsFile&&!File.Exists(uri.LocalPath))return false;
+        StartIdleDemo();videoDecoder.SetOutputVolumeStep(0);playingIdle=false;
+        audioDecoder=new WindowsVideoDecoder(Dispatcher.CurrentDispatcher,disableVideo:true) { PreserveStereo=true };
+        audioPlayer=new OriginalVideoPlayer(audioDecoder,_=> { });audioDecoder.Original=audioPlayer;
+        audioDecoder.Started=()=>Television.Overlay.SetLoading();ConfigureCloudDecoder?.Invoke(audioDecoder);
+        audioDecoder.SetOutputVolumeStep(songVolumeStep);
+        audioDecoder.ConfirmedPause=paused=> { bottom.SetConfirmedPlaybackState(paused,false);Television.Overlay.SetPaused(paused); };
+        audioPlayer.Completed+=()=>Dispatcher.CurrentDispatcher.BeginInvoke(()=> { if(audioPlayer is not null&&CommandOverride?.Invoke("decoder_completed")!=true)NextRequested?.Invoke(); });
+        audioPlayer.Failed+=_=>Dispatcher.CurrentDispatcher.BeginInvoke(()=> { if(audioPlayer?.State==OriginalVideoState.Errors)CommandOverride?.Invoke("decoder_failed"); });
+        CurrentMedia=null;IdleSongId=null;Source=PlaybackSource.YouTube;CurrentFlowId="";SourceChanged?.Invoke(Source);
+        Player.SetTrackInfo(0,1);Player.SetVolume(1);Television.Overlay.SetLoading("Đang tải âm thanh…");
+        return Player.SetSource(uri.AbsoluteUri)==0&&Player.Play()==0;
+    }
+    private void StopCloudAudio()
+    {
+        var old=audioDecoder;audioPlayer=null;audioDecoder=null;old?.Dispose();
     }
     public void Command(string command)
     {
@@ -476,9 +510,9 @@ public sealed class NativePlayback : IDisposable
     }
     public void SaveVideoFrame(string path)
     {
-        var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(Decoder.VideoSurface));
+        var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(videoDecoder.VideoSurface));
         using var file=File.Create(path);encoder.Save(file);
     }
-    public void Dispose() { Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); Decoder.Dispose(); }
+    public void Dispose() { Television.Overlay.Stop();Television.Detach(); Television.ClosePermanently(); StopCloudAudio();videoDecoder.Dispose(); }
     private sealed record PlaybackPreferences(int Volume,string IdleVideoPath="");
 }

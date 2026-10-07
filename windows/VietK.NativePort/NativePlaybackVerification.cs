@@ -43,6 +43,7 @@ public static class NativePlaybackVerification
                 await VerifyAudioFile(Path.Combine(fixtures,"multiple.ts"),true);
                 await VerifyAudioFile(Path.Combine(fixtures,"audio-ends-early.ts"),false);
                 await NativeMusicPipelineVerification.Run(playback,root,fixtures,output);
+                await NativeCloudPlaybackVerification.Run(playback,fixtures,output);
                 played=0;
                 var idlePreviewBefore=playback.DecodedPreviewFrames;
                 Require(playback.StartIdleDemo(),"Bundled original idle background unavailable");

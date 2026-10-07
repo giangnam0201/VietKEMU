@@ -19,6 +19,9 @@ public sealed class TelevisionOverlay
     public Canvas Canvas { get; }=new() { Width=1280,Height=720,IsHitTestVisible=false };
     public TelevisionBarrage Barrage { get; }=new();
     public TelevisionQr Qr { get; }=new();
+    private readonly TextBlock loading=new() { Width=1000,Height=54,TextAlignment=TextAlignment.Center,FontSize=24,Foreground=Brushes.White,Background=new SolidColorBrush(Color.FromArgb(180,20,12,35)),Visibility=Visibility.Collapsed };
+    public bool LoadingVisible=>loading.Visibility==Visibility.Visible;
+    public void SetLoading(string text="") { loading.Text=text;loading.Visibility=text.Length==0?Visibility.Collapsed:Visibility.Visible; }
     private readonly string root;
     private readonly TvOsdContract contract;
     private readonly Image control,pause,mute;
@@ -57,7 +60,7 @@ public sealed class TelevisionOverlay
         contract=JsonSerializer.Deserialize<TvOsdContract>(File.ReadAllText(Path.Combine(root,"player","osd.json")),
             new JsonSerializerOptions { PropertyNameCaseInsensitive=true })??throw new InvalidDataException("Missing original TV OSD contract");
         var logo=new Image { Source=Bitmap("top-logo.png"),Width=135,Height=64,Stretch=Stretch.Uniform };
-        Put(logo,20,10);
+        Put(logo,20,10);Put(loading,140,625);
         var strip=new Canvas { Width=1060,Height=54,ClipToBounds=true };
         marqueeTrain.RenderTransform=marqueeShift;strip.Children.Add(marqueeTrain);Put(strip,200,10);
         control=new Image { Width=contract.ControlWidth,Height=contract.ControlHeight,Visibility=Visibility.Collapsed };

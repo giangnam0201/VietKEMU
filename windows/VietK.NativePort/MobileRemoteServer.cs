@@ -52,7 +52,7 @@ public sealed class MobileRemoteServer : IDisposable
             context.Response.Headers.CacheControl="no-store";
             context.Response.Headers["Referrer-Policy"]="no-referrer";
             context.Response.Headers["X-Content-Type-Options"]="nosniff";
-            context.Response.Headers["Content-Security-Policy"]="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://i.ytimg.com https://img.youtube.com; frame-ancestors 'none'";
+            context.Response.Headers["Content-Security-Policy"]="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' https://i.ytimg.com https://img.youtube.com https://*.sndcdn.com https://thumbnailer.mixcloud.com; frame-ancestors 'none'";
             if(context.Request.Path.StartsWithSegments("/api"))
             {
                 var authorization=context.Request.Headers.Authorization.ToString();
@@ -135,10 +135,12 @@ public sealed class MobileRemoteServer : IDisposable
         {
             var query=context.Request.Query["q"].ToString().Trim();
             if(query.Length is <1 or >200)throw new ArgumentException();
+            var provider=context.Request.Query["provider"].ToString();if(provider.Length==0)provider="YouTube";
+            if(provider is not ("YouTube" or "SoundCloud" or "Mixcloud"))throw new ArgumentException();
             if(!await searchGate.WaitAsync(0,context.RequestAborted)) { context.Response.StatusCode=429;return; }
             try
             {
-                var pending=await Ui(()=>SearchFixture?.Invoke(query,context.RequestAborted)??music.RemoteSearch(query,context.RequestAborted));
+                var pending=await Ui(()=>SearchFixture?.Invoke(query,context.RequestAborted)??music.RemoteSearch(query,context.RequestAborted,provider));
                 var items=await pending;
                 lock(found) { if(found.Count>1000)found.Clear();foreach(var item in items)found[item.Id]=item; }
                 await context.Response.WriteAsJsonAsync(items);

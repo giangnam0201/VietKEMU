@@ -206,6 +206,8 @@ public static class Program
             {
                 singerNavigation?.Clear();
                 var panel = screen switch { 34 when youtube is not null => youtube.Create(),
+                    35 when youtube is not null => youtube.Create(source:"Mixcloud"),
+                    36 when youtube is not null => youtube.Create(source:"SoundCloud"),
                     38 => more.Create(), 14 => collectionScreen.Create(), 1=>singerDirectory.Create(),2 => browser.Create(), _ => renderer.Create() };
                 TextElement.SetFontFamily(panel, OriginalFont.Family);
                 var bar = bottom.Create();
@@ -614,7 +616,7 @@ public static class Program
             };
             renderer.NavigationRequested += fragment =>
             {
-                if (fragment is 1 or 38 or 2 or 34) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment==2?34:fragment) };
+                if (fragment is 1 or 38 or 2 or 34 or 35 or 36) window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel(fragment==2?34:fragment) };
             };
             more.HomeRequested += () => window.Content = new Viewbox { Stretch = Stretch.Uniform, Child = Panel() };
             more.NavigationRequested+=fragment=> { if(fragment==14)window.Content=new Viewbox { Stretch=Stretch.Uniform,Child=Panel(14) }; };
