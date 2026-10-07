@@ -91,3 +91,10 @@ timestamps are inconsistent, so the experimental note conversion is not added
 to the playback path. Opaque commands, timing, guide width selection and
 instrument fidelity remain outstanding. No manufacturer library is required
 by the independent block reader.
+
+The [Windows test release](https://github.com/giangnam0201/VietKEMU/releases/tag/arirang-midi-test-37579116484)
+passed [GitHub run 37579116484](https://github.com/giangnam0201/VietKEMU/actions/runs/37579116484).
+The downloaded verification report confirms nine/six music blocks, all 13
+channel streams reassembled and all channels reaching end-of-track. Notes,
+timing and playback remain marked false. Standard MIDI player and two-window
+checks also passed. Only the small verification ZIP was downloaded locally.
