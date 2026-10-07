@@ -98,3 +98,37 @@ The downloaded verification report confirms nine/six music blocks, all 13
 channel streams reassembled and all channels reaching end-of-track. Notes,
 timing and playback remain marked false. Standard MIDI player and two-window
 checks also passed. Only the small verification ZIP was downloaded locally.
+
+## Legacy timing and pitch-width experiments
+
+The initial command experiment produced three implausible 17,605-tick delays
+in device 30655, channel 4. Each arose at a repeated sequence where a `C0`
+note-off was followed by `C4 C5 C6`. The newer reference's signed-byte time
+rule consumed `C4 C5` as one delay, losing another note-off command.
+
+A legacy candidate instead reads `80..BF` as a two-byte delay prefix and
+`C0..FF` as whole-byte delays. With unchanged channel bytes and pitch width,
+the end moves from 55,204 to 2,977 ticks, close to the bass/percussion experiment
+at 2,987/2,999 ticks. This is evidence for a format difference, not yet proof
+of accurate timing; do not replace the player clock or the general MIDI parser
+with this hypothesis. The original MIDI attachment inspected as another
+possible comparison has 22 tracks and lacks verified correspondence to either
+Happy Birthday record, so it is not used as a timing oracle.
+
+The descriptor's first byte also cannot simply select pitch width everywhere.
+For device 30655, channel 6, using four bits gives 5,611 ticks and pitch range
+37..52; six bits gives 2,993 ticks and range 37..73. The guide melody requires
+five bits, while the other arrangement requires four to retain its octave
+leaps. These observed differences require locating the actual width-selection
+rule, not choosing widths merely to make durations match. Candidate note
+events, width sweeps and original compact streams remain private and are not
+offered as finished disc playback.
+
+Two additional public Volume 40 companion-file prefixes were inspected with
+64-KiB range reads each: `MASECOF3.BIN` (8,649,868 declared bytes) and
+`MASECOR5.DAT` (1,572,864 bytes). Neither prefix has ELF or SMF magic.
+`MASECOF3.BIN` contains `Multak MID10` at byte 2,000, followed by a
+`multak3.2006-7-13` identifier and structured header fields. This identifies
+another original structured resource for inspection; its name or signature
+does not establish that it contains executable decoder code. No downloaded
+companion data is executed, committed or packaged.
