@@ -13,6 +13,8 @@ subprocess.run(['ffmpeg', '-v', 'error', '-y', *video,
     '-f', 'lavfi', '-i', 'aevalsrc=0.2*sin(2*PI*440*t)|0.2*sin(2*PI*880*t):s=48000:d=20',
     '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '24',
     '-c:a', 'pcm_s16le', str(output / 'stereo.mkv')], check=True)
+subprocess.run(['ffmpeg','-v','error','-y','-i',str(output/'stereo.mkv'),
+    '-c:v','copy','-c:a','aac',str(output/'usb-idle.mp4')],check=True)
 subprocess.run(['ffmpeg', '-v', 'error', '-y', *video,
     '-f', 'lavfi', '-i', 'sine=frequency=480:sample_rate=48000:duration=20',
     '-f', 'lavfi', '-i', 'sine=frequency=1200:sample_rate=48000:duration=20',

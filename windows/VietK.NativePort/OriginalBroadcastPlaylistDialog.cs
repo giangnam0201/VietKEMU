@@ -15,6 +15,7 @@ public sealed class OriginalBroadcastPlaylistDialog
     public Canvas Overlay { get; }=BroadcastDialogUi.Overlay();
     internal IReadOnlyList<LocalSong> Draft=>songs;
     internal OriginalBroadcastAddDialog? AddDialog { get; private set; }
+    internal OriginalUsbBroadcastDialog? UsbDialog { get; private set; }
     private readonly Canvas host,content=new() { Width=680,Height=538 };
     private readonly NativePlayback playback;
     private readonly Func<int,LocalSong?> lookup;
@@ -69,10 +70,22 @@ public sealed class OriginalBroadcastPlaylistDialog
     private void Refresh()
     {
         usb.IsChecked=usbMode;local.IsChecked=!usbMode;add.Visibility=usbMode?Visibility.Collapsed:Visibility.Visible;
-        rows.Children.Clear();headers.Visibility=list.Visibility=usbMode||songs.Count==0?Visibility.Collapsed:Visibility.Visible;
+        var usbVideo=playback.UsbIdleVideo;
+        rows.Children.Clear();headers.Visibility=list.Visibility=(usbMode?usbVideo is null:songs.Count==0)?Visibility.Collapsed:Visibility.Visible;
         hint.Visibility=!usbMode&&songs.Count==0?Visibility.Visible:Visibility.Collapsed;
-        setupVideo.Visibility=usbMode?Visibility.Visible:Visibility.Collapsed;
-        if(usbMode)return;
+        setupVideo.Visibility=usbMode&&usbVideo is null?Visibility.Visible:Visibility.Collapsed;
+        if(usbMode)
+        {
+            if(usbVideo is not null)
+            {
+                var row=new Canvas { Width=600,Height=60,Background=Brushes.Transparent,Tag="broadcast:usb-row" };
+                BroadcastDialogUi.Put(row,BroadcastDialogUi.Label("Demo.mp4",175,60,18),10,0);
+                BroadcastDialogUi.Put(row,BroadcastDialogUi.Label("USB",137,60,18),332,0);
+                BroadcastDialogUi.Put(row,BroadcastDialogUi.Icon("ic_delete",50,60,()=>UsbDialog=new(host,()=>Task.FromResult(playback.DeleteUsbIdleVideo()),Refresh,deleting:true),"broadcast:usb-delete"),519,0);
+                rows.Children.Add(row);
+            }
+            return;
+        }
         for(var index=0;index<songs.Count;index++)
         {
             var position=index;var song=songs[index];var row=new Canvas { Width=600,Height=60,Background=Brushes.Transparent,Tag="broadcast:row:"+index };
@@ -88,10 +101,15 @@ public sealed class OriginalBroadcastPlaylistDialog
     }
     private void ChooseVideo()
     {
+        // The original searches the roots of mounted USB drives for Demo.mp4.
+        var removable=DriveInfo.GetDrives().Where(d=>d.DriveType==DriveType.Removable&&d.IsReady)
+            .Select(d=>Path.Combine(d.RootDirectory.FullName,"Demo.mp4")).LastOrDefault(File.Exists);
+        if(removable is not null) { ChooseVideoFromPath(removable);return; }
         var file=new Microsoft.Win32.OpenFileDialog { Title="Chọn Demo.mp4",Filter="MP4 video|*.mp4",CheckFileExists=true };
         if(file.ShowDialog()!=true)return;
-        playback.SetIdleVideo(file.FileName);Refresh();
+        ChooseVideoFromPath(file.FileName);
     }
+    internal void ChooseVideoFromPath(string path)=>UsbDialog=new(host,()=>playback.ImportUsbIdleVideo(path),()=> { usbMode=true;Refresh(); });
     internal void OpenAdd()
     {
         host.Children.Remove(Overlay);

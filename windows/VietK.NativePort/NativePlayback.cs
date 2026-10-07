@@ -279,13 +279,15 @@ public sealed class NativePlayback : IDisposable
     public Func<int,NativeIdleSong?>? ResolveIdleSong { get; set; }
     public Func<int,bool>? IdleSongExists { get; set; }
     public int? IdleSongId { get; private set; }
-    public string? UsbIdleVideo=>new[] { idleVideoPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4") }.FirstOrDefault(File.Exists);
+    internal OriginalUsbBroadcastStore UsbBroadcast { get; }
+    public string? UsbIdleVideo=>new[] { idleVideoPath,UsbBroadcast.DestinationPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4") }.FirstOrDefault(File.Exists);
     public OriginalMarqueeSettings MarqueeSettings { get; }
     public void SetLocalMarquee(string text) { MarqueeSettings.SaveLocal(text);Television.Overlay.RefreshAdvertisement(); }
     public NativePlayback(BottomBar bottom, string stateDirectory)
     {
         this.bottom = bottom;
         stateFile = Path.Combine(stateDirectory, "playback-state.json");
+        UsbBroadcast=new(stateDirectory);
         DefaultVolumeSettings=new OriginalDefaultVolumeSettings(stateDirectory);
         BroadcastVolumeSettings=new OriginalBroadcastVolumeSettings(stateDirectory);
         IdlePlaylist=new OriginalBroadcastPlaylist(stateDirectory);
@@ -334,7 +336,7 @@ public sealed class NativePlayback : IDisposable
     {
         // BroadcastListManager / USBSetBroadcastDialog: Demo.mp4 is a separate
         // idle broadcast, not the APK's grade_video.mp4 scoring animation.
-        var paths=new[] { idleVideoPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
+        var paths=new[] { idleVideoPath,UsbBroadcast.DestinationPath,Path.Combine(Path.GetDirectoryName(stateFile)!,"Demo.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Demo.mp4"),
             Path.Combine(AppContext.BaseDirectory,"Original","player","Demo.mp4"),
             Path.Combine(Path.GetDirectoryName(stateFile)!,"60003950.mp4"),
@@ -344,7 +346,7 @@ public sealed class NativePlayback : IDisposable
         NativeIdleSong? idleSong=null;
         if(!advance&&Source==PlaybackSource.Idle&&IdleVideoSource is { } replay&&File.Exists(replay))
             idleSong=CurrentMedia is { } current?new(replay,current):null;
-        else if(!paths.Take(4).Any(File.Exists)&&ResolveIdleSong is not null)
+        else if(!paths.Take(5).Any(File.Exists)&&ResolveIdleSong is not null)
             idleSong=IdlePlaylist.Next(id=> { var candidate=ResolveIdleSong(id);return candidate is not null&&File.Exists(candidate.Path)?candidate:null; },IdleSongExists);
         var demo=!advance&&Source==PlaybackSource.Idle&&IdleVideoSource is { } existing&&File.Exists(existing)?existing:idleSong?.Path??paths.FirstOrDefault(File.Exists);
         if(!playingIdle&&Source!=PlaybackSource.Idle)songVolumeStep=Decoder.OutputVolumeStep;
@@ -371,8 +373,31 @@ public sealed class NativePlayback : IDisposable
         idleVideoPath=Path.GetFullPath(path);SavePreferences();
         if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();
     }
+    internal async Task<bool> ImportUsbIdleVideo(string source)
+    {
+        var wasIdle=playingIdle;
+        var copied=await UsbBroadcast.ImportAsync(source,()=>
+        {
+            if(playingIdle&&string.Equals(IdleVideoSource,UsbBroadcast.DestinationPath,StringComparison.OrdinalIgnoreCase))Player.Stop();
+        });
+        if(copied)SetIdleVideo(UsbBroadcast.DestinationPath);
+        else if(wasIdle&&Player.State==OriginalVideoState.Stopped)StartIdleDemo();
+        return copied;
+    }
+    internal bool DeleteUsbIdleVideo()
+    {
+        var wasIdle=playingIdle;
+        if(playingIdle&&string.Equals(IdleVideoSource,UsbBroadcast.DestinationPath,StringComparison.OrdinalIgnoreCase))Player.Stop();
+        if(!UsbBroadcast.Delete()) { if(wasIdle)StartIdleDemo();return false; }
+        idleVideoPath="";SavePreferences();if(wasIdle)StartIdleDemo();return true;
+    }
     public void UseFactoryIdleVideo()
     {
+        if(File.Exists(UsbBroadcast.DestinationPath))
+        {
+            if(playingIdle&&string.Equals(IdleVideoSource,UsbBroadcast.DestinationPath,StringComparison.OrdinalIgnoreCase))Player.Stop();
+            if(!UsbBroadcast.Delete())throw new IOException("Không thể xoá video chờ đã nhập.");
+        }
         IdlePlaylist.Import("{\"play_list\":[]}");
         idleVideoPath="";SavePreferences();
         if(playingIdle || Player.State is OriginalVideoState.Idle or OriginalVideoState.Stopped)StartIdleDemo();

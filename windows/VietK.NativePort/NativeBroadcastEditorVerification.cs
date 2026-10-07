@@ -66,12 +66,33 @@ internal static class NativeBroadcastEditorVerification
             Outside(add.Overlay);Require(!panel.Children.Contains(add.Overlay)&&!panel.Children.Contains(dialog.Overlay)&&playback.IdlePlaylist.Entries.Count==5,"Outside add dismissal committed or returned to a dismissed parent");
             playback.ImportIdlePlaylist("{\"play_list\":[]}",restartIdle:false);dialog=Open();host.UpdateLayout();Capture(host,panel,output,"synthetic-broadcast-editor-empty.png");Outside(dialog.Overlay);
             Require(!panel.Children.Contains(dialog.Overlay)&&playback.IdlePlaylist.Entries.Count==0,"Outside parent dismissal saved or retained UI");
+            var removable=Path.Combine(folder,"removable","Demo.mp4");Directory.CreateDirectory(Path.GetDirectoryName(removable)!);
+            File.Copy(Path.Combine(fixtures,"usb-idle.mp4"),removable);dialog=Open();dialog.ChooseVideoFromPath(removable);host.UpdateLayout();
+            Capture(host,panel,output,"synthetic-broadcast-usb-confirm.png");
+            Click(dialog.UsbDialog!.Overlay,"broadcast-usb:cancel");
+            Require(!File.Exists(playback.UsbBroadcast.DestinationPath),"Cancelling USB confirmation copied video");
+            dialog.ChooseVideoFromPath(removable);var usb=dialog.UsbDialog!;await usb.Confirm();host.UpdateLayout();
+            Require(usb.Result==true&&File.Exists(playback.UsbBroadcast.DestinationPath)&&playback.UsbIdleVideo==playback.UsbBroadcast.DestinationPath,"USB import did not publish managed copy");
+            Capture(host,panel,output,"synthetic-broadcast-usb-success.png");await usb.Confirm();host.UpdateLayout();
+            Require(!panel.Children.Contains(usb.Overlay),"Second confirmation did not close USB result");
+            File.Delete(removable);timer.Restart();var frames=playback.DecodedPreviewFrames;
+            while(playback.DecodedPreviewFrames<frames+3) { if(timer.ElapsedMilliseconds>12000)throw new InvalidDataException("Imported USB video stopped after source removal");await Task.Delay(30); }
+            Require(playback.Player.Source==playback.UsbBroadcast.DestinationPath,"Imported video still played the removable path");
+            Capture(host,panel,output,"synthetic-broadcast-usb-row.png");Click(dialog.Overlay,"broadcast:usb-delete");host.UpdateLayout();
+            Capture(host,panel,output,"synthetic-broadcast-usb-delete.png");Click(dialog.UsbDialog!.Overlay,"broadcast-usb:cancel");
+            Require(File.Exists(playback.UsbBroadcast.DestinationPath),"Cancelled delete removed imported video");
+            Click(dialog.Overlay,"broadcast:usb-delete");await dialog.UsbDialog!.Confirm();host.UpdateLayout();
+            Require(!File.Exists(playback.UsbBroadcast.DestinationPath),"Confirmed delete retained imported video");
+            dialog.ChooseVideoFromPath(removable);await dialog.UsbDialog!.Confirm();host.UpdateLayout();
+            Require(dialog.UsbDialog.Result==false,"Missing USB source did not show failure");
+            Capture(host,panel,output,"synthetic-broadcast-usb-failure.png");await dialog.UsbDialog.Confirm();dialog.Close();
             File.WriteAllText(Path.Combine(output,"broadcast-editor-verification.json"),JsonSerializer.Serialize(new {
                 originalLocalGeometry=true,topAndDeleteStageOnly=true,cancelDiscardsDraft=true,freshAddDraft=true,blankClickRankCacheOrderAndSelection=true,
                 realUiSearchAndScrollPagination=true,partialFilteredPageStillPaginates=true,searchSelectionRetainsInput=true,addDeleteAndBack=true,
                 duplicateSelectionPreserved=true,addConfirmationStagesParent=true,parentConfirmationPersistsOriginalFormat=true,
                 nonlocalSongRoutesToOriginalOrder=true,savingDoesNotInterruptIdlePlayback=true,outsideDismissalDiscards=true,
-                emptyListHint=true,createAndConfirmLabelsFit=true,usbFileChooserAdapted=true,originalUsbCopyDeleteDialogPorted=false,linkedCloudEditorPorted=false,
+                emptyListHint=true,createAndConfirmLabelsFit=true,usbFileChooserAdapted=true,originalUsbCopyDeleteDialogPorted=true,
+                usbCancelPreservesFile=true,usbRemovalKeepsDecodedPreview=true,usbCopyFailureShown=true,linkedCloudEditorPorted=false,
                 originalHintArtworkPresent=File.Exists(Path.Combine(OriginalSupplement.Root,"ambience","settings","dialog_public_play_hint_icon.png"))
             },new JsonSerializerOptions { WriteIndented=true }));
         }

@@ -717,6 +717,7 @@ BroadcastPlaylistChecks.Run();
 BroadcastSearchChecks.Run();
 BroadcastControlChecks.Run();
 BroadcastRankCacheChecks.Run();
+await UsbBroadcastChecks.Run();
 MarqueeSettingsChecks.Run();
 RealTransportChecks.Run().GetAwaiter().GetResult();
 TransferConnectionChecks.Run().GetAwaiter().GetResult();
