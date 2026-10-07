@@ -388,3 +388,19 @@ unverified. Its bank therefore is not a verified original Arirang instrument set
 The resource and decoded bytes remain private research files. They are not
 included in source, release artifacts or the app. Windows MIDI remains the
 current output; the candidate bank does not change playback behavior yet.
+
+The independent `tools/arirang_wavebank_research.py` inspector now accepts a
+caller-supplied wrapped bank or decoded payload. It reads the melodic directory
+at `0x1D0`, its 128 program pointers starting at word 17, bank-selection pairs
+terminated by `0xFFFF`, and six-byte note/velocity region entries terminated by
+the upper bound's high bit. Bank-relative word pointers are checked against the
+4 MiB payload, and directory/region scans have explicit bounds. It publishes
+counts and verification flags only, never decoded samples or instrument data.
+
+The private candidate produced 154 bank selections, 790 regions and 790 distinct
+voice pointers, with all ranges/pointers accepted. Five independent synthetic
+checks cover a known byte permutation/mask, its round trip, shared voice pointers,
+invalid note ranges, out-of-bounds banks and malformed sizes. A separate small
+GitHub job checks these fixtures without downloading proprietary sound resources
+or rebuilding an unchanged Windows app. Percussion tables and voice descriptors
+(including loops and envelopes) remain separate research work.
