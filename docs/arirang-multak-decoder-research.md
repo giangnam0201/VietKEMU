@@ -369,3 +369,22 @@ entries, selected song 50001's 14,336-byte record, 5,426 note events, 1,194 lyri
 glyphs and its original font, with less than two MiB transferred. It separately
 checks that reading the selected song again adds no transfer. This is source
 and decode verification, not an original-device audio/timing measurement.
+
+## Candidate instrument-bank investigation
+
+Static inspection of the Multak phone player found a separate 4,198,400-byte
+wavetable resource. Its loader skips a 4,096-byte wrapper and processes the
+remaining 4 MiB in 512-byte blocks before synthesis. An independent local
+implementation of the observed byte permutation and XOR transform round-trips
+the complete payload exactly. No manufacturer code was executed.
+
+The synthesis code references the resulting bank for instrument-region lookup
+and sample reads. This gives a concrete starting point for researching a native
+instrument renderer, but neither the sample tables, envelopes and loop rules nor
+audible output have been fully implemented or verified. The mirrored phone
+package's signing identity and equivalence to legacy Arirang hardware remain
+unverified. Its bank therefore is not a verified original Arirang instrument set.
+
+The resource and decoded bytes remain private research files. They are not
+included in source, release artifacts or the app. Windows MIDI remains the
+current output; the candidate bank does not change playback behavior yet.
