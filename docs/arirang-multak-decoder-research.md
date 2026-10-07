@@ -53,11 +53,10 @@ Static observations, not yet validated as a complete disc decoder:
   uses two 12-bit values packed in three bytes; another uses a seven-bit
   identifier and nine-bit offset. Treating these bytes as ordinary note data
   would corrupt subsequent parsing.
-- This library initializes an internal channel descriptor layout that differs
-  from the seven-byte descriptors currently observed on Volume 40. Establish
-  the transformation and block addressing before applying its expansion
-  rules to original records. Do not infer compatibility merely from function
-  names or make the unknown header field into a tempo.
+- The apparent difference in channel descriptors was subsequently traced to
+  the independent reader starting one byte early (see the correction below).
+  Do not infer full compatibility merely from function names or make the
+  unknown header field into a tempo.
 
 Next validation should reconstruct the bounded block reader and expand the
 two complete original Happy Birthday arrangements (device codes 30655 and
@@ -101,6 +100,9 @@ checks also passed. Only the small verification ZIP was downloaded locally.
 
 ## Legacy timing and pitch-width experiments
 
+These earlier timing/width hypotheses are superseded by the corrected channel
+descriptor below. They are retained to explain why they must not be applied.
+
 The initial command experiment produced three implausible 17,605-tick delays
 in device 30655, channel 4. Each arose at a repeated sequence where a `C0`
 note-off was followed by `C4 C5 C6`. The newer reference's signed-byte time
@@ -132,3 +134,35 @@ Two additional public Volume 40 companion-file prefixes were inspected with
 another original structured resource for inspection; its name or signature
 does not establish that it contains executable decoder code. No downloaded
 companion data is executed, committed or packaged.
+
+## Channel descriptor correction and independent note expansion
+
+Tracing the reference's title-terminator loop established that the channel
+table begins at `titleEnd + 9`, not `titleEnd + 8`. The extra byte is outside
+the table. Each seven-byte descriptor contains channel, an unclassified
+format byte, a three-byte relative offset, base pitch and pitch width. Starting
+one byte early associated the preceding channel's pitch width with the next
+channel and omitted the final channel's width. Channel numbers, offsets and
+base pitches happened to remain at the correctly interpreted byte locations.
+
+The corrected Volume 40 pitch widths are `5,5,4,6,6` for device 30655 and
+`4,4,5,5,4,4,5,5` for device 32153. No inferred guide width or duration-based
+width choice is now needed. With those header values, the original reference's
+15-bit two-byte delay rule works across both complete records; the proposed
+`C0..FF` whole-byte delay exception is not used. The high-note retention
+experiment likewise did not repair the header problem and is not used.
+
+`MultakCompactNotes` independently expands bounded channel streams into note,
+controller, program, pressure and pitch-bend events with ticks. It preserves
+opaque commands rather than inventing their interpretation. Four recent
+pitches supply compact note-offs; percussion emits an immediate zero-velocity
+release. Exact synthetic checks cover controller/program handling, pitch,
+velocity, embedded delays, recent note-offs, percussion, two-byte time and
+malformed input. Complete original-record checks compare 1,692/1,001 expanded
+events, known opening melody pitches including octave leaps, and end ticks
+3,005/2,073 against independent byte expansion.
+
+Ticks are not yet verified wall-clock time. Tempo commands, lyric timing,
+instrument fidelity and audible original playback remain unfinished. The ISO
+inspection can report recovered event counts and header pitch widths but does
+not offer them as finished original song playback.

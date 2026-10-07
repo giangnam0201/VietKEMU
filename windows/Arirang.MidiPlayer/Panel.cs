@@ -214,10 +214,14 @@ internal sealed class Panel : Window
                         {
                             try
                             {
-                                var layout = await Task.Run(() => MultakSongLayout.Parse(table.ReadSongRecordIso(picker.FileName, inventory, sample.DeviceCode)));
+                                var raw = await Task.Run(() => table.ReadSongRecordIso(picker.FileName, inventory, sample.DeviceCode));
+                                var layout = MultakSongLayout.Parse(raw);
                                 musicIndex += $"\n\nBản ghi mẫu {sample.DeviceCode}: {layout.Tracks.Count} luồng kênh, " +
                                     $"vị trí nhạc {layout.MusicOffset:N0} byte.\nKênh: " + string.Join(", ", layout.Tracks.Select(t => t.Channel + 1)) +
-                                    "\nĐã đọc cấu trúc gốc; nốt nhạc và thời gian chưa được giải mã.";
+                                    "\nSố bit cao độ: " + string.Join(", ", layout.Tracks.Select(t => t.PitchBits));
+                                var expanded = await Task.Run(() => MultakSongStreams.Parse(raw).Channels.Select(MultakCompactNotes.Parse).ToArray());
+                                musicIndex += $"\nĐã đọc {expanded.Sum(n => n.Events.Count):N0} sự kiện nhạc; " +
+                                    "thời gian phát, lời và âm sắc gốc vẫn cần xác minh.";
                             }
                             catch (InvalidDataException error) { musicIndex += "\n\nCấu trúc bản ghi mẫu: " + error.Message; }
                         }

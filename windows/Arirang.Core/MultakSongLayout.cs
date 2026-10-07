@@ -2,8 +2,8 @@ using System.Buffers.Binary;
 
 namespace Arirang.Core;
 
-public sealed record MultakTrackLayout(byte Flags, byte Channel, byte UnknownFormat,
-    int RelativeOffset, byte UnknownValue);
+public sealed record MultakTrackLayout(byte PitchBits, byte Channel, byte UnknownFormat,
+    int RelativeOffset, byte BasePitch);
 
 // Structural decoding only: never treat these byte streams as Standard MIDI.
 public sealed record MultakSongLayout(byte[] TitleBytes, int MusicOffset,
@@ -27,7 +27,7 @@ public sealed record MultakSongLayout(byte[] TitleBytes, int MusicOffset,
         if (title.Any(value => value < 32)) throw new InvalidDataException("Invalid MULTAK title bytes.");
         if (titleEnd > raw.Length - 8) throw new InvalidDataException("Truncated MULTAK track header.");
         int trackCount = raw[titleEnd + 7] ^ mask;
-        int tableStart = titleEnd + 8;
+        int tableStart = titleEnd + 9;
         if (trackCount is < 1 or > 16 || tableStart > raw.Length - trackCount * 7)
             throw new InvalidDataException("Invalid MULTAK channel table.");
         if (Decode24(raw, titleEnd + 1, mask) != 16 + trackCount * 7)
@@ -41,12 +41,13 @@ public sealed record MultakSongLayout(byte[] TitleBytes, int MusicOffset,
         for (int i = 0; i < trackCount; i++)
         {
             int at = tableStart + i * 7;
-            byte flags = (byte)(raw[at] ^ mask), channel = (byte)(raw[at + 1] ^ mask);
-            int offset = Decode24(raw, at + 3, mask);
-            if (channel > 15 || !channels.Add(channel) || offset >= raw.Length - music ||
+            byte channel = (byte)(raw[at] ^ mask), pitchBits = (byte)(raw[at + 6] ^ mask);
+            byte basePitch = (byte)(raw[at + 5] ^ mask);
+            int offset = Decode24(raw, at + 2, mask);
+            if (channel > 15 || pitchBits is < 2 or > 8 || basePitch > 127 || !channels.Add(channel) || offset >= raw.Length - music ||
                 (i == 0 ? offset != 0 : offset <= tracks[^1].RelativeOffset))
                 throw new InvalidDataException("Invalid MULTAK track channel or music extent.");
-            tracks.Add(new(flags, channel, (byte)(raw[at + 2] ^ mask), offset, (byte)(raw[at + 6] ^ mask)));
+            tracks.Add(new(pitchBits, channel, (byte)(raw[at + 1] ^ mask), offset, basePitch));
         }
         return new(title, (int)music, BinaryPrimitives.ReadUInt32LittleEndian(raw.Slice(34, 4)),
             Decode24(raw, titleEnd + 4, mask), tracks);

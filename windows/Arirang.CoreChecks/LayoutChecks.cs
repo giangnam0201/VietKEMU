@@ -10,17 +10,19 @@ internal static class LayoutChecks
         raw[2] = 0x4f; raw[3] = 0x4b; raw[38] = mask;
         "TEST/\0"u8.CopyTo(raw.AsSpan(42));
         for (int i = 42; i < 48; i++) raw[i] ^= mask;
-        byte[] metadata = [0, 0, 23, 0, 0, 17, 1, 4, 0, 1, 0, 0, 0, 60];
+        byte[] metadata = [0, 0, 23, 0, 0, 17, 1, 0, 0, 1, 0, 0, 0, 60, 4];
         for (int i = 0; i < metadata.Length; i++) raw[48 + i] = (byte)(metadata[i] ^ mask);
         raw[98] = (byte)(0x1a ^ mask); raw[99] = (byte)(0xff ^ mask);
         var layout = MultakSongLayout.Parse(raw);
         if (layout.MusicOffset != 100 || layout.Tracks.Count != 1 || layout.Tracks[0].Channel != 0 ||
+            layout.Tracks[0].PitchBits != 4 || layout.Tracks[0].BasePitch != 60 ||
             !layout.TitleBytes.SequenceEqual("TEST/"u8.ToArray())) throw new Exception("MULTAK title, track table and boundary.");
         var badChannel = raw.ToArray(); badChannel[56] = (byte)(16 ^ mask);
         var badLayout = raw.ToArray(); badLayout[50] = (byte)(24 ^ mask);
         var badTrack = raw.ToArray(); badTrack[60] = (byte)(1 ^ mask);
         var badBoundary = raw.ToArray(); badBoundary[98] = mask;
-        foreach (var invalid in new[] { raw[..99], badChannel, badLayout, badTrack, badBoundary })
+        var badWidth = raw.ToArray(); badWidth[62] = mask;
+        foreach (var invalid in new[] { raw[..99], badChannel, badLayout, badTrack, badBoundary, badWidth })
         {
             bool rejected = false;
             try { MultakSongLayout.Parse(invalid); } catch (InvalidDataException) { rejected = true; }
@@ -43,6 +45,26 @@ internal static class LayoutChecks
             bool rejected = false;
             try { MultakSongStreams.Parse(invalid); } catch (InvalidDataException) { rejected = true; }
             if (!rejected) throw new Exception("Invalid MULTAK block references must be rejected.");
+        }
+        byte[] compact = [0, 0x8b, 7, 0xe4, 0x8c, 0x80, 8, 0x99, 0xc4, 0x8f, 0xff, 0x2f];
+        var noteStream = new MultakCompactStream(new(4, 0, 1, 0, 60), compact, 1);
+        var notes = MultakCompactNotes.Parse(noteStream);
+        if (notes.Events.Count != 4 || notes.Events[0] != new MultakNoteEvent(0, 0xb0, 7, 100) ||
+            notes.Events[1] != new MultakNoteEvent(0, 0xc0, 0, null) ||
+            notes.Events[2] != new MultakNoteEvent(0, 0x90, 64, 100) ||
+            notes.Events[3] != new MultakNoteEvent(3, 0x80, 64, 64) || notes.EndTick != 3)
+            throw new Exception("Compact controller, program, packed pitch, velocity, delay and recent-pitch note-off.");
+        var extendedTime = compact.Skip(1).Prepend((byte)0xc5).Prepend((byte)0xc4).ToArray();
+        if (MultakCompactNotes.Parse(noteStream with { Bytes = extendedTime }).Events[0].Tick != 17605)
+            throw new Exception("Compact time preserves the reference's 15-bit two-byte delay.");
+        var drums = MultakCompactNotes.Parse(noteStream with { Track = new(4, 9, 1, 0, 36) });
+        if (!drums.Events.Any(e => e.Status == 0x99 && e.Data1 == 40 && e.Data2 == 0))
+            throw new Exception("Percussion must release the packed note immediately.");
+        foreach (var invalid in new[] { compact[..^1], compact.Concat(new byte[] { 0 }).ToArray(), new byte[] { 0, 0x8b, 255, 128 } })
+        {
+            bool rejected = false;
+            try { MultakCompactNotes.Parse(noteStream with { Bytes = invalid }); } catch (InvalidDataException) { rejected = true; }
+            if (!rejected) throw new Exception("Invalid compact channel data must be rejected.");
         }
         var header = new byte[MultakIndex.TableOffset + 8];
         "multak3.3"u8.CopyTo(header.AsSpan(4));
@@ -83,6 +105,16 @@ internal static class LayoutChecks
             streamsA.Channels.Count != 5 || streamsB.Channels.Count != 8 ||
             streamsA.Channels.Concat(streamsB.Channels).Any(c => !c.Bytes.AsSpan().EndsWith(new byte[] { 0x8f, 0xff, 0x2f })))
             throw new InvalidDataException("Original compact channel reassembly does not match independent block inspection.");
+        var notesA = streamsA.Channels.Select(MultakCompactNotes.Parse).ToArray();
+        var notesB = streamsB.Channels.Select(MultakCompactNotes.Parse).ToArray();
+        byte[] openingA = [80, 80, 82, 80, 85, 84, 80, 80, 82, 80, 87, 85, 80, 80, 92, 89];
+        byte[] openingB = [71, 71, 73, 71, 76, 75, 71, 71, 73, 71, 78, 76, 71, 71, 83, 80];
+        byte[] FirstNotes(MultakCompactNotes channel) => channel.Events.Where(e => (e.Status >> 4) == 9 && e.Data2 > 0)
+            .Take(16).Select(e => e.Data1).ToArray();
+        if (!FirstNotes(notesA[0]).SequenceEqual(openingA) || !FirstNotes(notesB[0]).SequenceEqual(openingB) ||
+            notesA.Sum(n => n.Events.Count) != 1692 || notesB.Sum(n => n.Events.Count) != 1001 ||
+            notesA.Max(n => n.EndTick) != 3005 || notesB.Max(n => n.EndTick) != 2073)
+            throw new InvalidDataException("Original compact notes do not match independent event expansion.");
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         File.WriteAllText(output, JsonSerializer.Serialize(new
         {
@@ -93,7 +125,10 @@ internal static class LayoutChecks
             percussionChannelsLocated = true, trackOffsetsVerified = true,
             firstBlocksRead = streamsA.BlocksRead, secondBlocksRead = streamsB.BlocksRead,
             compactStreamsReassembled = true, allChannelsReachedEndOfTrack = true,
-            notesDecoded = false, timingDecoded = false, playbackVerified = false
+            firstNoteEvents = notesA.Sum(n => n.Events.Count), secondNoteEvents = notesB.Sum(n => n.Events.Count),
+            firstEndTick = notesA.Max(n => n.EndTick), secondEndTick = notesB.Max(n => n.EndTick),
+            pitchWidthsReadFromHeader = true, melodyPrefixesVerified = true,
+            notesDecoded = true, ticksParsed = true, timingDecoded = false, playbackVerified = false
         }, new JsonSerializerOptions { WriteIndented = true }));
     }
 }
